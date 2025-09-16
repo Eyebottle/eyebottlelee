@@ -10,6 +10,11 @@
 - **OneDrive 동기화**: 개인 OneDrive 폴더 자동 백업
 - **시스템 트레이**: 백그라운드 실행 및 상태 모니터링
 
+## 📚 문서
+
+- 개발 가이드: [docs/developing.md](docs/developing.md)
+- 제품 요구사항(PRD): [docs/medical-recording-prd.md](docs/medical-recording-prd.md)
+
 ## 🛠 개발 환경 설정
 
 > 📖 **자세한 설치 가이드**: [INSTALL.md](INSTALL.md) 참고
