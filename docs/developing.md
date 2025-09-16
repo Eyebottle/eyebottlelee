@@ -4,6 +4,7 @@
 
 - 대상: Windows 데스크톱용 Flutter 앱 개발(WSL 파일시스템 + Windows 툴체인)
 - 마지막 갱신: 2025-09-16
+- 참고: [제품 요구사항 PRD](medical-recording-prd.md)
 
 ---
 
@@ -171,4 +172,3 @@ flutter run -d windows
 - 파괴적 변경(파일 삭제 정책/경로 변경 등)은 반드시 문서에 근거 및 롤백 전략 기재
 
 참고: 루트의 `AGENTS.md`는 에이전트/자동화 도구 작업 지침을 정의합니다. 변경 시 함께 갱신하세요.
-
