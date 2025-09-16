@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Auto-load project-local env if present
+if [ -f ./.flutterw.env ]; then
+  # shellcheck disable=SC1091
+  . ./.flutterw.env
+fi
+
+# WSL→Windows Flutter bridge.
+# Usage: ./flutterw <flutter-args>
+# - Runs Windows Flutter (C:\\flutter\\bin\\flutter.bat by default)
+# - Executes in the Windows view of the current WSL directory to avoid UNC issues
+# - Set FLUTTER_WIN_HOME to override Flutter install dir (e.g., C:\\src\\flutter)
+
+FLUTTER_WIN_HOME=${FLUTTER_WIN_HOME:-'C:\\flutter'}
+FLUTTER_BAT="${FLUTTER_WIN_HOME}\\bin\\flutter.bat"
+
+if [ ! -x /mnt/c/Windows/System32/cmd.exe ]; then
+  echo "cmd.exe not found at /mnt/c/Windows/System32. This script requires WSL with Windows drive mounted." >&2
+  exit 1
+fi
+
+# Convert current working directory to Windows path
+WINPWD=$(wslpath -w "${PWD}")
+
+# Optional UNC→drive translation driven by env vars
+# Set these if your project lives in WSL and you mapped it to a Windows path:
+#   FLUTTERW_UNC_PREFIX='\\wsl.localhost\\Ubuntu\\home\\<you>\\project'
+#   FLUTTERW_DRIVE='W:'    or 'W:\\' or 'C:\\wsl\\project'
+if [[ -n "${FLUTTERW_DRIVE:-}" && ( -n "${FLUTTERW_UNIX_PREFIX:-}" || -n "${FLUTTERW_UNC_PREFIX:-}" ) ]]; then
+  # Prefer an explicitly provided UNIX path to avoid wslpath limitations on UNC.
+  UNC_UNIX="${FLUTTERW_UNIX_PREFIX:-}"
+  [[ -z "$UNC_UNIX" ]] && UNC_UNIX=$(wslpath -u "${FLUTTERW_UNC_PREFIX}" 2>/dev/null || true)
+  [[ -n "${FLUTTERW_TRACE:-}" ]] && echo "TRACE pre: PWD=$PWD WINPWD=$WINPWD UNC_UNIX=$UNC_UNIX BASE=$FLUTTERW_DRIVE" || true
+  if [[ -n "$UNC_UNIX" && $PWD == $UNC_UNIX* ]]; then
+    REL=${PWD#"$UNC_UNIX"}
+    [[ -z "$REL" ]] && REL="." || REL=${REL#/}
+    REL_WIN=${REL//\//\\}
+    BASE="$FLUTTERW_DRIVE"
+    case "$BASE" in
+      *:\\) ;;                  # e.g. W:\ already ends with backslash
+      *:)   BASE="${BASE}\\";;  # e.g. W:  → W:\
+    esac
+    if [[ "$REL_WIN" == "." ]]; then
+      WINPWD="$BASE"
+    else
+      if [[ "$BASE" == *\\ ]]; then WINPWD="${BASE}${REL_WIN}"; else WINPWD="${BASE}\\${REL_WIN}"; fi
+    fi
+    [[ -n "${FLUTTERW_TRACE:-}" ]] && echo "TRACE post: WINPWD=$WINPWD REL=$REL REL_WIN=$REL_WIN" || true
+  fi
+fi
+
+# Build a cmd-safe argument string, quoting each arg. Also convert absolute
+# POSIX paths to Windows paths when they point to real files/dirs.
+ARGLINE=""
+for ARG in "$@"; do
+  WINARG="$ARG"
+  if [[ "$ARG" == /* ]] && [ -e "$ARG" ]; then
+    # Best-effort path conversion for file/dir args
+    WINARG=$(wslpath -w "$ARG" 2>/dev/null || echo "$ARG")
+  fi
+  # Quote the argument for cmd context (assumes no embedded quotes)
+  ARGLINE+=" \"${WINARG}\""
+done
+
+# Run via cmd with pushd to ensure working directory is a Windows drive path.
+# Build the command string via printf to avoid fragile nested quoting.
+# Compose the final command string for cmd.exe and run it
+CMDS=$(printf 'pushd "%s" && call "%s"%s' "$WINPWD" "$FLUTTER_BAT" "$ARGLINE")
+if [[ -n "${FLUTTERW_PRINT:-}" ]]; then
+  echo "$CMDS"
+  exit 0
+fi
+/mnt/c/Windows/System32/cmd.exe /c "$CMDS"
