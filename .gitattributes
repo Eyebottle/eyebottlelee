@@ -1,21 +1,10 @@
-# Enforce LF line endings for all text files
 * text=auto eol=lf
 
-# Specific file types
-*.dart text eol=lf
-*.yaml text eol=lf
-*.yml text eol=lf
-*.json text eol=lf
-*.md text eol=lf
-*.txt text eol=lf
-*.sh text eol=lf
+# Keep Windows scripts with CRLF where appropriate
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
 
-# Binary files
-*.png binary
-*.jpg binary
-*.jpeg binary
-*.gif binary
-*.ico binary
-*.pdf binary
-*.zip binary
-*.tar.gz binary
+# Generated Windows runner sources can keep CRLF
+windows/** text eol=crlf
+
