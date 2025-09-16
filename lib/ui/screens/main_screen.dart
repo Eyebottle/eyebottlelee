@@ -1,10 +1,17 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+
+import '../../models/schedule_model.dart';
 import '../../services/audio_service.dart';
 import '../../services/schedule_service.dart';
-import '../../models/schedule_model.dart';
+import '../../services/settings_service.dart';
+import '../../services/tray_service.dart';
 import '../widgets/recording_status_widget.dart';
-import '../widgets/volume_meter_widget.dart';
 import '../widgets/schedule_config_widget.dart';
+import '../widgets/volume_meter_widget.dart';
+import '../widgets/advanced_settings_dialog.dart';
+import 'package:file_selector/file_selector.dart';
+
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -16,6 +23,8 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   final AudioService _audioService = AudioService();
   final ScheduleService _scheduleService = ScheduleService();
+  final SettingsService _settings = SettingsService();
+  final TrayService _trayService = TrayService();
 
   bool _isRecording = false;
   double _volumeLevel = 0.0;
@@ -46,9 +55,22 @@ class _MainScreenState extends State<MainScreen> {
     _scheduleService.onRecordingStart = () => _startRecording();
     _scheduleService.onRecordingStop = () => _stopRecording();
 
-    // 기본 진료 스케줄 적용 (월-금 09:00~18:00, 점심 12:00~13:00)
-    final defaultSchedule = WeeklySchedule.defaultSchedule();
-    _scheduleService.applySchedule(defaultSchedule);
+    // 저장된 스케줄을 우선 적용, 없으면 기본값
+    final saved = await _settings.loadSchedule();
+    final schedule = saved ?? WeeklySchedule.defaultSchedule();
+    _scheduleService.applySchedule(schedule);
+
+    // VAD 설정 적용
+    final (vadEnabled, vadThreshold) = await _settings.getVad();
+    _audioService.configureVad(enabled: vadEnabled, threshold: vadThreshold);
+
+    // 트레이 초기화 (아이콘 파일이 없으면 내부적으로 실패할 수 있음 → 무시)
+    try {
+      await _trayService.initialize();
+      _trayService.onStartRecording = () => _startRecording();
+      _trayService.onStopRecording = () => _stopRecording();
+      _trayService.onShowWindow = () => _bringToFront();
+    } catch (_) {}
   }
 
   @override
@@ -75,7 +97,7 @@ class _MainScreenState extends State<MainScreen> {
             VolumeMeterWidget(volumeLevel: _volumeLevel),
             const SizedBox(height: 16),
 
-            // 오늘 녹음 시간
+            // 오늘 녹음 시간 (추후 계산 로직 연결 예정)
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
@@ -144,34 +166,59 @@ class _MainScreenState extends State<MainScreen> {
   void _showScheduleDialog() {
     showDialog(
       context: context,
-      builder: (context) => const ScheduleConfigWidget(),
+      builder: (context) => ScheduleConfigWidget(
+        onSaved: () async {
+          // 저장된 스케줄 재적용
+          final saved = await _settings.loadSchedule();
+          if (saved != null) {
+            _scheduleService.applySchedule(saved);
+          }
+        },
+      ),
     );
   }
 
-  void _showFolderDialog() {
-    // TODO: 폴더 선택 다이얼로그 구현
+  Future<void> _showFolderDialog() async {
+    final selectedPath = await getDirectoryPath();
+    if (selectedPath != null) {
+      await _settings.setSaveFolder(selectedPath);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('저장 폴더가 설정되었습니다: ' + selectedPath)),
+      );
+      return;
+    }
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('저장 폴더 설정 기능 준비 중입니다.')),
+      const SnackBar(content: Text('폴더 선택이 취소되었습니다. 다시 시도해주세요.')),
     );
   }
 
-  void _showAdvancedSettings() {
-    // TODO: 고급 설정 다이얼로그 구현
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('고급 설정 기능 준비 중입니다.')),
+
+  Future<void> _showAdvancedSettings() async {
+    final result = await showDialog(
+      context: context,
+      builder: (context) => const AdvancedSettingsDialog(),
     );
+    if (result == 'saved') {
+      final (enabled, threshold) = await _settings.getVad();
+      _audioService.configureVad(enabled: enabled, threshold: threshold);
+    }
   }
 
   Future<void> _startRecording() async {
     try {
       await _audioService.startRecording();
+      if (!mounted) return;
       setState(() {
         _isRecording = true;
       });
+      unawaited(_trayService.updateTrayIcon(TrayIconState.recording));
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('녹음을 시작했습니다.')),
       );
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('녹음 시작 실패: $e')),
       );
@@ -181,10 +228,12 @@ class _MainScreenState extends State<MainScreen> {
   Future<void> _pauseRecording() async {
     try {
       await _audioService.pauseRecording();
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('녹음을 일시정지했습니다.')),
       );
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('일시정지 실패: $e')),
       );
@@ -194,22 +243,30 @@ class _MainScreenState extends State<MainScreen> {
   Future<void> _stopRecording() async {
     try {
       await _audioService.stopRecording();
+      if (!mounted) return;
       setState(() {
         _isRecording = false;
       });
+      unawaited(_trayService.updateTrayIcon(TrayIconState.waiting));
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('녹음을 중지했습니다.')),
       );
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('녹음 중지 실패: $e')),
       );
     }
   }
 
+  void _bringToFront() {
+    // TODO: window_manager를 이용해 창을 전면으로 가져오기 (필요 시)
+  }
+
   @override
   void dispose() {
     _audioService.dispose();
+    _trayService.dispose();
     super.dispose();
   }
 }

@@ -1,9 +1,12 @@
 import 'dart:async';
 import 'dart:io';
+
 import 'package:flutter/foundation.dart';
-import 'package:record/record.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
+import 'package:path_provider/path_provider.dart';
+import 'package:record/record.dart';
+
+import 'settings_service.dart';
 
 class AudioService {
   final Record _recorder = Record();
@@ -13,7 +16,13 @@ class AudioService {
   bool _isRecording = false;
   bool _vadEnabled = true;
   double vadThreshold = 0.01; // RMS 기반 VAD 임계값
+  int _silenceMs = 0;
+  bool _pausedByVad = false;
+  Timer? _resumeTimer;
   String? _currentFilePath;
+
+  // 보관 주기 (기본 7일)
+  Duration retention = const Duration(days: 7);
 
   // 콜백 함수들
   Function(double)? onAmplitudeChanged;
@@ -44,6 +53,9 @@ class AudioService {
 
         // 오디오 레벨 모니터링 시작
         _startAmplitudeMonitoring();
+
+        // 보관 정책 적용
+        unawaited(_pruneOldFiles());
 
         debugPrint('녹음 시작: $filePath');
       } else {
@@ -85,6 +97,9 @@ class AudioService {
       _segmentTimer?.cancel();
       _amplitudeSubscription?.cancel();
 
+      // 보관 정책 적용
+      await _pruneOldFiles();
+
       debugPrint('녹음 중지됨: $filePath');
       return filePath;
     } catch (e) {
@@ -117,6 +132,9 @@ class AudioService {
         path: newFilePath,
       );
 
+      // 보관 정책 적용 (백그라운드)
+      unawaited(_pruneOldFiles());
+
       debugPrint('새 세그먼트 시작: $newFilePath');
     } catch (e) {
       debugPrint('세그먼트 분할 실패: $e');
@@ -141,20 +159,55 @@ class AudioService {
       }
 
       // 간단한 VAD 로직 (선택적)
-      if (_vadEnabled) {
-        _processVAD(level);
-      }
+      if (_vadEnabled) _processVAD(level);
     });
   }
 
   /// Voice Activity Detection 처리
   void _processVAD(double level) {
-    // MVP에서는 단순히 레벨 모니터링 위주
-    // 향후 무음 구간 스킵 로직 추가 가능
+    const windowMs = 200; // onAmplitudeChanged 주기와 동일
+    const silenceHoldMs = 3000; // 3초 무음 시 일시정지
+    const resumeDelayMs = 500; // 재개 지연
+
+    // 무음 누적/해제
     if (level < vadThreshold) {
-      // 무음 구간 감지됨
-      debugPrint('무음 구간 감지: $level');
+      _silenceMs += windowMs;
+    } else {
+      _silenceMs = 0;
+      if (_pausedByVad) {
+        _resumeTimer?.cancel();
+        _resumeTimer = Timer(const Duration(milliseconds: resumeDelayMs), () async {
+          try {
+            await _recorder.resume();
+            _pausedByVad = false;
+            debugPrint('VAD: 음성 감지로 녹음 재개');
+          } catch (e) {
+            debugPrint('VAD 재개 실패: $e');
+          }
+        });
+      }
     }
+
+    // 일정 무음 지속 시 일시정지
+    if (!_pausedByVad && _silenceMs >= silenceHoldMs) {
+      _resumeTimer?.cancel();
+      _silenceMs = 0;
+      () async {
+        try {
+          await _recorder.pause();
+          _pausedByVad = true;
+          debugPrint('VAD: 무음 지속으로 녹음 일시정지');
+        } catch (e) {
+          debugPrint('VAD 일시정지 실패: $e');
+        }
+      }();
+    }
+  }
+
+  /// 외부에서 VAD 구성 적용
+  void configureVad({required bool enabled, required double threshold}) {
+    _vadEnabled = enabled;
+    vadThreshold = threshold;
   }
 
   /// 파일 경로 생성
@@ -166,8 +219,19 @@ class AudioService {
     return path.join(directory.path, filename);
   }
 
-  /// 녹음 저장 디렉토리 가져오기
+  /// 녹음 저장 디렉토리 가져오기 (설정 폴더 우선)
   Future<Directory> _getRecordingDirectory() async {
+    final settings = SettingsService();
+    final saved = await settings.getSaveFolder();
+    if (saved != null && saved.isNotEmpty) {
+      final dir = Directory(saved);
+      if (!await dir.exists()) {
+        await dir.create(recursive: true);
+      }
+      return dir;
+    }
+
+    // 기본 앱 문서 디렉토리 하위 폴더
     final appDir = await getApplicationDocumentsDirectory();
     final recordingDir = Directory(path.join(appDir.path, 'EyebottleRecorder'));
 
@@ -178,6 +242,34 @@ class AudioService {
     return recordingDir;
   }
 
+  /// 오래된 파일 정리 (보관 주기 초과 파일 삭제)
+  Future<void> _pruneOldFiles() async {
+    try {
+      final dir = await _getRecordingDirectory();
+      if (!await dir.exists()) return;
+
+      final now = DateTime.now();
+      final threshold = now.subtract(retention);
+
+      await for (final entity in dir.list(followLinks: false)) {
+        if (entity is File && entity.path.toLowerCase().endsWith('.m4a')) {
+          final stat = await entity.stat();
+          final modified = stat.modified;
+          if (modified.isBefore(threshold)) {
+            try {
+              await entity.delete();
+              debugPrint('보관기간 경과 파일 삭제: ${path.basename(entity.path)}');
+            } catch (e) {
+              debugPrint('파일 삭제 실패: ${entity.path} - $e');
+            }
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('보관 파일 정리 실패: $e');
+    }
+  }
+
   /// 두 자리 숫자 포맷
   String _twoDigits(int n) => n.toString().padLeft(2, '0');
 
@@ -185,6 +277,7 @@ class AudioService {
   void dispose() {
     _amplitudeSubscription?.cancel();
     _segmentTimer?.cancel();
+    _resumeTimer?.cancel();
     _recorder.dispose();
   }
 }

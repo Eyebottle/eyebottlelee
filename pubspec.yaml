@@ -16,6 +16,7 @@ dependencies:
   # 파일/저장/설정
   path_provider: ^2.1.4
   shared_preferences: ^2.3.2
+  file_selector: ^1.0.3
 
   # 스케줄링
   cron: ^0.5.1

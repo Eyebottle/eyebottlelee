@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import '../../models/schedule_model.dart';
-import '../../services/schedule_service.dart';
+import '../../services/settings_service.dart';
 
 class ScheduleConfigWidget extends StatefulWidget {
-  const ScheduleConfigWidget({super.key});
+  final VoidCallback? onSaved;
+  const ScheduleConfigWidget({super.key, this.onSaved});
 
   @override
   State<ScheduleConfigWidget> createState() => _ScheduleConfigWidgetState();
@@ -222,12 +223,22 @@ class _ScheduleConfigWidgetState extends State<ScheduleConfigWidget> {
   }
 
   /// 스케줄 저장
-  void _saveSchedule() {
-    // TODO: SharedPreferences에 저장
-    Navigator.of(context).pop();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('진료 시간표가 저장되었습니다.')),
-    );
+  Future<void> _saveSchedule() async {
+    try {
+      await SettingsService().saveSchedule(_schedule);
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('진료 시간표가 저장되었습니다.')),
+        );
+      }
+      widget.onSaved?.call();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('저장 실패: $e')),
+      );
+    }
   }
 
   /// 기본 스케줄 반환
