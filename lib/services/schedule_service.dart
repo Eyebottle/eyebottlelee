@@ -1,10 +1,18 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:cron/cron.dart';
 import '../models/schedule_model.dart';
+import 'logging_service.dart';
 
 class ScheduleService {
   final Cron _cron = Cron();
   WeeklySchedule? _currentSchedule;
+  final LoggingService _logging = LoggingService();
+
+  ScheduleService() {
+    unawaited(_logging.ensureInitialized());
+  }
 
   // 콜백 함수들
   Function()? onRecordingStart;
@@ -18,7 +26,7 @@ class ScheduleService {
 
     // 새 스케줄 등록
     _registerCronJobs(schedule);
-    debugPrint('새로운 진료 시간표가 적용되었습니다.');
+    _logging.info('새로운 진료 시간표 적용 완료');
   }
 
   /// 크론 작업 등록
@@ -52,7 +60,8 @@ class ScheduleService {
     final cronExpression = _buildCronExpression(weekDay, timeOfDay);
 
     _cron.schedule(Schedule.parse(cronExpression), () {
-      debugPrint('스케줄된 녹음 시작: ${_formatTime(timeOfDay)}');
+      _logging.info('스케줄된 녹음 시작 트리거');
+      _logging.debug('요일=$weekDay, 시각=${_formatTime(timeOfDay)}');
       if (onRecordingStart != null) {
         onRecordingStart!();
       }
@@ -64,7 +73,8 @@ class ScheduleService {
     final cronExpression = _buildCronExpression(weekDay, timeOfDay);
 
     _cron.schedule(Schedule.parse(cronExpression), () {
-      debugPrint('스케줄된 녹음 중지: ${_formatTime(timeOfDay)}');
+      _logging.info('스케줄된 녹음 중지 트리거');
+      _logging.debug('요일=$weekDay, 시각=${_formatTime(timeOfDay)}');
       if (onRecordingStop != null) {
         onRecordingStop!();
       }
@@ -156,15 +166,4 @@ class ScheduleService {
   void dispose() {
     _cron.close();
   }
-}
-
-/// 시간 클래스
-class TimeOfDay {
-  final int hour;
-  final int minute;
-
-  const TimeOfDay({required this.hour, required this.minute});
-
-  @override
-  String toString() => '$hour:${minute.toString().padLeft(2, '0')}';
 }

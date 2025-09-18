@@ -80,7 +80,10 @@ class RecordingStatusWidget extends StatelessWidget {
           height: 12,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: Theme.of(context).colorScheme.error.withOpacity(value),
+            color: Theme.of(context)
+                .colorScheme
+                .error
+                .withValues(alpha: value.clamp(0.0, 1.0).toDouble()),
           ),
         );
       },

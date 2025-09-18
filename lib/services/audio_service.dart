@@ -1,17 +1,18 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 
 import 'settings_service.dart';
+import 'logging_service.dart';
 
 class AudioService {
-  final Record _recorder = Record();
+  final AudioRecorder _recorder = AudioRecorder();
   StreamSubscription<Amplitude>? _amplitudeSubscription;
   Timer? _segmentTimer;
+  final LoggingService _logging = LoggingService();
 
   bool _isRecording = false;
   bool _vadEnabled = true;
@@ -19,16 +20,21 @@ class AudioService {
   int _silenceMs = 0;
   bool _pausedByVad = false;
   Timer? _resumeTimer;
-  String? _currentFilePath;
-
   // 보관 주기 (기본 7일)
   Duration retention = const Duration(days: 7);
 
   // 콜백 함수들
   Function(double)? onAmplitudeChanged;
   Function(String)? onFileSegmentCreated;
+  Function(DateTime startTime)? onRecordingStarted;
+  Function(DateTime startTime, DateTime stopTime, Duration recordedDuration)? onRecordingStopped;
 
   bool get isRecording => _isRecording;
+  DateTime? _sessionStartTime;
+
+  AudioService() {
+    unawaited(_logging.ensureInitialized());
+  }
 
   /// 녹음 시작
   Future<void> startRecording({Duration segmentDuration = const Duration(minutes: 10)}) async {
@@ -36,13 +42,8 @@ class AudioService {
       // 권한 확인
       if (await _recorder.hasPermission()) {
         final filePath = await _generateFilePath();
-        _currentFilePath = filePath;
-
         await _recorder.start(
-          encoder: AudioEncoder.aacLc,
-          bitRate: 64000,
-          numChannels: 1,
-          samplingRate: 16000,
+          _buildRecordConfig(),
           path: filePath,
         );
 
@@ -54,15 +55,23 @@ class AudioService {
         // 오디오 레벨 모니터링 시작
         _startAmplitudeMonitoring();
 
+        final startedAt = DateTime.now();
+        _sessionStartTime = startedAt;
+        if (onRecordingStarted != null) {
+          onRecordingStarted!(startedAt);
+        }
+
         // 보관 정책 적용
         unawaited(_pruneOldFiles());
 
-        debugPrint('녹음 시작: $filePath');
+        _logging.info('녹음 시작');
+        _logging.debug('녹음 파일 경로: $filePath');
       } else {
         throw Exception('마이크 권한이 필요합니다.');
       }
     } catch (e) {
       _isRecording = false;
+      _logging.error('녹음 시작 실패', error: e);
       throw Exception('녹음 시작 실패: $e');
     }
   }
@@ -71,8 +80,9 @@ class AudioService {
   Future<void> pauseRecording() async {
     try {
       await _recorder.pause();
-      debugPrint('녹음 일시정지됨');
+      _logging.info('녹음 일시정지됨');
     } catch (e) {
+      _logging.error('녹음 일시정지 실패', error: e);
       throw Exception('녹음 일시정지 실패: $e');
     }
   }
@@ -81,8 +91,9 @@ class AudioService {
   Future<void> resumeRecording() async {
     try {
       await _recorder.resume();
-      debugPrint('녹음 재개됨');
+      _logging.info('녹음 재개됨');
     } catch (e) {
+      _logging.error('녹음 재개 실패', error: e);
       throw Exception('녹음 재개 실패: $e');
     }
   }
@@ -97,12 +108,26 @@ class AudioService {
       _segmentTimer?.cancel();
       _amplitudeSubscription?.cancel();
 
+      final startTime = _sessionStartTime;
+      final stopTime = DateTime.now();
+      if (startTime != null) {
+        final duration = stopTime.difference(startTime);
+        if (onRecordingStopped != null && duration > Duration.zero) {
+          onRecordingStopped!(startTime, stopTime, duration);
+        }
+      }
+      _sessionStartTime = null;
+
       // 보관 정책 적용
       await _pruneOldFiles();
 
-      debugPrint('녹음 중지됨: $filePath');
+      _logging.info('녹음 중지됨');
+      if (filePath != null) {
+        _logging.debug('마지막 세그먼트 경로: $filePath');
+      }
       return filePath;
     } catch (e) {
+      _logging.error('녹음 중지 실패', error: e);
       throw Exception('녹음 중지 실패: $e');
     }
   }
@@ -119,25 +144,25 @@ class AudioService {
       if (completedPath != null && onFileSegmentCreated != null) {
         onFileSegmentCreated!(completedPath);
       }
+      if (completedPath != null) {
+        _logging.info('세그먼트 저장 완료');
+        _logging.debug('완료된 세그먼트 경로: $completedPath');
+      }
 
       // 새로운 세그먼트로 즉시 재시작
       final newFilePath = await _generateFilePath();
-      _currentFilePath = newFilePath;
-
       await _recorder.start(
-        encoder: AudioEncoder.aacLc,
-        bitRate: 64000,
-        numChannels: 1,
-        samplingRate: 16000,
+        _buildRecordConfig(),
         path: newFilePath,
       );
+
+      _logging.debug('새 세그먼트 시작: $newFilePath');
 
       // 보관 정책 적용 (백그라운드)
       unawaited(_pruneOldFiles());
 
-      debugPrint('새 세그먼트 시작: $newFilePath');
     } catch (e) {
-      debugPrint('세그먼트 분할 실패: $e');
+      _logging.error('세그먼트 분할 실패', error: e);
     }
   }
 
@@ -180,9 +205,9 @@ class AudioService {
           try {
             await _recorder.resume();
             _pausedByVad = false;
-            debugPrint('VAD: 음성 감지로 녹음 재개');
+            _logging.debug('VAD: 음성 감지로 녹음 재개');
           } catch (e) {
-            debugPrint('VAD 재개 실패: $e');
+            _logging.error('VAD 재개 실패', error: e);
           }
         });
       }
@@ -196,9 +221,9 @@ class AudioService {
         try {
           await _recorder.pause();
           _pausedByVad = true;
-          debugPrint('VAD: 무음 지속으로 녹음 일시정지');
+          _logging.debug('VAD: 무음 지속으로 녹음 일시정지');
         } catch (e) {
-          debugPrint('VAD 일시정지 실패: $e');
+          _logging.error('VAD 일시정지 실패', error: e);
         }
       }();
     }
@@ -208,6 +233,7 @@ class AudioService {
   void configureVad({required bool enabled, required double threshold}) {
     _vadEnabled = enabled;
     vadThreshold = threshold;
+    _logging.info('VAD 설정 변경 (enabled=$enabled, threshold=$threshold)');
   }
 
   /// 파일 경로 생성
@@ -258,15 +284,15 @@ class AudioService {
           if (modified.isBefore(threshold)) {
             try {
               await entity.delete();
-              debugPrint('보관기간 경과 파일 삭제: ${path.basename(entity.path)}');
+              _logging.debug('보관기간 경과 파일 삭제: ${path.basename(entity.path)}');
             } catch (e) {
-              debugPrint('파일 삭제 실패: ${entity.path} - $e');
+              _logging.error('파일 삭제 실패: ${entity.path}', error: e);
             }
           }
         }
       }
     } catch (e) {
-      debugPrint('보관 파일 정리 실패: $e');
+      _logging.error('보관 파일 정리 실패', error: e);
     }
   }
 
@@ -278,6 +304,15 @@ class AudioService {
     _amplitudeSubscription?.cancel();
     _segmentTimer?.cancel();
     _resumeTimer?.cancel();
-    _recorder.dispose();
+    unawaited(_recorder.dispose());
+  }
+
+  RecordConfig _buildRecordConfig() {
+    return const RecordConfig(
+      encoder: AudioEncoder.aacLc,
+      bitRate: 64000,
+      sampleRate: 16000,
+      numChannels: 1,
+    );
   }
 }

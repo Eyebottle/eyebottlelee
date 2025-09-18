@@ -101,7 +101,12 @@ class _AdvancedSettingsDialogState extends State<AdvancedSettingsDialog> {
     if (!kIsWeb && Platform.isWindows) {
       try {
         // appPath는 배포 후 실제 exe로 교체 필요
-        await LaunchAtStartup.instance.setup(appName: 'Eyebottle Medical Recorder');
+        final exePath = Platform.resolvedExecutable;
+        await LaunchAtStartup.instance.setup(
+          appName: 'Eyebottle Medical Recorder',
+          appPath: exePath,
+          args: const [],
+        );
         if (_launchAtStartup) {
           await LaunchAtStartup.instance.enable();
         } else {

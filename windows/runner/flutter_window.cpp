@@ -31,6 +31,11 @@ bool FlutterWindow::OnCreate() {
     this->Show();
   });
 
+  // Flutter can complete the first frame before the "show window" callback is
+  // registered. The following call ensures a frame is pending to ensure the
+  // window is shown. It is a no-op if the first frame hasn't completed yet.
+  flutter_controller_->ForceRedraw();
+
   return true;
 }
 
@@ -42,9 +47,10 @@ void FlutterWindow::OnDestroy() {
   Win32Window::OnDestroy();
 }
 
-LRESULT FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
-                                      WPARAM const wparam,
-                                      LPARAM const lparam) noexcept {
+LRESULT
+FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
+                              WPARAM const wparam,
+                              LPARAM const lparam) noexcept {
   // Give Flutter, including plugins, an opportunity to handle window messages.
   if (flutter_controller_) {
     std::optional<LRESULT> result =

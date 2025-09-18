@@ -6,6 +6,7 @@ import '../../services/audio_service.dart';
 import '../../services/schedule_service.dart';
 import '../../services/settings_service.dart';
 import '../../services/tray_service.dart';
+import '../../services/logging_service.dart';
 import '../widgets/recording_status_widget.dart';
 import '../widgets/schedule_config_widget.dart';
 import '../widgets/volume_meter_widget.dart';
@@ -25,10 +26,15 @@ class _MainScreenState extends State<MainScreen> {
   final ScheduleService _scheduleService = ScheduleService();
   final SettingsService _settings = SettingsService();
   final TrayService _trayService = TrayService();
+  final LoggingService _loggingService = LoggingService();
 
   bool _isRecording = false;
   double _volumeLevel = 0.0;
   String _todayRecordingTime = '0시간 0분';
+  Duration _todayDuration = Duration.zero;
+  DateTime? _currentSessionStart;
+  Timer? _sessionTicker;
+  String _currentDayKey = '';
 
   @override
   void initState() {
@@ -37,6 +43,20 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   Future<void> _initializeServices() async {
+    try {
+      await _loggingService.ensureInitialized();
+    } catch (e) {
+      if (mounted) {
+        Future.microtask(() {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('로그 초기화 실패: $e')),
+          );
+        });
+      }
+    }
+    _loggingService.addErrorListener(_handleLoggingError);
+
     // 오디오 레벨 콜백 → UI 반영
     _audioService.onAmplitudeChanged = (level) {
       if (!mounted) return;
@@ -49,6 +69,19 @@ class _MainScreenState extends State<MainScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('분할 저장됨: ${filePath.split('/').last}')),
       );
+    };
+
+    _audioService.onRecordingStarted = (startTime) {
+      _currentSessionStart = startTime;
+      _startSessionTicker();
+      _updateTodayRecordingDisplay();
+    };
+
+    _audioService.onRecordingStopped = (startTime, stopTime, recordedDuration) async {
+      _sessionTicker?.cancel();
+      _sessionTicker = null;
+      _currentSessionStart = null;
+      await _recordSessionDuration(startTime, stopTime);
     };
 
     // 스케줄 서비스: 자동 시작/종료 연동
@@ -71,6 +104,8 @@ class _MainScreenState extends State<MainScreen> {
       _trayService.onStopRecording = () => _stopRecording();
       _trayService.onShowWindow = () => _bringToFront();
     } catch (_) {}
+
+    await _loadTodayRecordingDuration();
   }
 
   @override
@@ -265,8 +300,79 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   void dispose() {
+    _sessionTicker?.cancel();
     _audioService.dispose();
     _trayService.dispose();
+    _loggingService.removeErrorListener(_handleLoggingError);
     super.dispose();
+  }
+
+  Future<void> _loadTodayRecordingDuration() async {
+    final now = DateTime.now();
+    final duration = await _settings.getRecordingDuration(now);
+    if (!mounted) return;
+    _currentDayKey = _dayKey(now);
+    setState(() {
+      _todayDuration = duration;
+      _todayRecordingTime = _formatDuration(duration + _currentRunningDuration());
+    });
+  }
+
+  Future<void> _recordSessionDuration(DateTime startTime, DateTime stopTime) async {
+    var segmentStart = startTime;
+    while (segmentStart.isBefore(stopTime)) {
+      final dayStart = DateTime(segmentStart.year, segmentStart.month, segmentStart.day);
+      final nextDay = dayStart.add(const Duration(days: 1));
+      final segmentEnd = stopTime.isBefore(nextDay) ? stopTime : nextDay;
+      final delta = segmentEnd.difference(segmentStart);
+      if (delta > Duration.zero) {
+        await _settings.addRecordingDuration(segmentStart, delta);
+      }
+      segmentStart = segmentEnd;
+    }
+
+    await _loadTodayRecordingDuration();
+  }
+
+  void _startSessionTicker() {
+    _sessionTicker?.cancel();
+    _sessionTicker = Timer.periodic(const Duration(seconds: 1), (_) {
+      _updateTodayRecordingDisplay();
+    });
+  }
+
+  void _updateTodayRecordingDisplay() {
+    if (!mounted) return;
+    final now = DateTime.now();
+    if (_dayKey(now) != _currentDayKey) {
+      unawaited(_loadTodayRecordingDuration());
+      return;
+    }
+    final displayDuration = _todayDuration + _currentRunningDuration();
+    setState(() {
+      _todayRecordingTime = _formatDuration(displayDuration);
+    });
+  }
+
+  Duration _currentRunningDuration() {
+    if (_currentSessionStart == null) return Duration.zero;
+    return DateTime.now().difference(_currentSessionStart!);
+  }
+
+  String _formatDuration(Duration duration) {
+    final hours = duration.inHours;
+    final minutes = duration.inMinutes.remainder(60);
+    return '${hours}시간 ${minutes}분';
+  }
+
+  String _dayKey(DateTime date) {
+    return '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+  }
+
+  void _handleLoggingError(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
   }
 }

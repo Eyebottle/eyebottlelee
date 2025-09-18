@@ -22,6 +22,7 @@
   - `record` 패키지로 AAC-LC 64kbps, mono, 16kHz 녹음
   - 10분 단위 자동 분할(`Timer.periodic`)
   - UI로 입력 레벨 시각화(200ms 주기)
+  - 메인 화면의 "오늘 녹음" 카드는 UI 플레이스홀더(집계 로직 미구현)
 - VAD(무음 자동 스킵)
   - 임계값 기본 `0.01`(정규화 레벨)
   - 3초 무음 지속 시 `pause()`, 음성 감지 후 500ms 뒤 `resume()`
@@ -78,7 +79,8 @@ lib/
 │  ├─ audio_service.dart                     # 녹음/분할/VAD/보관정리
 │  ├─ schedule_service.dart                  # 주간 스케줄 → cron 작업 등록
 │  ├─ settings_service.dart                  # SharedPreferences 저장/로드
-│  └─ tray_service.dart                      # 시스템 트레이 연동(가드)
+│  ├─ tray_service.dart                      # 시스템 트레이 연동(가드)
+│  └─ logging_service.dart                   # logger 기반 파일 로깅/에러 알림
 ├─ models/
 │  └─ schedule_model.dart                    # WeeklySchedule/DaySchedule
 └─ ui/
@@ -107,33 +109,27 @@ lib/
 
 ---
 
-## 6) 다음 작업(TODO)
-권장 우선순위(시험 구현 기준)
+## 6) 단계별 향후 개발 계획 (업데이트: 2025-09-16)
 
-- 알림/안내
-  - [ ] Windows Toast 알림(진료 시작 5분 전, 종료 요약 등)
-  - [ ] 오류/경고(마이크 미검출, 디스크 부족 등) 사용자 노출 전략 정리
-- 스케줄 확장/예외
-  - [ ] 휴진일/예외 날짜 UI 및 저장/적용
-  - [ ] 점심시간/파트타임 등 다중 구간 지원(필요 시)
-- 단축키/마킹
-  - [ ] 글로벌 단축키(Ctrl+M)로 마킹 파일/메타 남기기(플랫폼 제약 검토)
-- 저장/동기화
-  - [ ] OneDrive 동기 상태 감지(지연 경고)
-  - [ ] 저장 폴더 접근성/권한 오류 처리 강화
-- 자동 시작
-  - [ ] 개발 환경 경로 이슈 문서화 및 MSIX 배포 후 exe 경로 고정 → 재검증
-- 안정성/성능
-  - [ ] 8시간 연속 녹음 soak 테스트 스크립트(로그 수집/세그먼트 누락 확인)
-  - [ ] CPU/메모리/VAD 튜닝(임계값/윈도우 길이 슬라이더 노출 여부)
-- 로깅/진단
-  - [ ] 파일 로테이션 로그(예: `logger` 설정), 에러 텔레메트리(선택)
-- 테스트/품질
-  - [ ] 단위 테스트(AudioService 분할/보관, ScheduleService 크론 표현식)
-  - [ ] 통합 테스트(스케줄 시작/중지, 분할, 보관정리)
-- 배포 체계
-  - [ ] GitHub Actions로 Windows 빌드/아티팩트 업로드
-  - [ ] 코드 서명/winget 채널 검토(후순위)
+### Phase 0. 안정화 (2025-09-16 ~ 09-27)
+- [x] **녹음 세션 집계** — "오늘 녹음" 카드에 실제 누적 시간을 표시. 녹음 시작/중지 시 세션 로그를 유지하고 자정 기준으로 리셋. (SharedPreferences에 일자별 초 단위 누적, 실시간 타이머 표시) 관련: `AudioService`, `MainScreen`.
+- [x] **로그 인프라** — `LoggingService`로 `logger` 파일 로테이션 구성, 세그먼트/오류 이벤트 기록 및 실패 시 SnackBar 알림. 관련: `lib/services/audio_service.dart`, `lib/services/logging_service.dart`.
+- [ ] **8시간 Soak 테스트 스크립트** — Windows PowerShell 또는 Dart 스크립트로 장시간 녹음 안정성 검증, 로그 분석 체크리스트 포함. 완료 조건: 8시간 연속 녹음 중 세그먼트 누락 0건.
+
+### Phase 1. 사용자 경험 향상 (2025-09-30 ~ 10-11)
+- [ ] **Windows Toast 알림** — 진료 시작 5분 전/종료 시각에 알림 노출. `system_tray` 또는 Windows API 연계 검토. UI 문구/끄기 옵션 포함.
+- [ ] **오류 가시화** — 마이크 미검출, 녹음 실패, 디스크 부족 시 다이얼로그/Toast 안내. AudioService 예외 메시지 표준화.
+- [ ] **트레이 아이콘 리소스** — `assets/icons/`에 실제 아이콘(.ico) 포함 및 생성 스크립트 결과 버전관리. 아이콘 미존재 시 fallback 처리.
+
+### Phase 2. 스케줄/워크플로 확장 (2025-10-14 ~ 10-25)
+- [ ] **휴진일·예외 스케줄** — 달력 UI에서 단일 날짜 비활성화/시간 덮어쓰기 저장. SharedPreferences 스키마 확장 및 ScheduleService 적용 로직 보완.
+- [ ] **다중 시간 구간 지원** — 오전/오후 등 복수 구간 입력 허용. UI/모델(WeekdaySlot) 재설계, Cron 등록 로직 업데이트.
+- [ ] **글로벌 마킹 단축키** — Ctrl+M 입력 시 현재 세그먼트에 타임스탬프 메타 저장(Windows API 제약 확인). 마킹 결과를 별도 JSON/CSV로 기록.
+
+### Phase 3. 동기화·배포 체계 (2025-10-28 ~ 11-15)
+- [ ] **OneDrive 동기 상태 감지** — 선택한 폴더에 대해 파일 시스템 이벤트 감시, 동기 지연 시 경고 출력. 옵션: `windows` 플러그인 또는 PowerShell 연동.
+- [ ] **자동 시작 안정화** — MSIX 패키징 시 고정 경로 기반으로 `launch_at_startup` 재검증. 개발 환경 경고 문구 문서화.
+- [ ] **CI/CD 및 배포** — GitHub Actions로 Windows 빌드/테스트/아티팩트 업로드, MSIX 생성 자동화. 후속으로 코드 서명 및 winget 채널 검토.
 
 ---
 
