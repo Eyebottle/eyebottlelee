@@ -40,43 +40,58 @@ class _AdvancedSettingsDialogState extends State<AdvancedSettingsDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final mediaSize = MediaQuery.of(context).size;
+    final maxWidth = (mediaSize.width * 0.9).clamp(0.0, 360.0);
+    final maxHeight = mediaSize.height * 0.7;
+
     return AlertDialog(
       title: const Text('고급 설정'),
       content: _loading
           ? const SizedBox(width: 320, height: 120, child: Center(child: CircularProgressIndicator()))
-          : SizedBox(
-              width: 420,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // VAD
-                  SwitchListTile(
-                    title: const Text('VAD(무음 자동 스킵) 사용'),
-                    value: _vadEnabled,
-                    onChanged: (v) => setState(() => _vadEnabled = v),
-                  ),
-                  ListTile(
-                    title: const Text('VAD 임계값'),
-                    subtitle: Slider(
-                      value: _vadThreshold.clamp(0.001, 0.2),
-                      min: 0.001,
-                      max: 0.1,
-                      divisions: 99,
-                      label: _vadThreshold.toStringAsFixed(3),
-                      onChanged: _vadEnabled ? (v) => setState(() => _vadThreshold = v) : null,
+          : ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: maxWidth,
+                maxHeight: maxHeight,
+              ),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.only(right: 4),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SwitchListTile(
+                      title: const Text('VAD(무음 자동 스킵) 사용'),
+                      value: _vadEnabled,
+                      onChanged: (v) => setState(() => _vadEnabled = v),
                     ),
-                  ),
-                  const Divider(height: 24),
-
-                  // Launch at startup
-                  CheckboxListTile(
-                    title: const Text('Windows 로그인 시 자동 실행'),
-                    value: _launchAtStartup,
-                    onChanged: (v) => setState(() => _launchAtStartup = v ?? true),
-                    subtitle: const Text('개발 단계에서는 실행 경로에 따라 동작이 제한될 수 있습니다.'),
-                  ),
-                ],
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('VAD 임계값'),
+                          Slider(
+                            value: _vadThreshold.clamp(0.001, 0.2),
+                            min: 0.001,
+                            max: 0.1,
+                            divisions: 99,
+                            label: _vadThreshold.toStringAsFixed(3),
+                            onChanged: _vadEnabled
+                                ? (v) => setState(() => _vadThreshold = v)
+                                : null,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Divider(height: 24),
+                    CheckboxListTile(
+                      title: const Text('Windows 로그인 시 자동 실행'),
+                      value: _launchAtStartup,
+                      onChanged: (v) => setState(() => _launchAtStartup = v ?? true),
+                      subtitle: const Text('개발 단계에서는 실행 경로에 따라 동작이 제한될 수 있습니다.'),
+                    ),
+                  ],
+                ),
               ),
             ),
       actions: [
@@ -102,10 +117,10 @@ class _AdvancedSettingsDialogState extends State<AdvancedSettingsDialog> {
       try {
         // appPath는 배포 후 실제 exe로 교체 필요
         final exePath = Platform.resolvedExecutable;
-        await LaunchAtStartup.instance.setup(
+        LaunchAtStartup.instance.setup(
           appName: 'Eyebottle Medical Recorder',
           appPath: exePath,
-          args: const [],
+          args: const <String>[],
         );
         if (_launchAtStartup) {
           await LaunchAtStartup.instance.enable();

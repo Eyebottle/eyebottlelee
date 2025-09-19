@@ -21,19 +21,28 @@ class _ScheduleConfigWidgetState extends State<ScheduleConfigWidget> {
 
   @override
   Widget build(BuildContext context) {
+    final mediaSize = MediaQuery.of(context).size;
+    final maxWidth = mediaSize.width * 0.9;
+    final maxHeight = mediaSize.height * 0.8;
+
     return AlertDialog(
       title: const Text('진료 시간표 설정'),
-      content: SizedBox(
-        width: 400,
-        height: 500,
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // 요일별 설정
-              for (int weekDay = 1; weekDay <= 7; weekDay++)
-                _buildDayScheduleCard(weekDay),
-            ],
+      content: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: maxWidth.clamp(0.0, 420.0),
+          maxHeight: maxHeight,
+        ),
+        child: Scrollbar(
+          thumbVisibility: true,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.only(right: 4),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (int weekDay = 1; weekDay <= 7; weekDay++)
+                  _buildDayScheduleCard(weekDay),
+              ],
+            ),
           ),
         ),
       ),
@@ -82,15 +91,18 @@ class _ScheduleConfigWidgetState extends State<ScheduleConfigWidget> {
               const SizedBox(height: 8),
 
               // 진료 시간 설정
-              Row(
+              Wrap(
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 8,
+                runSpacing: 8,
                 children: [
-                  const Text('진료시간: '),
+                  const Text('진료시간:'),
                   _buildTimeButton(
                     context,
                     daySchedule.startTime,
                     (time) => _updateStartTime(weekDay, time),
                   ),
-                  const Text(' ~ '),
+                  const Text('~'),
                   _buildTimeButton(
                     context,
                     daySchedule.endTime,
@@ -101,20 +113,26 @@ class _ScheduleConfigWidgetState extends State<ScheduleConfigWidget> {
               const SizedBox(height: 8),
 
               // 점심시간 설정
-              Row(
+              Wrap(
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 8,
+                runSpacing: 8,
                 children: [
-                  Checkbox(
-                    value: daySchedule.lunchStart != null,
-                    onChanged: (value) => _toggleLunchTime(weekDay, value ?? false),
+                  SizedBox(
+                    height: 24,
+                    child: Checkbox(
+                      value: daySchedule.lunchStart != null,
+                      onChanged: (value) => _toggleLunchTime(weekDay, value ?? false),
+                    ),
                   ),
-                  const Text('점심시간: '),
+                  const Text('점심시간:'),
                   if (daySchedule.lunchStart != null) ...[
                     _buildTimeButton(
                       context,
                       daySchedule.lunchStart!,
                       (time) => _updateLunchStart(weekDay, time),
                     ),
-                    const Text(' ~ '),
+                    const Text('~'),
                     _buildTimeButton(
                       context,
                       daySchedule.lunchEnd!,

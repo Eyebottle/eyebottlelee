@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:file_selector/file_selector.dart';
+import 'package:window_manager/window_manager.dart';
 
 import '../../models/schedule_model.dart';
 import '../../services/audio_service.dart';
@@ -7,11 +9,10 @@ import '../../services/schedule_service.dart';
 import '../../services/settings_service.dart';
 import '../../services/tray_service.dart';
 import '../../services/logging_service.dart';
+import '../widgets/advanced_settings_dialog.dart';
 import '../widgets/recording_status_widget.dart';
 import '../widgets/schedule_config_widget.dart';
 import '../widgets/volume_meter_widget.dart';
-import '../widgets/advanced_settings_dialog.dart';
-import 'package:file_selector/file_selector.dart';
 
 
 class MainScreen extends StatefulWidget {
@@ -72,7 +73,11 @@ class _MainScreenState extends State<MainScreen> {
     };
 
     _audioService.onRecordingStarted = (startTime) {
-      _currentSessionStart = startTime;
+      if (!mounted) return;
+      setState(() {
+        _currentSessionStart = startTime;
+        _isRecording = true;
+      });
       _startSessionTicker();
       _updateTodayRecordingDisplay();
     };
@@ -80,13 +85,18 @@ class _MainScreenState extends State<MainScreen> {
     _audioService.onRecordingStopped = (startTime, stopTime, recordedDuration) async {
       _sessionTicker?.cancel();
       _sessionTicker = null;
-      _currentSessionStart = null;
+      if (mounted) {
+        setState(() {
+          _currentSessionStart = null;
+          _isRecording = false;
+        });
+      }
       await _recordSessionDuration(startTime, stopTime);
     };
 
     // 스케줄 서비스: 자동 시작/종료 연동
-    _scheduleService.onRecordingStart = () => _startRecording();
-    _scheduleService.onRecordingStop = () => _stopRecording();
+    _scheduleService.onRecordingStart = () => _startRecording(showFeedback: false);
+    _scheduleService.onRecordingStop = () => _stopRecording(showFeedback: false);
 
     // 저장된 스케줄을 우선 적용, 없으면 기본값
     final saved = await _settings.loadSchedule();
@@ -106,6 +116,7 @@ class _MainScreenState extends State<MainScreen> {
     } catch (_) {}
 
     await _loadTodayRecordingDuration();
+    await _syncRecordingWithSchedule(initial: true);
   }
 
   @override
@@ -116,84 +127,104 @@ class _MainScreenState extends State<MainScreen> {
         centerTitle: true,
         backgroundColor: Theme.of(context).colorScheme.primaryContainer,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // 녹음 상태 표시
-            RecordingStatusWidget(
-              isRecording: _isRecording,
-              startTime: _isRecording ? DateTime.now() : null,
-            ),
-            const SizedBox(height: 16),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(16.0),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // 녹음 상태 표시
+                  RecordingStatusWidget(
+                    isRecording: _isRecording,
+                    startTime: _isRecording ? _currentSessionStart : null,
+                  ),
+                  const SizedBox(height: 16),
 
-            // 볼륨 레벨 미터
-            VolumeMeterWidget(volumeLevel: _volumeLevel),
-            const SizedBox(height: 16),
+                  // 볼륨 레벨 미터
+                  VolumeMeterWidget(volumeLevel: _volumeLevel),
+                  const SizedBox(height: 16),
 
-            // 오늘 녹음 시간 (추후 계산 로직 연결 예정)
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Row(
-                  children: [
-                    const Icon(Icons.storage, size: 24),
-                    const SizedBox(width: 8),
-                    Text(
-                      '오늘 녹음: $_todayRecordingTime',
-                      style: Theme.of(context).textTheme.titleMedium,
+                  // 오늘 녹음 시간 카드
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.storage, size: 24),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              '오늘 녹음: $_todayRecordingTime',
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // 설정 버튼들
+                  ElevatedButton.icon(
+                    onPressed: () => _showScheduleDialog(),
+                    icon: const Icon(Icons.calendar_today),
+                    label: const Text('진료 시간표 설정'),
+                  ),
+                  const SizedBox(height: 12),
+
+                  ElevatedButton.icon(
+                    onPressed: () => _showFolderDialog(),
+                    icon: const Icon(Icons.folder),
+                    label: const Text('저장 폴더 설정'),
+                  ),
+                  const SizedBox(height: 12),
+
+                  ElevatedButton.icon(
+                    onPressed: () => _showAdvancedSettings(),
+                    icon: const Icon(Icons.settings),
+                    label: const Text('고급 설정'),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // 제어 버튼들
+                  Wrap(
+                    alignment: WrapAlignment.spaceBetween,
+                    spacing: 12,
+                    runSpacing: 12,
+                    children: [
+                      SizedBox(
+                        width: constraints.maxWidth >= 360 ? 150 : double.infinity,
+                        child: ElevatedButton(
+                          onPressed: _isRecording ? _pauseRecording : null,
+                          child: const Text('일시정지'),
+                        ),
+                      ),
+                      SizedBox(
+                        width: constraints.maxWidth >= 360 ? 150 : double.infinity,
+                        child: ElevatedButton(
+                          onPressed: _isRecording ? _stopRecording : _startRecording,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _isRecording
+                                ? Theme.of(context).colorScheme.error
+                                : Theme.of(context).colorScheme.primary,
+                            foregroundColor: Colors.white,
+                          ),
+                          child: Text(_isRecording ? '중지' : '시작'),
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 16),
+                ],
               ),
             ),
-            const SizedBox(height: 32),
-
-            // 설정 버튼들
-            ElevatedButton.icon(
-              onPressed: () => _showScheduleDialog(),
-              icon: const Icon(Icons.calendar_today),
-              label: const Text('진료 시간표 설정'),
-            ),
-            const SizedBox(height: 12),
-
-            ElevatedButton.icon(
-              onPressed: () => _showFolderDialog(),
-              icon: const Icon(Icons.folder),
-              label: const Text('저장 폴더 설정'),
-            ),
-            const SizedBox(height: 12),
-
-            ElevatedButton.icon(
-              onPressed: () => _showAdvancedSettings(),
-              icon: const Icon(Icons.settings),
-              label: const Text('고급 설정'),
-            ),
-            const SizedBox(height: 32),
-
-            // 제어 버튼들
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                ElevatedButton(
-                  onPressed: _isRecording ? _pauseRecording : null,
-                  child: const Text('일시정지'),
-                ),
-                ElevatedButton(
-                  onPressed: _isRecording ? _stopRecording : _startRecording,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _isRecording
-                        ? Theme.of(context).colorScheme.error
-                        : Theme.of(context).colorScheme.primary,
-                    foregroundColor: Colors.white,
-                  ),
-                  child: Text(_isRecording ? '중지' : '시작'),
-                ),
-              ],
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
@@ -203,10 +234,11 @@ class _MainScreenState extends State<MainScreen> {
       context: context,
       builder: (context) => ScheduleConfigWidget(
         onSaved: () async {
-          // 저장된 스케줄 재적용
+          // 저장된 스케줄 재적용 후 현재 시각에 맞춰 동기화
           final saved = await _settings.loadSchedule();
           if (saved != null) {
             _scheduleService.applySchedule(saved);
+            await _syncRecordingWithSchedule(initial: false);
           }
         },
       ),
@@ -241,7 +273,16 @@ class _MainScreenState extends State<MainScreen> {
     }
   }
 
-  Future<void> _startRecording() async {
+  Future<void> _startRecording({bool showFeedback = true}) async {
+    if (_audioService.isRecording) {
+      if (showFeedback && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('이미 녹음 중입니다.')),
+        );
+      }
+      return;
+    }
+
     try {
       await _audioService.startRecording();
       if (!mounted) return;
@@ -249,9 +290,11 @@ class _MainScreenState extends State<MainScreen> {
         _isRecording = true;
       });
       unawaited(_trayService.updateTrayIcon(TrayIconState.recording));
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('녹음을 시작했습니다.')),
-      );
+      if (showFeedback) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('녹음을 시작했습니다.')),
+        );
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -275,7 +318,16 @@ class _MainScreenState extends State<MainScreen> {
     }
   }
 
-  Future<void> _stopRecording() async {
+  Future<void> _stopRecording({bool showFeedback = true}) async {
+    if (!_audioService.isRecording) {
+      if (showFeedback && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('현재 녹음 중이 아닙니다.')),
+        );
+      }
+      return;
+    }
+
     try {
       await _audioService.stopRecording();
       if (!mounted) return;
@@ -283,9 +335,11 @@ class _MainScreenState extends State<MainScreen> {
         _isRecording = false;
       });
       unawaited(_trayService.updateTrayIcon(TrayIconState.waiting));
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('녹음을 중지했습니다.')),
-      );
+      if (showFeedback) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('녹음을 중지했습니다.')),
+        );
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -295,7 +349,18 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   void _bringToFront() {
-    // TODO: window_manager를 이용해 창을 전면으로 가져오기 (필요 시)
+    () async {
+      try {
+        final isMinimized = await windowManager.isMinimized();
+        if (isMinimized) {
+          await windowManager.restore();
+        }
+        await windowManager.show();
+        await windowManager.focus();
+      } catch (e) {
+        _loggingService.warning('창 포커스 이동 실패', error: e);
+      }
+    }();
   }
 
   @override
@@ -369,10 +434,22 @@ class _MainScreenState extends State<MainScreen> {
     return '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
   }
 
+  Future<void> _syncRecordingWithSchedule({required bool initial}) async {
+    final shouldRecord = _scheduleService.isCurrentlyWorkingTime();
+
+    if (shouldRecord && !_audioService.isRecording) {
+      await _startRecording(showFeedback: !initial);
+    } else if (!shouldRecord && _audioService.isRecording) {
+      await _stopRecording(showFeedback: !initial);
+    }
+  }
+
   void _handleLoggingError(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message)),
     );
+    unawaited(_trayService.updateTrayIcon(TrayIconState.error));
+    unawaited(_trayService.showNotification('녹음 오류', message));
   }
 }

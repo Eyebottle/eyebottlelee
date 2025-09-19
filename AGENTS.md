@@ -1,60 +1,42 @@
-# AGENTS.md
+# Repository Guidelines
 
-본 문서는 이 리포지터리에서 에이전트(코딩 보조 도구, 예: Codex CLI)가 작업할 때 따라야 할 규칙과 절차를 정의합니다. 문서의 범위는 리포지터리 루트부터 하위 전체 디렉터리에 적용됩니다.
+WSL에서 작성한 Flutter 코드를 Windows 데스크톱 환경으로 빠르게 배포하기 위한 지침입니다. 변경 전에는 반드시 `docs/medical-recording-prd.md`와 `docs/developing.md`를 확인해 제품 방향과 개발 계획을 맞춰 주세요.
 
-## 목적과 범위
-- 이 리포지터리에서 수행되는 자동화/반자동화 코딩 작업의 일관성, 안전성, 재현성을 보장합니다.
-- 사람이 요청한 작업을 에이전트가 수행할 때의 기본 원칙과 실행 순서를 명확히 합니다.
+## Project Structure & Module Organization
+- `lib/`는 앱 로직의 중심이며, `services/`(녹음·스케줄), `ui/`(화면·위젯), `models/`, `utils/`로 구성됩니다.
+- `docs/`에는 PRD와 개발 가이드가 있으니 기능 정의나 일정 변경 시 함께 갱신합니다.
+- `assets/icons/`는 트레이·앱 아이콘을 보관하며, `scripts/`에는 `sync_wsl_to_windows.sh`와 `windows/` 하위 PowerShell 스크립트가 있습니다.
+- Windows 데스크톱 빌드 리소스는 `windows/runner/`에 있으며, 플랫폼 수정 전 Flutter 업데이트 여부를 확인합니다.
 
-## 기본 원칙
-- 최소 변경: 요청 범위를 벗어나지 않는 선에서 필요한 변경만 수행합니다.
-- 명확성: 변경 이유와 사용법이 드러나도록 파일/코드/커밋 메시지(사람이 커밋 시)를 간결히 설명합니다.
-- 안전성: 파괴적 작업(파일 삭제/대체/대규모 리팩터) 전에는 반드시 사용자 확인을 받습니다.
-- 한국어 우선: 별도 요청이 없으면 한글로 소통합니다. 코드/식별자/CLI 옵션 등은 원문 유지.
-- 문서 우선: 변경 전/후에 `docs/medical-recording-prd.md`, `docs/developing.md`를 참고하여 요구사항과 향후 계획을 일치시킵니다.
+## Build, Test, and Development Commands
+- `flutter pub get` — 의존성을 동기화합니다.
+- `flutter run -d windows` — Windows 데스크톱 디바이스로 실행해 UI/오디오 동작을 검증합니다.
+- `flutter analyze` 및 `flutter test` — 정적 분석과 단위 테스트를 수행하며, 테스트가 없다면 최소 스텁 추가를 권장합니다.
+- `pwsh -File scripts/windows/generate-placeholder-icons.ps1` — 개발용 아이콘 세트를 생성합니다.
+- `bash scripts/sync_wsl_to_windows.sh` — WSL→Windows 워킹카피를 수동 동기화합니다.
 
-## 권장 작업 흐름
-1) 맥락 파악: 기존 파일 구조를 탐색하고, PRD/Devel 문서의 최신 상태를 요약합니다.
-2) 계획 수립: 3–6단계의 짧은 계획을 제시하고, `update_plan` 도구로 단계별 진행 상황을 갱신합니다.
-3) 변경 수행: 실제 수정은 반드시 `apply_patch` 형식으로 제안합니다(파일 추가/수정/삭제). ASCII 기본, 불필요한 공백 변경 금지.
-4) 검증: 영향 범위 내에서 `flutter analyze`, `flutter test`, 사용자 지정 스크립트 등 빠른 검증을 우선 실행합니다. 실행이 불가하거나 미실시한 이유를 보고합니다.
-5) 보고: 무엇이, 왜, 어떻게 바뀌었는지 요약하고, 관련 파일 경로/라인을 명시한 뒤 다음 단계 제안을 제공합니다.
+## Coding Style & Naming Conventions
+- Dart 공식 스타일을 따르며 저장 전 `dart format` 또는 IDE 자동 포매터를 사용합니다.
+- 파일과 클래스 이름은 UpperCamelCase, 프라이빗 멤버는 선행 `_`, 상수는 UPPER_SNAKE_CASE를 사용합니다.
+- UI 위젯은 `lib/ui/widgets/`에서 `FeatureRoleWidget` 식으로 이름 붙이고, 서비스는 `FeatureService` 접미사를 일관되게 유지합니다.
 
-## 환경 및 스타일 가이드
-- 스택: Flutter 3.24+ / Dart 3+, Windows Desktop 대상. 빌드/런은 Windows 툴체인에서 수행하고, 코드 저장은 WSL 경로(예: `/home/<user>/projects/eyebottlelee`).
-- 코드 스타일: 기존 파일의 형식/네이밍을 따릅니다. 자동 포매터는 리포지터리에 설정된 경우에만 사용합니다.
-- 주석: 의도, 경계조건, 함수 계약만 간결히 남깁니다.
-- 인코딩/EOL: UTF-8, 혼합 금지.
-- 문서: 사용법·한계·예시는 `docs/` 또는 관련 파일 상단에 기재합니다. 변경 시 문서와 코드가 불일치하지 않도록 동기화합니다.
+## Testing Guidelines
+- 테스트는 `test/` 루트에 배치하고, 파일은 `<target>_test.dart` 패턴을 따릅니다.
+- 오디오 세그먼트, 스케줄 계산, 보관 정리 로직은 모킹 가능한 서비스 단위 테스트를 우선 작성합니다.
+- 장시간 녹음 시나리오는 PowerShell soak 스크립트 추가 계획(Phase 0)을 참고해 수동 체크리스트라도 결과를 기록합니다.
 
-## 파일/폴더 관례
-- 애플리케이션 코드: `lib/` 하위(services/models/ui 구조 유지). 새로운 서비스/위젯은 기존 디렉터리 패턴을 따른다.
-- 플랫폼/스크립트: `windows/`, `scripts/` 하위 규칙 준수. 스크립트 추가 시 실행 방법을 README 또는 해당 폴더의 README에 문서화.
-- 자산: 아이콘·이미지는 `assets/icons/`, `assets/images/`에 두고 `pubspec.yaml`을 업데이트.
-- 문서: 제품/개발 문서는 `docs/`에 위치하며, 지침 변경 시 AGENTS.md와 함께 갱신한다.
-- 민감 정보: 환경 변수/비밀키는 `.env` 또는 시스템 비밀관리 사용. 저장소에 직접 포함하지 않는다.
+## Commit & Pull Request Guidelines
+- 커밋 메시지는 `docs:`, `feat:`, `fix:` 등 범위 접두사를 사용하고, 필수 설명을 50자 내외로 유지합니다.
+- PR에는 변경 요약, 영향 모듈, 테스트 결과(`flutter analyze`, `flutter test`, 수동 시나리오)를 표 형식으로 포함합니다.
+- 이슈를 다룰 때는 `Fixes #123` 또는 `Refs #123` 라인을 추가해 추적성을 보장합니다.
+- UI 변경은 필요 시 Windows 실행 화면 캡처를 첨부하고, 동기화 스크립트 수정 시 `docs/sync-workflow.md`를 함께 갱신합니다.
 
-## 안전/보안 지침
-- 비밀정보(토큰/키/개인정보)는 로그와 리포지터리에 남기지 않습니다.
-- 의존성 추가/업그레이드는 사용자 승인 후 진행합니다(네트워크 접근 필요).
-- 라이선스 호환성 확인 없이 외부 코드/데이터를 포함하지 않습니다.
+## Sync Workflow Essentials
+- post-commit 훅이 `scripts/sync_wsl_to_windows.sh`를 호출하므로, 훅 비활성화 시 수동 실행을 잊지 마세요.
+- Windows 경로 `C:\\ws-workspace\\eyebottlelee`에서 빌드할 때 열린 편집기가 있다면 동기화 전 저장하고 닫습니다.
+- 새 스크립트를 추가할 경우 실행 권한(`chmod +x`)과 Windows 대응 PowerShell 버전을 동시에 제공합니다.
 
-## Codex CLI 사용 가이드
-- 기본 환경: danger-full-access, approval `never` 가정. 명시적으로 제한이 바뀌면 해당 정책을 우선한다.
-- 명령 실행 시 항상 `workdir`를 지정하고, 불필요한 `cd` 사용을 피한다.
-- 파일 내용 확인은 `cat`, `sed`, `nl` 등 읽기 전용 명령 우선. 검색은 `rg` 기본.
-- 네트워크/웹 검색은 사용자가 요청하거나 최신 정보 확인이 필요한 경우에만 수행하며, 필요한 경우 사전 안내 후 실행한다.
-
-## 변경 제안 형식
-- 작은 단위로 나누어 `apply_patch`를 사용합니다.
-- 한 패치에는 논리적으로 연관된 변경만 포함합니다(예: 코드 + 해당 테스트).
-- 새로운 파일 추가 시 헤더/주석/예제를 함께 제공하여 사용 맥락을 분명히 합니다.
-- 불필요한 개행·트레일링 스페이스 추가/제거는 피하고, 필요 변경 시 이유를 보고합니다.
-
-## 문서 유지
-- 리포지터리 구조나 도구 체계가 바뀌면, 본 문서를 가장 먼저 갱신합니다.
-- `docs/medical-recording-prd.md`, `docs/developing.md`의 업데이트가 필요하면 코드 변경과 함께 진행하고, 변경 요약을 최종 보고에 포함합니다.
-- 테스트/빌드 절차가 추가되면 INSTALL.md 또는 README.md도 동기화합니다.
-
----
-최종 수정: 2025-09-16
+## Security & Configuration Tips
+- 비밀 값은 `.env`나 OS 비밀 저장소에 보관하고 레포지토리에 커밋하지 않습니다.
+- `pubspec.yaml` 의존성 변경은 `docs/developing.md`의 단계별 계획과 충돌하지 않는지 검토한 뒤 진행합니다.
+- Windows 자동 시작이나 OneDrive 경로는 사용자의 관리자 권한에 의존하므로, 실패 시 사용자 안내 문구를 UI와 문서에 동기화합니다.
