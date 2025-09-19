@@ -6,6 +6,7 @@ import 'package:launch_at_startup/launch_at_startup.dart';
 
 import '../../services/settings_service.dart';
 import '../style/app_spacing.dart';
+import 'app_section_card.dart';
 
 class AdvancedSettingsDialog extends StatefulWidget {
   const AdvancedSettingsDialog({super.key});
@@ -58,18 +59,19 @@ class _AdvancedSettingsDialogState extends State<AdvancedSettingsDialog> {
                 padding: const EdgeInsets.only(right: AppSpacing.xs),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    SwitchListTile(
-                      title: const Text('VAD(무음 자동 스킵) 사용'),
-                      value: _vadEnabled,
-                      onChanged: (v) => setState(() => _vadEnabled = v),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                    AppSectionCard(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          SwitchListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: const Text('VAD(무음 자동 스킵) 사용'),
+                            value: _vadEnabled,
+                            onChanged: (v) => setState(() => _vadEnabled = v),
+                          ),
+                          const SizedBox(height: AppSpacing.sm),
                           const Text('VAD 임계값'),
                           Slider(
                             value: _vadThreshold.clamp(0.001, 0.2),
@@ -84,17 +86,20 @@ class _AdvancedSettingsDialogState extends State<AdvancedSettingsDialog> {
                         ],
                       ),
                     ),
-                    const Divider(height: 24),
-                    CheckboxListTile(
-                      title: const Text('Windows 로그인 시 자동 실행'),
-                      value: _launchAtStartup,
-                      onChanged: (v) => setState(() => _launchAtStartup = v ?? true),
-                      subtitle: const Text('개발 단계에서는 실행 경로에 따라 동작이 제한될 수 있습니다.'),
+                    const SizedBox(height: AppSpacing.md),
+                    AppSectionCard(
+                      child: CheckboxListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('Windows 로그인 시 자동 실행'),
+                        value: _launchAtStartup,
+                        onChanged: (v) => setState(() => _launchAtStartup = v ?? true),
+                        subtitle: const Text('개발 단계에서는 실행 경로에 따라 동작이 제한될 수 있습니다.'),
+                      ),
                     ),
                   ],
                 ),
-              ),
             ),
+          ),
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),

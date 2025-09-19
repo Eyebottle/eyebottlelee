@@ -310,8 +310,8 @@ class AudioService {
   RecordConfig _buildRecordConfig() {
     return const RecordConfig(
       encoder: AudioEncoder.aacLc,
-      bitRate: 64000,
-      sampleRate: 16000,
+      bitRate: 128000,
+      sampleRate: 44100,
       numChannels: 1,
     );
   }
