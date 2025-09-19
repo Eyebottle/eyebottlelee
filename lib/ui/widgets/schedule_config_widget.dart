@@ -32,22 +32,19 @@ class _ScheduleConfigWidgetState extends State<ScheduleConfigWidget> {
   @override
   Widget build(BuildContext context) {
     final mediaSize = MediaQuery.of(context).size;
-    final maxWidth = mediaSize.width * 0.9;
-    final maxHeight = mediaSize.height * 0.8;
+    final maxWidth = (mediaSize.width * 0.9).clamp(320.0, 420.0);
+    final maxHeight = (mediaSize.height * 0.8).clamp(360.0, 560.0);
 
     return AlertDialog(
       title: const Text('진료 시간표 설정'),
-      content: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxWidth: maxWidth.clamp(0.0, 420.0),
-          maxHeight: maxHeight,
-        ),
+      content: SizedBox(
+        width: maxWidth,
+        height: maxHeight,
         child: Scrollbar(
           controller: _scrollController,
           thumbVisibility: true,
           child: ListView.separated(
             controller: _scrollController,
-            shrinkWrap: true,
             itemCount: 7,
             padding: const EdgeInsets.only(right: AppSpacing.xs, bottom: AppSpacing.sm),
             separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.sm),
