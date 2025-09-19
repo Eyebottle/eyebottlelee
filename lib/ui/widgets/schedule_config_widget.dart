@@ -14,12 +14,19 @@ class ScheduleConfigWidget extends StatefulWidget {
 
 class _ScheduleConfigWidgetState extends State<ScheduleConfigWidget> {
   late WeeklySchedule _schedule;
+  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
     _schedule = _getDefaultSchedule();
     _loadPersistedSchedule();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
   }
 
   @override
@@ -36,16 +43,15 @@ class _ScheduleConfigWidgetState extends State<ScheduleConfigWidget> {
           maxHeight: maxHeight,
         ),
         child: Scrollbar(
+          controller: _scrollController,
           thumbVisibility: true,
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.only(right: AppSpacing.xs),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                for (int weekDay = 1; weekDay <= 7; weekDay++)
-                  _buildDayScheduleCard(weekDay),
-              ],
-            ),
+          child: ListView.separated(
+            controller: _scrollController,
+            shrinkWrap: true,
+            itemCount: 7,
+            padding: const EdgeInsets.only(right: AppSpacing.xs, bottom: AppSpacing.sm),
+            separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.sm),
+            itemBuilder: (_, index) => _buildDayScheduleCard(index + 1),
           ),
         ),
       ),
@@ -68,7 +74,7 @@ class _ScheduleConfigWidgetState extends State<ScheduleConfigWidget> {
     final daySchedule = _schedule.weekDays[weekDay % 7] ?? DaySchedule.rest();
 
     return AppSectionCard(
-      margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+      margin: EdgeInsets.zero,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
