@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:launch_at_startup/launch_at_startup.dart';
 
 import '../../services/settings_service.dart';
+import '../style/app_spacing.dart';
 
 class AdvancedSettingsDialog extends StatefulWidget {
   const AdvancedSettingsDialog({super.key});
@@ -54,7 +55,7 @@ class _AdvancedSettingsDialogState extends State<AdvancedSettingsDialog> {
                 maxHeight: maxHeight,
               ),
               child: SingleChildScrollView(
-                padding: const EdgeInsets.only(right: 4),
+                padding: const EdgeInsets.only(right: AppSpacing.xs),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -65,7 +66,7 @@ class _AdvancedSettingsDialogState extends State<AdvancedSettingsDialog> {
                       onChanged: (v) => setState(() => _vadEnabled = v),
                     ),
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [

@@ -1,12 +1,12 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
 import 'package:cron/cron.dart';
+import 'package:flutter/material.dart';
 import '../models/schedule_model.dart';
 import 'logging_service.dart';
 
 class ScheduleService {
-  final Cron _cron = Cron();
+  Cron _cron = Cron();
   WeeklySchedule? _currentSchedule;
   final LoggingService _logging = LoggingService();
 
@@ -20,13 +20,17 @@ class ScheduleService {
 
   /// 진료 시간표 적용
   void applySchedule(WeeklySchedule schedule) {
-    // 기존 스케줄 정리
-    _cron.close();
+    _resetCron();
     _currentSchedule = schedule;
 
     // 새 스케줄 등록
     _registerCronJobs(schedule);
     _logging.info('새로운 진료 시간표 적용 완료');
+  }
+
+  void _resetCron() {
+    _cron.close();
+    _cron = Cron();
   }
 
   /// 크론 작업 등록

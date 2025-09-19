@@ -9,7 +9,9 @@ import '../../services/schedule_service.dart';
 import '../../services/settings_service.dart';
 import '../../services/tray_service.dart';
 import '../../services/logging_service.dart';
+import '../style/app_spacing.dart';
 import '../widgets/advanced_settings_dialog.dart';
+import '../widgets/app_section_card.dart';
 import '../widgets/recording_status_widget.dart';
 import '../widgets/schedule_config_widget.dart';
 import '../widgets/volume_meter_widget.dart';
@@ -130,7 +132,7 @@ class _MainScreenState extends State<MainScreen> {
       body: LayoutBuilder(
         builder: (context, constraints) {
           return SingleChildScrollView(
-            padding: const EdgeInsets.all(16.0),
+            padding: AppPadding.screen,
             child: ConstrainedBox(
               constraints: BoxConstraints(minHeight: constraints.maxHeight),
               child: Column(
@@ -138,35 +140,36 @@ class _MainScreenState extends State<MainScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   // 녹음 상태 표시
-                  RecordingStatusWidget(
-                    isRecording: _isRecording,
-                    startTime: _isRecording ? _currentSessionStart : null,
-                  ),
-                  const SizedBox(height: 16),
-
-                  // 볼륨 레벨 미터
-                  VolumeMeterWidget(volumeLevel: _volumeLevel),
-                  const SizedBox(height: 16),
-
-                  // 오늘 녹음 시간 카드
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.storage, size: 24),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              '오늘 녹음: $_todayRecordingTime',
-                              style: Theme.of(context).textTheme.titleMedium,
-                            ),
-                          ),
-                        ],
-                      ),
+                  AppSectionCard(
+                    child: RecordingStatusWidget(
+                      isRecording: _isRecording,
+                      startTime: _isRecording ? _currentSessionStart : null,
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: AppSpacing.md),
+
+                  // 볼륨 레벨 미터
+                  AppSectionCard(
+                    child: VolumeMeterWidget(volumeLevel: _volumeLevel),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+
+                  // 오늘 녹음 시간 카드
+                  AppSectionCard(
+                    child: Row(
+                      children: [
+                        const Icon(Icons.storage, size: 24),
+                        const SizedBox(width: AppSpacing.sm),
+                        Expanded(
+                          child: Text(
+                            '오늘 녹음: $_todayRecordingTime',
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
 
                   // 설정 버튼들
                   ElevatedButton.icon(
@@ -174,27 +177,27 @@ class _MainScreenState extends State<MainScreen> {
                     icon: const Icon(Icons.calendar_today),
                     label: const Text('진료 시간표 설정'),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: AppSpacing.sm + AppSpacing.xs),
 
                   ElevatedButton.icon(
                     onPressed: () => _showFolderDialog(),
                     icon: const Icon(Icons.folder),
                     label: const Text('저장 폴더 설정'),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: AppSpacing.sm + AppSpacing.xs),
 
                   ElevatedButton.icon(
                     onPressed: () => _showAdvancedSettings(),
                     icon: const Icon(Icons.settings),
                     label: const Text('고급 설정'),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: AppSpacing.lg),
 
                   // 제어 버튼들
                   Wrap(
                     alignment: WrapAlignment.spaceBetween,
-                    spacing: 12,
-                    runSpacing: 12,
+                    spacing: AppSpacing.sm,
+                    runSpacing: AppSpacing.sm,
                     children: [
                       SizedBox(
                         width: constraints.maxWidth >= 360 ? 150 : double.infinity,
@@ -219,7 +222,7 @@ class _MainScreenState extends State<MainScreen> {
                     ],
                   ),
 
-                  const SizedBox(height: 16),
+                  const SizedBox(height: AppSpacing.md),
                 ],
               ),
             ),

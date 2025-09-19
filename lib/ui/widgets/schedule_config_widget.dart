@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../models/schedule_model.dart';
 import '../../services/settings_service.dart';
+import '../style/app_spacing.dart';
+import 'app_section_card.dart';
 
 class ScheduleConfigWidget extends StatefulWidget {
   final VoidCallback? onSaved;
@@ -17,6 +19,7 @@ class _ScheduleConfigWidgetState extends State<ScheduleConfigWidget> {
   void initState() {
     super.initState();
     _schedule = _getDefaultSchedule();
+    _loadPersistedSchedule();
   }
 
   @override
@@ -35,7 +38,7 @@ class _ScheduleConfigWidgetState extends State<ScheduleConfigWidget> {
         child: Scrollbar(
           thumbVisibility: true,
           child: SingleChildScrollView(
-            padding: const EdgeInsets.only(right: 4),
+            padding: const EdgeInsets.only(right: AppSpacing.xs),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -64,86 +67,71 @@ class _ScheduleConfigWidgetState extends State<ScheduleConfigWidget> {
     final dayName = _getDayName(weekDay);
     final daySchedule = _schedule.weekDays[weekDay % 7] ?? DaySchedule.rest();
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 요일 제목과 근무일 체크박스
-            Row(
-              children: [
-                Text(
+    return AppSectionCard(
+      margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
                   dayName,
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
-                const Spacer(),
-                Checkbox(
-                  value: daySchedule.isWorkingDay,
-                  onChanged: (value) => _toggleWorkingDay(weekDay, value ?? false),
+              ),
+              Checkbox(
+                value: daySchedule.isWorkingDay,
+                onChanged: (value) => _toggleWorkingDay(weekDay, value ?? false),
+              ),
+              const Text('근무일'),
+            ],
+          ),
+
+          if (daySchedule.isWorkingDay) ...[
+            const SizedBox(height: AppSpacing.sm),
+            _ResponsiveFieldRow(
+              label: '진료시간',
+              controls: [
+                _buildTimeButton(
+                  context,
+                  daySchedule.startTime,
+                  (time) => _updateStartTime(weekDay, time),
                 ),
-                const Text('근무일'),
+                const Text('~'),
+                _buildTimeButton(
+                  context,
+                  daySchedule.endTime,
+                  (time) => _updateEndTime(weekDay, time),
+                ),
               ],
             ),
-
-            if (daySchedule.isWorkingDay) ...[
-              const SizedBox(height: 8),
-
-              // 진료 시간 설정
-              Wrap(
-                crossAxisAlignment: WrapCrossAlignment.center,
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  const Text('진료시간:'),
-                  _buildTimeButton(
-                    context,
-                    daySchedule.startTime,
-                    (time) => _updateStartTime(weekDay, time),
-                  ),
-                  const Text('~'),
-                  _buildTimeButton(
-                    context,
-                    daySchedule.endTime,
-                    (time) => _updateEndTime(weekDay, time),
-                  ),
-                ],
+            if (daySchedule.lunchStart != null)
+              const SizedBox(height: AppSpacing.sm),
+            _ResponsiveFieldRow(
+              label: '점심시간',
+              leading: Checkbox(
+                value: daySchedule.lunchStart != null,
+                onChanged: (value) => _toggleLunchTime(weekDay, value ?? false),
               ),
-              const SizedBox(height: 8),
-
-              // 점심시간 설정
-              Wrap(
-                crossAxisAlignment: WrapCrossAlignment.center,
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  SizedBox(
-                    height: 24,
-                    child: Checkbox(
-                      value: daySchedule.lunchStart != null,
-                      onChanged: (value) => _toggleLunchTime(weekDay, value ?? false),
-                    ),
-                  ),
-                  const Text('점심시간:'),
-                  if (daySchedule.lunchStart != null) ...[
-                    _buildTimeButton(
-                      context,
-                      daySchedule.lunchStart!,
-                      (time) => _updateLunchStart(weekDay, time),
-                    ),
-                    const Text('~'),
-                    _buildTimeButton(
-                      context,
-                      daySchedule.lunchEnd!,
-                      (time) => _updateLunchEnd(weekDay, time),
-                    ),
-                  ],
-                ],
-              ),
-            ],
+              controls: daySchedule.lunchStart == null
+                  ? [const Text('미사용')]
+                  : [
+                      _buildTimeButton(
+                        context,
+                        daySchedule.lunchStart!,
+                        (time) => _updateLunchStart(weekDay, time),
+                      ),
+                      const Text('~'),
+                      _buildTimeButton(
+                        context,
+                        daySchedule.lunchEnd!,
+                        (time) => _updateLunchEnd(weekDay, time),
+                      ),
+                    ],
+            ),
           ],
-        ),
+        ],
       ),
     );
   }
@@ -259,6 +247,14 @@ class _ScheduleConfigWidgetState extends State<ScheduleConfigWidget> {
     }
   }
 
+  Future<void> _loadPersistedSchedule() async {
+    final saved = await SettingsService().loadSchedule();
+    if (!mounted) return;
+    if (saved != null) {
+      setState(() => _schedule = saved);
+    }
+  }
+
   /// 기본 스케줄 반환
   WeeklySchedule _getDefaultSchedule() {
     return WeeklySchedule(
@@ -316,5 +312,73 @@ class _ScheduleConfigWidgetState extends State<ScheduleConfigWidget> {
   /// 시간 포맷팅
   String _formatTime(TimeOfDay time) {
     return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
+  }
+}
+
+class _ResponsiveFieldRow extends StatelessWidget {
+  const _ResponsiveFieldRow({
+    required this.label,
+    required this.controls,
+    this.leading,
+  });
+
+  final String label;
+  final List<Widget> controls;
+  final Widget? leading;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isCompact = constraints.maxWidth < 300;
+        final labelWidget = Text(
+          label,
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+        );
+        final controlsWrap = Wrap(
+          alignment: WrapAlignment.start,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: AppSpacing.sm,
+          runSpacing: AppSpacing.xs,
+          children: controls,
+        );
+
+        if (isCompact) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (leading != null) ...[
+                    SizedBox(height: 24, child: leading!),
+                    const SizedBox(width: AppSpacing.xs),
+                  ],
+                  labelWidget,
+                ],
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              controlsWrap,
+            ],
+          );
+        }
+
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            if (leading != null) ...[
+              SizedBox(height: 24, child: leading!),
+              const SizedBox(width: AppSpacing.xs),
+            ],
+            SizedBox(
+              width: 80,
+              child: labelWidget,
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(child: controlsWrap),
+          ],
+        );
+      },
+    );
   }
 }
