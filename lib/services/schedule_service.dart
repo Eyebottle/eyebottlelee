@@ -35,26 +35,15 @@ class ScheduleService {
 
   /// 크론 작업 등록
   void _registerCronJobs(WeeklySchedule schedule) {
-    for (final daySchedule in schedule.weekDays.entries) {
-      final weekDay = daySchedule.key;
-      final dayConfig = daySchedule.value;
+    for (final entry in schedule.weekDays.entries) {
+      final weekDay = entry.key;
+      final dayConfig = entry.value;
 
-      if (dayConfig.isWorkingDay) {
-        // 진료 시작 스케줄
-        _scheduleStartJob(weekDay, dayConfig.startTime);
+      if (!dayConfig.hasWorkingSession) continue;
 
-        // 점심시간 시작 (녹음 중지)
-        if (dayConfig.lunchStart != null) {
-          _scheduleStopJob(weekDay, dayConfig.lunchStart!);
-        }
-
-        // 점심시간 종료 (녹음 재시작)
-        if (dayConfig.lunchEnd != null) {
-          _scheduleStartJob(weekDay, dayConfig.lunchEnd!);
-        }
-
-        // 진료 종료 스케줄
-        _scheduleStopJob(weekDay, dayConfig.endTime);
+      for (final slot in dayConfig.sessions) {
+        _scheduleStartJob(weekDay, slot.start);
+        _scheduleStopJob(weekDay, slot.end);
       }
     }
   }
@@ -101,30 +90,9 @@ class ScheduleService {
     final currentTime = TimeOfDay(hour: now.hour, minute: now.minute);
 
     final daySchedule = _currentSchedule!.weekDays[currentDay];
-    if (daySchedule == null || !daySchedule.isWorkingDay) return false;
+    if (daySchedule == null) return false;
 
-    // 기본 진료 시간 체크
-    if (!_isTimeInRange(currentTime, daySchedule.startTime, daySchedule.endTime)) {
-      return false;
-    }
-
-    // 점심시간 체크
-    if (daySchedule.lunchStart != null && daySchedule.lunchEnd != null) {
-      if (_isTimeInRange(currentTime, daySchedule.lunchStart!, daySchedule.lunchEnd!)) {
-        return false; // 점심시간이므로 근무 시간이 아님
-      }
-    }
-
-    return true;
-  }
-
-  /// 시간 범위 체크
-  bool _isTimeInRange(TimeOfDay current, TimeOfDay start, TimeOfDay end) {
-    final currentMinutes = current.hour * 60 + current.minute;
-    final startMinutes = start.hour * 60 + start.minute;
-    final endMinutes = end.hour * 60 + end.minute;
-
-    return currentMinutes >= startMinutes && currentMinutes <= endMinutes;
+    return daySchedule.isTimeInWorkingHours(currentTime);
   }
 
   /// 다음 진료 시작 시간 가져오기
@@ -139,22 +107,22 @@ class ScheduleService {
       final weekDay = checkDate.weekday % 7;
       final daySchedule = _currentSchedule!.weekDays[weekDay];
 
-      if (daySchedule != null && daySchedule.isWorkingDay) {
-        final startTime = daySchedule.startTime;
-        final workingDateTime = DateTime(
-          checkDate.year,
-          checkDate.month,
-          checkDate.day,
-          startTime.hour,
-          startTime.minute,
-        );
+      if (daySchedule != null && daySchedule.hasWorkingSession) {
+        for (final slot in daySchedule.sessions) {
+          final workingDateTime = DateTime(
+            checkDate.year,
+            checkDate.month,
+            checkDate.day,
+            slot.start.hour,
+            slot.start.minute,
+          );
 
-        // 오늘이면 현재 시간 이후인지 체크
-        if (i == 0 && workingDateTime.isBefore(now)) {
-          continue;
+          if (i == 0 && workingDateTime.isBefore(now)) {
+            continue;
+          }
+
+          return workingDateTime;
         }
-
-        return workingDateTime;
       }
     }
 
