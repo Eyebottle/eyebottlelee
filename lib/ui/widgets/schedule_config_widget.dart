@@ -488,14 +488,23 @@ class _TimeButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final formatted = _formatTime(time);
+    final textTheme = Theme.of(context).textTheme;
     return OutlinedButton(
       onPressed: () => onPressed(),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
+      style: OutlinedButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        minimumSize: const Size(0, 40),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Text(label),
-          const SizedBox(width: AppSpacing.xs),
-          Text(formatted, style: Theme.of(context).textTheme.bodyMedium),
+          Text(label, style: textTheme.bodySmall),
+          const SizedBox(height: 4),
+          Text(
+            formatted,
+            style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+          ),
         ],
       ),
     );
