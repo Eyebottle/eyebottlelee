@@ -111,13 +111,22 @@ class _ScheduleConfigWidgetState extends State<ScheduleConfigWidget> {
           ),
           if (editor.working) ...[
             const SizedBox(height: AppSpacing.sm),
-            SegmentedButton<DaySessionMode>(
-              segments: const [
-                ButtonSegment(value: DaySessionMode.fullDay, label: Text('종일')),
-                ButtonSegment(value: DaySessionMode.split, label: Text('오전/오후')),
-              ],
-              selected: {editor.mode},
-              onSelectionChanged: (values) => _onModeChanged(index, values.first),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: SegmentedButton<DaySessionMode>(
+                segments: const [
+                  ButtonSegment(value: DaySessionMode.fullDay, label: Text('종일')),
+                  ButtonSegment(value: DaySessionMode.split, label: Text('오전·오후')),
+                ],
+                selected: {editor.mode},
+                style: ButtonStyle(
+                  padding: MaterialStateProperty.all(const EdgeInsets.symmetric(horizontal: 12, vertical: 8)),
+                  visualDensity: VisualDensity.compact,
+                  textStyle: MaterialStateProperty.all(TextStyle(fontSize: Theme.of(context).textTheme.bodySmall?.fontSize ?? 13)),
+                ),
+                onSelectionChanged: (values) => _onModeChanged(index, values.first),
+              ),
             ),
             const SizedBox(height: AppSpacing.sm),
             if (editor.mode == DaySessionMode.fullDay)
