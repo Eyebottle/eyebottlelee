@@ -91,6 +91,7 @@ class _ScheduleConfigWidgetState extends State<ScheduleConfigWidget> {
     return AppSectionCard(
       margin: EdgeInsets.zero,
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
@@ -300,6 +301,7 @@ class _FullDayEditor extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(
+      mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text('근무 시간'),
@@ -360,6 +362,7 @@ class _SplitEditor extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(
+      mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _SessionRow(
@@ -424,6 +427,7 @@ class _SessionRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(
+      mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
