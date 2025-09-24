@@ -1,3 +1,5 @@
+// ignore_for_file: invalid_use_of_protected_member
+
 import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart';
@@ -35,6 +37,7 @@ class _AdvancedSettingsDialogState extends State<AdvancedSettingsDialog> {
   bool _launchAtStartup = true;
   bool _loading = true;
   RetentionOption _retentionOption = RetentionOption.forever;
+  VadPreset? _vadPreset;
 
   @override
   void initState() {
@@ -53,6 +56,7 @@ class _AdvancedSettingsDialogState extends State<AdvancedSettingsDialog> {
       _vadThreshold = vadThreshold;
       _launchAtStartup = launch;
       _retentionOption = _optionFromDuration(retention);
+      _vadPreset = _presetFromThreshold(_vadThreshold);
       _loading = false;
     });
   }
@@ -118,8 +122,8 @@ class _AdvancedSettingsDialogState extends State<AdvancedSettingsDialog> {
     final theme = Theme.of(context);
     final (title, description) = switch (widget.section) {
       AdvancedSettingSection.vad => (
-          'VAD 설정',
-          '무음 감지 민감도를 조정해 진료 환경에 맞게 최적화하세요.'
+          '무음 감지 설정',
+          '말이 끊어졌을 때 자동으로 녹음을 멈추고, 다시 말하면 이어서 녹음되도록 민감도를 조절합니다.'
         ),
       AdvancedSettingSection.retention => (
           '녹음 파일 보관 기간',
@@ -168,9 +172,9 @@ class _AdvancedSettingsDialogState extends State<AdvancedSettingsDialog> {
       case AdvancedSettingSection.vad:
         return _SettingsCard(
           icon: Icons.mic,
-          title: 'VAD (무음 자동 스킵)',
+          title: '무음 감지(자동 일시정지)',
           description:
-              '값을 낮출수록 조용한 소리까지 감지하고, 값을 높이면 큰 소리에서만 녹음이 이어집니다. 환경 소음이 많다면 값을 조금 높여주세요.',
+              '값을 낮출수록 작은 소리에도 녹음이 이어지고, 값을 높이면 큰 소리에서만 녹음이 유지됩니다. 진료실이 조용한 경우 낮은 값(0.004), 복도나 대기실 소음이 들어오는 경우 높은 값(0.020)을 권장합니다. 설정 후 짧은 테스트 녹음을 꼭 진행해 보세요.',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -179,6 +183,34 @@ class _AdvancedSettingsDialogState extends State<AdvancedSettingsDialog> {
                 title: const Text('VAD 사용'),
                 value: _vadEnabled,
                 onChanged: (v) => setState(() => _vadEnabled = v),
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                children: [
+                  ChoiceChip(
+                    label: const Text('주변 조용 (권장 0.004)'),
+                    selected: _vadPreset == VadPreset.quiet,
+                    onSelected: (selected) {
+                      if (!selected) return;
+                      setState(() {
+                        _vadPreset = VadPreset.quiet;
+                        _vadThreshold = 0.004;
+                      });
+                    },
+                  ),
+                  ChoiceChip(
+                    label: const Text('주변 혼잡 (권장 0.020)'),
+                    selected: _vadPreset == VadPreset.noisy,
+                    onSelected: (selected) {
+                      if (!selected) return;
+                      setState(() {
+                        _vadPreset = VadPreset.noisy;
+                        _vadThreshold = 0.02;
+                      });
+                    },
+                  ),
+                ],
               ),
               const SizedBox(height: 12),
               Text(
@@ -195,7 +227,10 @@ class _AdvancedSettingsDialogState extends State<AdvancedSettingsDialog> {
                 divisions: 99,
                 label: _vadThreshold.toStringAsFixed(3),
                 onChanged: _vadEnabled
-                    ? (v) => setState(() => _vadThreshold = v)
+                    ? (v) => setState(() {
+                          _vadThreshold = v;
+                          _vadPreset = null;
+                        })
                     : null,
               ),
             ],
@@ -205,20 +240,28 @@ class _AdvancedSettingsDialogState extends State<AdvancedSettingsDialog> {
         return _SettingsCard(
           icon: Icons.history,
           title: '녹음 파일 자동 삭제 기간',
-          description: '선택한 기간이 지나면 앱이 날짜별 폴더를 포함해 자동으로 정리합니다.',
-          child: Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: RetentionOption.values
-                .map(
-                  (option) => ChoiceChip(
-                    label: Text(_labelForOption(option)),
-                    selected: _retentionOption == option,
-                    onSelected: (_) =>
-                        setState(() => _retentionOption = option),
-                  ),
-                )
-                .toList(),
+          description: '기본값은 영구 보존이며, 선택한 기간이 지나면 앱이 날짜별 폴더를 포함해 자동으로 정리합니다.',
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: RetentionOption.values.map((option) {
+              final (label, detail) = _retentionDetails(option);
+              return RadioListTile<RetentionOption>(
+                contentPadding: EdgeInsets.zero,
+                title: Text(label,
+                    style: const TextStyle(fontWeight: FontWeight.w600)),
+                subtitle: detail == null
+                    ? null
+                    : Text(detail,
+                        style: Theme.of(context).textTheme.bodySmall),
+                value: option,
+                groupValue: _retentionOption,
+                onChanged: (value) {
+                  if (value != null) {
+                    setState(() => _retentionOption = value);
+                  }
+                },
+              );
+            }).toList(),
           ),
         );
       case AdvancedSettingSection.autoLaunch:
@@ -268,6 +311,14 @@ class _AdvancedSettingsDialogState extends State<AdvancedSettingsDialog> {
       Navigator.of(context).pop('saved');
     }
   }
+}
+
+enum VadPreset { quiet, noisy }
+
+VadPreset? _presetFromThreshold(double threshold) {
+  if ((threshold - 0.004).abs() < 0.0005) return VadPreset.quiet;
+  if ((threshold - 0.020).abs() < 0.0005) return VadPreset.noisy;
+  return null;
 }
 
 class _SettingsCard extends StatelessWidget {
@@ -389,5 +440,25 @@ String _labelForOption(RetentionOption option) {
       return '6개월';
     case RetentionOption.year:
       return '1년';
+  }
+}
+
+(String, String?) _retentionDetails(RetentionOption option) {
+  switch (option) {
+    case RetentionOption.forever:
+      return (
+        '삭제 없음 (영구 보존)',
+        '기본값입니다. 모든 녹음 파일을 수동으로 정리할 때까지 보관합니다.',
+      );
+    case RetentionOption.week:
+      return ('1주', '최근 진료만 확인할 때 권장합니다.');
+    case RetentionOption.month:
+      return ('1개월', '일반적인 진료 기록 보관 기간에 적합합니다.');
+    case RetentionOption.threeMonths:
+      return ('3개월', '분기별 보고나 검토를 준비할 때 유용합니다.');
+    case RetentionOption.sixMonths:
+      return ('6개월', '반기 단위로 정리하는 환경에 적합합니다.');
+    case RetentionOption.year:
+      return ('1년', '장기 보관이 필요할 때 사용하세요.');
   }
 }
