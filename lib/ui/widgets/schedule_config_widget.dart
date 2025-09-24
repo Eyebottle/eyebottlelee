@@ -3,9 +3,10 @@ import 'package:flutter/material.dart';
 import '../../models/schedule_model.dart';
 import '../../services/settings_service.dart';
 import '../style/app_spacing.dart';
-import 'app_section_card.dart';
 
 enum DaySessionMode { fullDay, split }
+
+const _textMuted = Color(0xFF54606A);
 
 class ScheduleConfigWidget extends StatefulWidget {
   const ScheduleConfigWidget({super.key, this.onSaved});
@@ -39,37 +40,86 @@ class _ScheduleConfigWidgetState extends State<ScheduleConfigWidget> {
   @override
   Widget build(BuildContext context) {
     final mediaSize = MediaQuery.of(context).size;
-    final maxWidth = (mediaSize.width * 0.9).clamp(320.0, 420.0);
-    final maxHeight = (mediaSize.height * 0.8).clamp(360.0, 560.0);
+    final maxWidth = (mediaSize.width * 0.8).clamp(360.0, 540.0);
+    final maxHeight = (mediaSize.height * 0.82).clamp(420.0, 640.0);
 
-    return AlertDialog(
-      title: const Text('진료 시간표 설정'),
-      content: SizedBox(
-        width: maxWidth,
-        height: maxHeight,
-        child: Scrollbar(
-          controller: _scrollController,
-          thumbVisibility: true,
-          child: ListView.separated(
-            controller: _scrollController,
-            padding: const EdgeInsets.only(
-                right: AppSpacing.xs, bottom: AppSpacing.sm),
-            itemCount: 7,
-            separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.sm),
-            itemBuilder: (_, index) => _buildDayCard(index + 1),
-          ),
+    return Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: maxWidth, maxHeight: maxHeight),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '진료 시간표 설정',
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleLarge
+                              ?.copyWith(fontWeight: FontWeight.w700),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          '요일별 근무 여부와 진료 시간을 설정하세요.',
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodySmall
+                              ?.copyWith(color: Colors.grey.shade600),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: '닫기',
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            Expanded(
+              child: Scrollbar(
+                controller: _scrollController,
+                thumbVisibility: true,
+                child: ListView.separated(
+                  controller: _scrollController,
+                  padding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
+                  itemCount: 7,
+                  separatorBuilder: (_, __) => const SizedBox(height: 16),
+                  itemBuilder: (_, index) => _buildDayCard(index + 1),
+                ),
+              ),
+            ),
+            const Divider(height: 1),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('취소'),
+                  ),
+                  const SizedBox(width: 12),
+                  FilledButton(
+                    onPressed: _save,
+                    child: const Text('저장'),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('취소'),
-        ),
-        ElevatedButton(
-          onPressed: _save,
-          child: const Text('저장'),
-        ),
-      ],
     );
   }
 
@@ -89,47 +139,71 @@ class _ScheduleConfigWidgetState extends State<ScheduleConfigWidget> {
     final editor = _editorStates[index]!;
     final dayName = _dayName(weekDay);
 
-    return AppSectionCard(
-      margin: EdgeInsets.zero,
+    final theme = Theme.of(context);
+    final cardColor = theme.colorScheme.surface;
+    final borderColor = theme.colorScheme.outlineVariant.withAlpha(60);
+    return Container(
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: borderColor),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0F000000),
+            blurRadius: 12,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(20),
       child: Column(
-        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
               Expanded(
-                child: Text(
-                  dayName,
-                  style: Theme.of(context).textTheme.titleMedium,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      dayName,
+                      style: theme.textTheme.titleMedium
+                          ?.copyWith(fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      editor.working ? '근무를 설정하세요' : '휴무일로 설정되어 있습니다',
+                      style: theme.textTheme.bodySmall
+                          ?.copyWith(color: _textMuted),
+                    ),
+                  ],
                 ),
               ),
-              Switch(
+              Switch.adaptive(
                 value: editor.working,
                 onChanged: (value) => _onWorkingChanged(index, value),
               ),
-              Text(editor.working ? '근무' : '휴무'),
             ],
           ),
           if (editor.working) ...[
-            const SizedBox(height: AppSpacing.sm),
-            Wrap(
-              spacing: AppSpacing.sm,
-              children: [
-                ChoiceChip(
-                  label: const Text('종일'),
-                  selected: editor.mode == DaySessionMode.fullDay,
-                  onSelected: (_) =>
-                      _onModeChanged(index, DaySessionMode.fullDay),
+            const SizedBox(height: 16),
+            SegmentedButton<DaySessionMode>(
+              showSelectedIcon: false,
+              segments: const [
+                ButtonSegment(
+                  value: DaySessionMode.fullDay,
+                  label: Text('종일'),
                 ),
-                ChoiceChip(
-                  label: const Text('오전·오후'),
-                  selected: editor.mode == DaySessionMode.split,
-                  onSelected: (_) =>
-                      _onModeChanged(index, DaySessionMode.split),
+                ButtonSegment(
+                  value: DaySessionMode.split,
+                  label: Text('오전·오후'),
                 ),
               ],
+              selected: {editor.mode},
+              onSelectionChanged: (selection) =>
+                  _onModeChanged(index, selection.first),
             ),
-            const SizedBox(height: AppSpacing.sm),
+            const SizedBox(height: 20),
             if (editor.mode == DaySessionMode.fullDay)
               _FullDayEditor(
                 state: editor,
@@ -323,8 +397,14 @@ class _FullDayEditor extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('근무 시간'),
-        const SizedBox(height: AppSpacing.xs),
+        Text(
+          '근무 시간',
+          style: Theme.of(context)
+              .textTheme
+              .labelLarge
+              ?.copyWith(fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 8),
         Row(
           children: [
             Expanded(
@@ -451,16 +531,23 @@ class _SessionRow extends StatelessWidget {
       children: [
         Row(
           children: [
-            Checkbox(
+            Switch.adaptive(
               value: enabled,
-              onChanged: (value) => onToggle(value ?? false),
+              onChanged: (value) => onToggle(value),
             ),
-            Text(label),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: Theme.of(context)
+                  .textTheme
+                  .bodyMedium
+                  ?.copyWith(fontWeight: FontWeight.w600),
+            ),
           ],
         ),
         if (enabled)
           Padding(
-            padding: const EdgeInsets.only(left: 8.0),
+            padding: const EdgeInsets.only(left: 4.0, top: 6.0),
             child: Row(
               children: [
                 Expanded(
@@ -501,21 +588,22 @@ class _TimeButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final formatted = _formatTime(time);
     final textTheme = Theme.of(context).textTheme;
-    return OutlinedButton(
+    return FilledButton.tonal(
       onPressed: () => onPressed(),
-      style: OutlinedButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-        minimumSize: const Size(0, 40),
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      style: FilledButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        alignment: Alignment.centerLeft,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: textTheme.bodySmall),
+          Text(label, style: textTheme.labelSmall?.copyWith(color: _textMuted)),
           const SizedBox(height: 4),
           Text(
             formatted,
-            style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+            style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
           ),
         ],
       ),
