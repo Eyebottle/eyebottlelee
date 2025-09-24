@@ -255,20 +255,6 @@ class _MainScreenState extends State<MainScreen>
           label: const Text('사용법'),
           style: TextButton.styleFrom(foregroundColor: _primaryColor),
         ),
-        const SizedBox(width: 8),
-        FilledButton.icon(
-          onPressed: () => _tabController.animateTo(1),
-          icon: const Icon(Icons.settings),
-          label: const Text('설정'),
-          style: FilledButton.styleFrom(
-            backgroundColor: _primaryColor,
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-        ),
       ],
     );
   }
@@ -286,8 +272,10 @@ class _MainScreenState extends State<MainScreen>
         dividerColor: Colors.transparent,
         indicator: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
-          color: _primaryColor.withAlpha((0.12 * 255).round()),
+          color: _primaryColor.withAlpha((0.16 * 255).round()),
         ),
+        indicatorPadding:
+            const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
         labelColor: _primaryColor,
         unselectedLabelColor: _textMuted,
         tabs: const [

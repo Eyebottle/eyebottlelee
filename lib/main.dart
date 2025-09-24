@@ -20,13 +20,11 @@ void main() async {
   );
 
   windowManager.waitUntilReadyToShow(windowOptions, () async {
-    print('[Window] waitUntilReadyToShow');
     await windowManager.show();
     await windowManager.focus();
   });
 
   WidgetsBinding.instance.addPostFrameCallback((_) async {
-    print('[Window] addPostFrameCallback');
     await _applyWindowMetrics(
         initialSize: initialSize, minimumSize: minimumSize);
   });
@@ -46,30 +44,16 @@ Future<void> _applyWindowMetrics({
     }
 
     final ratio = await windowManager.getDevicePixelRatio();
-    print('[Window] attempt ${attempt + 1} dpr=$ratio');
 
     await windowManager.setMinimumSize(minimumSize);
     await windowManager.setSize(initialSize);
     await windowManager.center();
-    await _logWindowState('applySize attempt ${attempt + 1}', ratio: ratio);
 
     if (ratio > 1.01 || ratio < 0.99) {
       // DPI 제대로 반영된 것 같으면 더 시도하지 않음
       break;
     }
   }
-}
-
-Future<void> _logWindowState(String label, {double? ratio}) async {
-  final bounds = await windowManager.getBounds();
-  final size = await windowManager.getSize();
-  final position = await windowManager.getPosition();
-  final devicePixelRatio = ratio ?? await windowManager.getDevicePixelRatio();
-
-  print('[Window][$label] ratio=$devicePixelRatio '
-      'size=${size.width}×${size.height} '
-      'bounds=${bounds.size.width}×${bounds.size.height} '
-      'pos=${position.dx},${position.dy}');
 }
 
 class MedicalRecorderApp extends StatelessWidget {
