@@ -3,7 +3,7 @@
 문서 목적: 이 저장소를 처음 받는 개발자가 현재까지의 구현 상태를 빠르게 파악하고, 동일한 방향으로 다음 작업을 이어갈 수 있도록 돕습니다.
 
 - 대상: Windows 데스크톱용 Flutter 앱 개발(WSL 파일시스템 + Windows 툴체인)
-- 마지막 갱신: 2025-09-16
+- 마지막 갱신: 2025-09-24
 - 참고: [제품 요구사항 PRD](medical-recording-prd.md)
 
 ---
@@ -43,6 +43,13 @@
   - “진료 시간표 설정” 다이얼로그 저장 → 스케줄 즉시 재적용
   - “고급 설정” 다이얼로그(VAD 토글/임계값, 값 설명 문구, Windows 자동 시작 토글, 녹음 파일 보관 기간 선택)
   - 대시보드 하단 카드에서 현재 저장 경로 및 자동 정리 정책 안내
+
+### 2025-09-24 주요 업데이트
+- 메인 화면을 `대시보드 / 설정` 탭 구조로 재구성하고, 녹음 상태 카드·애니메이션 볼륨 미터·저장 경로 안내 카드를 새 디자인으로 통일(`feat: refresh dashboard layout and window sizing`).
+- 스케줄 설정 다이얼로그를 카드형 UI로 전면 수정하고 SegmentedButton·Switch 기반 컨트롤을 도입해 일관된 사용자 경험 제공(`feat: redesign schedule configuration dialog`).
+- 고급 설정을 VAD / 보관 기간 / 자동 실행 세 가지 개별 다이얼로그로 분리하고, 권장 프리셋과 설명을 추가해 사용성을 개선(`feat: split advanced settings into dedicated dialogs`, `feat: add VAD presets and guidance`).
+- 창 초기 크기·최소 크기 로직을 개선해 DPI 환경에서도 650×840 레이아웃이 안정적으로 적용되도록 조정(`feat: refresh dashboard layout and window sizing`).
+- 날짜별 저장 디렉터리 및 자동 보관 정책을 강화하고, 문서에 최신 정책을 반영.
 
 최근 확인 사항 (2025-09-23)
 - Windows 워킹카피(`C:\ws-workspace\eyebottlelee`)에서 `flutter pub get`, `flutter analyze` 수행해 무경고 상태임.
