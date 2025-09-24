@@ -196,7 +196,9 @@ class _MainScreenState extends State<MainScreen>
                       _SettingsTab(
                         onOpenSchedule: () => _showScheduleDialog(),
                         onOpenSaveFolder: () => _showFolderDialog(),
-                        onOpenAdvanced: () => _showAdvancedSettings(),
+                        onOpenVad: () => _openVadSettings(),
+                        onOpenRetention: () => _openRetentionSettings(),
+                        onOpenAutoLaunch: () => _openAutoLaunchSettings(),
                       ),
                     ],
                   ),
@@ -325,17 +327,33 @@ class _MainScreenState extends State<MainScreen>
     );
   }
 
-  Future<void> _showAdvancedSettings() async {
-    final result = await showDialog<String>(
-      context: context,
-      builder: (context) => const AdvancedSettingsDialog(),
+  Future<void> _openVadSettings() async {
+    final result = await AdvancedSettingsDialog.show(
+      context,
+      AdvancedSettingSection.vad,
     );
     if (result == 'saved') {
       final (enabled, threshold) = await _settings.getVad();
       _audioService.configureVad(enabled: enabled, threshold: threshold);
+    }
+  }
+
+  Future<void> _openRetentionSettings() async {
+    final result = await AdvancedSettingsDialog.show(
+      context,
+      AdvancedSettingSection.retention,
+    );
+    if (result == 'saved') {
       final retention = await _settings.getRetentionDuration();
       _audioService.configureRetention(retention);
     }
+  }
+
+  Future<void> _openAutoLaunchSettings() async {
+    await AdvancedSettingsDialog.show(
+      context,
+      AdvancedSettingSection.autoLaunch,
+    );
   }
 
   Future<void> _refreshSaveFolderDisplay() async {
@@ -785,12 +803,16 @@ class _SettingsTab extends StatelessWidget {
   const _SettingsTab({
     required this.onOpenSchedule,
     required this.onOpenSaveFolder,
-    required this.onOpenAdvanced,
+    required this.onOpenVad,
+    required this.onOpenRetention,
+    required this.onOpenAutoLaunch,
   });
 
   final Future<void> Function() onOpenSchedule;
   final Future<void> Function() onOpenSaveFolder;
-  final Future<void> Function() onOpenAdvanced;
+  final Future<void> Function() onOpenVad;
+  final Future<void> Function() onOpenRetention;
+  final Future<void> Function() onOpenAutoLaunch;
 
   @override
   Widget build(BuildContext context) {
@@ -824,7 +846,7 @@ class _SettingsTab extends StatelessWidget {
                 icon: Icons.history,
                 title: '저장 기간',
                 description: '녹음 파일의 보관 기간을 설정합니다.',
-                onTap: onOpenAdvanced,
+                onTap: onOpenRetention,
               ),
             ],
           ),
@@ -836,13 +858,13 @@ class _SettingsTab extends StatelessWidget {
                 icon: Icons.mic,
                 title: '음성 활동 감지 (VAD)',
                 description: '음성이 감지될 때만 녹음하도록 설정합니다.',
-                onTap: onOpenAdvanced,
+                onTap: onOpenVad,
               ),
               SettingsDestination(
                 icon: Icons.play_circle,
                 title: '윈도우 시작 시 자동 실행',
                 description: '컴퓨터 시작 시 앱을 자동으로 실행합니다.',
-                onTap: onOpenAdvanced,
+                onTap: onOpenAutoLaunch,
               ),
             ],
           ),
