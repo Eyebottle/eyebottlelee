@@ -268,19 +268,23 @@ class _MainScreenState extends State<MainScreen>
       ),
       child: TabBar(
         controller: _tabController,
-        labelPadding: const EdgeInsets.symmetric(vertical: 16),
+        padding: EdgeInsets.zero,
+        labelPadding: EdgeInsets.zero,
         dividerColor: Colors.transparent,
         indicator: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
-          color: _primaryColor.withAlpha((0.16 * 255).round()),
+          color: _primaryColor.withAlpha((0.12 * 255).round()),
         ),
-        indicatorPadding:
-            const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+        indicatorPadding: const EdgeInsets.all(4),
+        indicatorSize: TabBarIndicatorSize.tab,
         labelColor: _primaryColor,
         unselectedLabelColor: _textMuted,
+        labelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+        unselectedLabelStyle:
+            const TextStyle(fontWeight: FontWeight.w500, fontSize: 16),
         tabs: const [
-          Text('대시보드', style: TextStyle(fontWeight: FontWeight.w600)),
-          Text('설정', style: TextStyle(fontWeight: FontWeight.w600)),
+          Tab(child: Center(child: Text('대시보드'))),
+          Tab(child: Center(child: Text('설정'))),
         ],
       ),
     );
