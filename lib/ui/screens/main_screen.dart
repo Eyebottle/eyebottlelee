@@ -1,21 +1,23 @@
 import 'dart:async';
-import 'package:flutter/material.dart';
+
 import 'package:file_selector/file_selector.dart';
+import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../../models/schedule_model.dart';
 import '../../services/audio_service.dart';
+import '../../services/logging_service.dart';
 import '../../services/schedule_service.dart';
 import '../../services/settings_service.dart';
 import '../../services/tray_service.dart';
-import '../../services/logging_service.dart';
-import '../style/app_spacing.dart';
 import '../widgets/advanced_settings_dialog.dart';
-import '../widgets/app_section_card.dart';
-import '../widgets/recording_status_widget.dart';
+import '../widgets/animated_volume_meter.dart';
 import '../widgets/schedule_config_widget.dart';
-import '../widgets/volume_meter_widget.dart';
 
+const _backgroundColor = Color(0xFFF6F7F8);
+const _primaryColor = Color(0xFF1193D4);
+const _textMuted = Color(0xFF4A5860);
+const _cardBorder = Color(0xFFE7EFF3);
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -24,24 +26,33 @@ class MainScreen extends StatefulWidget {
   State<MainScreen> createState() => _MainScreenState();
 }
 
-class _MainScreenState extends State<MainScreen> {
+class _MainScreenState extends State<MainScreen>
+    with SingleTickerProviderStateMixin {
+  static const _volumeHistoryLimit = 48;
+
   final AudioService _audioService = AudioService();
   final ScheduleService _scheduleService = ScheduleService();
   final SettingsService _settings = SettingsService();
   final TrayService _trayService = TrayService();
   final LoggingService _loggingService = LoggingService();
 
+  late final TabController _tabController;
+
   bool _isRecording = false;
   double _volumeLevel = 0.0;
+  List<double> _volumeHistory = const [];
   String _todayRecordingTime = '0시간 0분';
   Duration _todayDuration = Duration.zero;
   DateTime? _currentSessionStart;
   Timer? _sessionTicker;
   String _currentDayKey = '';
+  String _currentSaveFolder = '경로 확인 중...';
+  WeeklySchedule? _currentSchedule;
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
     _initializeServices();
   }
 
@@ -60,13 +71,17 @@ class _MainScreenState extends State<MainScreen> {
     }
     _loggingService.addErrorListener(_handleLoggingError);
 
-    // 오디오 레벨 콜백 → UI 반영
     _audioService.onAmplitudeChanged = (level) {
       if (!mounted) return;
-      setState(() => _volumeLevel = level.clamp(0.0, 1.0));
+      setState(() {
+        _volumeLevel = level.clamp(0.0, 1.0);
+        final history = List<double>.from(_volumeHistory)..add(_volumeLevel);
+        _volumeHistory = history.length > _volumeHistoryLimit
+            ? history.sublist(history.length - _volumeHistoryLimit)
+            : history;
+      });
     };
 
-    // 세그먼트 파일 생성 콜백 (선택적 안내)
     _audioService.onFileSegmentCreated = (filePath) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -84,7 +99,8 @@ class _MainScreenState extends State<MainScreen> {
       _updateTodayRecordingDisplay();
     };
 
-    _audioService.onRecordingStopped = (startTime, stopTime, recordedDuration) async {
+    _audioService.onRecordingStopped =
+        (startTime, stopTime, recordedDuration) async {
       _sessionTicker?.cancel();
       _sessionTicker = null;
       if (mounted) {
@@ -96,20 +112,24 @@ class _MainScreenState extends State<MainScreen> {
       await _recordSessionDuration(startTime, stopTime);
     };
 
-    // 스케줄 서비스: 자동 시작/종료 연동
-    _scheduleService.onRecordingStart = () => _startRecording(showFeedback: false);
-    _scheduleService.onRecordingStop = () => _stopRecording(showFeedback: false);
+    _scheduleService.onRecordingStart =
+        () => _startRecording(showFeedback: false);
+    _scheduleService.onRecordingStop =
+        () => _stopRecording(showFeedback: false);
 
-    // 저장된 스케줄을 우선 적용, 없으면 기본값
-    final saved = await _settings.loadSchedule();
-    final schedule = saved ?? WeeklySchedule.defaultSchedule();
+    final savedSchedule = await _settings.loadSchedule();
+    final schedule = savedSchedule ?? WeeklySchedule.defaultSchedule();
     _scheduleService.applySchedule(schedule);
+    if (mounted) {
+      setState(() => _currentSchedule = schedule);
+    }
 
-    // VAD 설정 적용
     final (vadEnabled, vadThreshold) = await _settings.getVad();
     _audioService.configureVad(enabled: vadEnabled, threshold: vadThreshold);
 
-    // 트레이 초기화 (아이콘 파일이 없으면 내부적으로 실패할 수 있음 → 무시)
+    final retention = await _settings.getRetentionDuration();
+    _audioService.configureRetention(retention);
+
     try {
       await _trayService.initialize();
       _trayService.onStartRecording = () => _startRecording();
@@ -119,128 +139,176 @@ class _MainScreenState extends State<MainScreen> {
 
     await _loadTodayRecordingDuration();
     await _syncRecordingWithSchedule(initial: true);
+    await _refreshSaveFolderDisplay();
+  }
+
+  @override
+  void dispose() {
+    _sessionTicker?.cancel();
+    _tabController.dispose();
+    _audioService.dispose();
+    _trayService.dispose();
+    _loggingService.removeErrorListener(_handleLoggingError);
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('아이보틀 진료 녹음'),
-        centerTitle: true,
-        backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-      ),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          return SingleChildScrollView(
-            padding: AppPadding.screen,
-            child: ConstrainedBox(
-              constraints: BoxConstraints(minHeight: constraints.maxHeight),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // 녹음 상태 표시
-                  AppSectionCard(
-                    child: RecordingStatusWidget(
-                      isRecording: _isRecording,
-                      startTime: _isRecording ? _currentSessionStart : null,
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-
-                  // 볼륨 레벨 미터
-                  AppSectionCard(
-                    child: VolumeMeterWidget(volumeLevel: _volumeLevel),
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-
-                  // 오늘 녹음 시간 카드
-                  AppSectionCard(
-                    child: Row(
-                      children: [
-                        const Icon(Icons.storage, size: 24),
-                        const SizedBox(width: AppSpacing.sm),
-                        Expanded(
-                          child: Text(
-                            '오늘 녹음: $_todayRecordingTime',
-                            style: Theme.of(context).textTheme.titleMedium,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.lg),
-
-                  // 설정 버튼들
-                  ElevatedButton.icon(
-                    onPressed: () => _showScheduleDialog(),
-                    icon: const Icon(Icons.calendar_today),
-                    label: const Text('진료 시간표 설정'),
-                  ),
-                  const SizedBox(height: AppSpacing.sm + AppSpacing.xs),
-
-                  ElevatedButton.icon(
-                    onPressed: () => _showFolderDialog(),
-                    icon: const Icon(Icons.folder),
-                    label: const Text('저장 폴더 설정'),
-                  ),
-                  const SizedBox(height: AppSpacing.sm + AppSpacing.xs),
-
-                  ElevatedButton.icon(
-                    onPressed: () => _showAdvancedSettings(),
-                    icon: const Icon(Icons.settings),
-                    label: const Text('고급 설정'),
-                  ),
-                  const SizedBox(height: AppSpacing.lg),
-
-                  // 제어 버튼들
-                  Wrap(
-                    alignment: WrapAlignment.spaceBetween,
-                    spacing: AppSpacing.sm,
-                    runSpacing: AppSpacing.sm,
+      backgroundColor: _backgroundColor,
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(
+              minWidth: 620,
+              maxWidth: 960,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                  child: _buildHeader(),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: _buildTabBar(),
+                ),
+                const SizedBox(height: 16),
+                Expanded(
+                  child: TabBarView(
+                    controller: _tabController,
+                    physics: const NeverScrollableScrollPhysics(),
                     children: [
-                      SizedBox(
-                        width: constraints.maxWidth >= 360 ? 150 : double.infinity,
-                        child: ElevatedButton(
-                          onPressed: _isRecording ? _pauseRecording : null,
-                          child: const Text('일시정지'),
-                        ),
+                      _DashboardTab(
+                        isRecording: _isRecording,
+                        todayRecordingTime: _todayRecordingTime,
+                        plannedSessions: _plannedSessionsForToday(),
+                        saveFolder: _currentSaveFolder,
+                        volumeLevel: _volumeLevel,
+                        volumeHistory: _volumeHistory,
+                        onStartRecording: () => _startRecording(),
+                        onPauseRecording: () => _pauseRecording(),
+                        onStopRecording: () => _stopRecording(),
+                        onSyncSchedule: () => _syncRecordingWithSchedule(),
                       ),
-                      SizedBox(
-                        width: constraints.maxWidth >= 360 ? 150 : double.infinity,
-                        child: ElevatedButton(
-                          onPressed: _isRecording ? _stopRecording : _startRecording,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: _isRecording
-                                ? Theme.of(context).colorScheme.error
-                                : Theme.of(context).colorScheme.primary,
-                            foregroundColor: Colors.white,
-                          ),
-                          child: Text(_isRecording ? '중지' : '시작'),
-                        ),
+                      _SettingsTab(
+                        onOpenSchedule: () => _showScheduleDialog(),
+                        onOpenSaveFolder: () => _showFolderDialog(),
+                        onOpenAdvanced: () => _showAdvancedSettings(),
                       ),
                     ],
                   ),
-
-                  const SizedBox(height: AppSpacing.md),
-                ],
-              ),
+                ),
+              ],
             ),
-          );
-        },
+          ),
+        ),
       ),
     );
   }
 
-  void _showScheduleDialog() {
-    showDialog(
+  Widget _buildHeader() {
+    final subtitle = _isRecording ? '녹음이 진행 중입니다' : '대시보드에서 상태를 확인하세요';
+    return Row(
+      children: [
+        Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            color: _primaryColor,
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: const Icon(Icons.mic_none, color: Colors.white),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                '아이보틀 진료 녹음기',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF101C22),
+                ),
+              ),
+              Text(
+                subtitle,
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: _textMuted,
+                ),
+              ),
+            ],
+          ),
+        ),
+        TextButton.icon(
+          onPressed: () {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('사용법은 준비 중입니다.')),
+            );
+          },
+          icon: const Icon(Icons.menu_book_outlined),
+          label: const Text('사용법'),
+          style: TextButton.styleFrom(foregroundColor: _primaryColor),
+        ),
+        const SizedBox(width: 8),
+        FilledButton.icon(
+          onPressed: () => _tabController.animateTo(1),
+          icon: const Icon(Icons.settings),
+          label: const Text('설정'),
+          style: FilledButton.styleFrom(
+            backgroundColor: _primaryColor,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTabBar() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _cardBorder),
+      ),
+      child: TabBar(
+        controller: _tabController,
+        labelPadding: const EdgeInsets.symmetric(vertical: 16),
+        dividerColor: Colors.transparent,
+        indicator: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          color: _primaryColor.withAlpha((0.12 * 255).round()),
+        ),
+        labelColor: _primaryColor,
+        unselectedLabelColor: _textMuted,
+        tabs: const [
+          Text('대시보드', style: TextStyle(fontWeight: FontWeight.w600)),
+          Text('설정', style: TextStyle(fontWeight: FontWeight.w600)),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showScheduleDialog() async {
+    await showDialog<Widget>(
       context: context,
       builder: (context) => ScheduleConfigWidget(
         onSaved: () async {
-          // 저장된 스케줄 재적용 후 현재 시각에 맞춰 동기화
           final saved = await _settings.loadSchedule();
           if (saved != null) {
             _scheduleService.applySchedule(saved);
+            if (mounted) {
+              setState(() => _currentSchedule = saved);
+            }
             await _syncRecordingWithSchedule(initial: false);
           }
         },
@@ -252,9 +320,10 @@ class _MainScreenState extends State<MainScreen> {
     final selectedPath = await getDirectoryPath();
     if (selectedPath != null) {
       await _settings.setSaveFolder(selectedPath);
+      await _refreshSaveFolderDisplay();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('저장 폴더가 설정되었습니다: ' + selectedPath)),
+        SnackBar(content: Text('저장 폴더가 설정되었습니다: $selectedPath')),
       );
       return;
     }
@@ -264,15 +333,31 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
-
   Future<void> _showAdvancedSettings() async {
-    final result = await showDialog(
+    final result = await showDialog<String>(
       context: context,
       builder: (context) => const AdvancedSettingsDialog(),
     );
     if (result == 'saved') {
       final (enabled, threshold) = await _settings.getVad();
       _audioService.configureVad(enabled: enabled, threshold: threshold);
+      final retention = await _settings.getRetentionDuration();
+      _audioService.configureRetention(retention);
+    }
+  }
+
+  Future<void> _refreshSaveFolderDisplay() async {
+    try {
+      final path = await _audioService.getResolvedSaveRootPath();
+      if (!mounted) return;
+      setState(() {
+        _currentSaveFolder = path;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _currentSaveFolder = '경로를 확인할 수 없습니다: $e';
+      });
     }
   }
 
@@ -307,6 +392,9 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   Future<void> _pauseRecording() async {
+    if (!_audioService.isRecording) {
+      return;
+    }
     try {
       await _audioService.pauseRecording();
       if (!mounted) return;
@@ -366,15 +454,6 @@ class _MainScreenState extends State<MainScreen> {
     }();
   }
 
-  @override
-  void dispose() {
-    _sessionTicker?.cancel();
-    _audioService.dispose();
-    _trayService.dispose();
-    _loggingService.removeErrorListener(_handleLoggingError);
-    super.dispose();
-  }
-
   Future<void> _loadTodayRecordingDuration() async {
     final now = DateTime.now();
     final duration = await _settings.getRecordingDuration(now);
@@ -382,14 +461,17 @@ class _MainScreenState extends State<MainScreen> {
     _currentDayKey = _dayKey(now);
     setState(() {
       _todayDuration = duration;
-      _todayRecordingTime = _formatDuration(duration + _currentRunningDuration());
+      _todayRecordingTime =
+          _formatDuration(duration + _currentRunningDuration());
     });
   }
 
-  Future<void> _recordSessionDuration(DateTime startTime, DateTime stopTime) async {
+  Future<void> _recordSessionDuration(
+      DateTime startTime, DateTime stopTime) async {
     var segmentStart = startTime;
     while (segmentStart.isBefore(stopTime)) {
-      final dayStart = DateTime(segmentStart.year, segmentStart.month, segmentStart.day);
+      final dayStart =
+          DateTime(segmentStart.year, segmentStart.month, segmentStart.day);
       final nextDay = dayStart.add(const Duration(days: 1));
       final segmentEnd = stopTime.isBefore(nextDay) ? stopTime : nextDay;
       final delta = segmentEnd.difference(segmentStart);
@@ -430,14 +512,17 @@ class _MainScreenState extends State<MainScreen> {
   String _formatDuration(Duration duration) {
     final hours = duration.inHours;
     final minutes = duration.inMinutes.remainder(60);
-    return '${hours}시간 ${minutes}분';
+    final seconds = duration.inSeconds.remainder(60);
+    return '${hours.toString().padLeft(2, '0')}:'
+        '${minutes.toString().padLeft(2, '0')}:'
+        '${seconds.toString().padLeft(2, '0')}';
   }
 
   String _dayKey(DateTime date) {
     return '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
   }
 
-  Future<void> _syncRecordingWithSchedule({required bool initial}) async {
+  Future<void> _syncRecordingWithSchedule({bool initial = false}) async {
     final shouldRecord = _scheduleService.isCurrentlyWorkingTime();
 
     if (shouldRecord && !_audioService.isRecording) {
@@ -454,5 +539,541 @@ class _MainScreenState extends State<MainScreen> {
     );
     unawaited(_trayService.updateTrayIcon(TrayIconState.error));
     unawaited(_trayService.showNotification('녹음 오류', message));
+  }
+
+  List<String> _plannedSessionsForToday() {
+    final schedule = _currentSchedule;
+    if (schedule == null) return const [];
+    final now = DateTime.now();
+    final weekdayIndex = now.weekday % 7;
+    final daySchedule = schedule.weekDays[weekdayIndex] ?? DaySchedule.rest();
+    if (!daySchedule.isWorkingDay || daySchedule.sessions.isEmpty) {
+      return const ['오늘은 녹음 일정이 없습니다.'];
+    }
+
+    final isSplit = daySchedule.sessions.length > 1;
+    final lines = <String>[];
+    for (var i = 0; i < daySchedule.sessions.length; i++) {
+      final session = daySchedule.sessions[i];
+      final prefix = isSplit
+          ? (session.start.hour < 12
+              ? '오전'
+              : (session.start.hour < 18 ? '오후' : '세션 ${i + 1}'))
+          : '세션';
+      lines.add(
+          '$prefix: ${_formatTime(session.start)} - ${_formatTime(session.end)}');
+    }
+    return lines;
+  }
+
+  String _formatTime(TimeOfDay time) {
+    final hour = time.hour.toString().padLeft(2, '0');
+    final minute = time.minute.toString().padLeft(2, '0');
+    return '$hour:$minute';
+  }
+}
+
+class _DashboardTab extends StatelessWidget {
+  const _DashboardTab({
+    required this.isRecording,
+    required this.todayRecordingTime,
+    required this.plannedSessions,
+    required this.saveFolder,
+    required this.volumeLevel,
+    required this.volumeHistory,
+    required this.onStartRecording,
+    required this.onPauseRecording,
+    required this.onStopRecording,
+    required this.onSyncSchedule,
+  });
+
+  final bool isRecording;
+  final String todayRecordingTime;
+  final List<String> plannedSessions;
+  final String saveFolder;
+  final double volumeLevel;
+  final List<double> volumeHistory;
+  final Future<void> Function() onStartRecording;
+  final Future<void> Function() onPauseRecording;
+  final Future<void> Function() onStopRecording;
+  final Future<void> Function() onSyncSchedule;
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _buildRecordingCard(context),
+          const SizedBox(height: 16),
+          _buildInfoCard(context),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRecordingCard(BuildContext context) {
+    final theme = Theme.of(context);
+    final statusText = isRecording ? '녹음 진행 중' : '대기 중';
+    final statusColor = isRecording ? _primaryColor : _textMuted;
+    final indicatorColor = isRecording ? _primaryColor : _textMuted;
+
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: _cardBorder),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0C101C22),
+            blurRadius: 18,
+            offset: Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Column(
+            children: [
+              Text(
+                statusText,
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: statusColor,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _LiveIndicator(color: indicatorColor),
+                  const SizedBox(width: 8),
+                  Text(
+                    isRecording ? '실시간' : '대기 중',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: indicatorColor,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          AnimatedVolumeMeter(
+            history: volumeHistory,
+            maxHeight: 120,
+          ),
+          const SizedBox(height: 24),
+          Row(
+            children: [
+              Expanded(
+                child: _SummaryTile(
+                  title: '오늘의 녹음 시간',
+                  value: todayRecordingTime,
+                  alignment: TextAlign.left,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: _SummaryTile(
+                  title: '예정 녹음 시간',
+                  valueLines: plannedSessions,
+                  alignment: TextAlign.right,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isWide = constraints.maxWidth > 480;
+              return Wrap(
+                spacing: 16,
+                runSpacing: 12,
+                alignment: WrapAlignment.center,
+                children: [
+                  SizedBox(
+                    width:
+                        isWide ? constraints.maxWidth / 2 - 8 : double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: isRecording ? () => onPauseRecording() : null,
+                      icon: const Icon(Icons.pause),
+                      label: const Text('일시정지'),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        foregroundColor: _textMuted,
+                        disabledForegroundColor:
+                            _textMuted.withAlpha((0.4 * 255).round()),
+                      ),
+                    ),
+                  ),
+                  SizedBox(
+                    width:
+                        isWide ? constraints.maxWidth / 2 - 8 : double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: () =>
+                          isRecording ? onStopRecording() : onStartRecording(),
+                      icon: Icon(
+                          isRecording ? Icons.stop : Icons.fiber_manual_record),
+                      label: Text(isRecording ? '중지' : '녹음 시작'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor:
+                            isRecording ? Colors.redAccent : _primaryColor,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+          const SizedBox(height: 16),
+          Align(
+            alignment: Alignment.center,
+            child: TextButton.icon(
+              onPressed: () => onSyncSchedule(),
+              icon: const Icon(Icons.sync),
+              label: const Text('스케줄과 동기화'),
+              style: TextButton.styleFrom(
+                foregroundColor: _primaryColor,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoCard(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: _cardBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '저장 위치',
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: const Color(0xFF101C22),
+            ),
+          ),
+          const SizedBox(height: 8),
+          SelectableText(
+            saveFolder,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: _textMuted,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '녹음 파일은 날짜별 하위 폴더에 자동 정리됩니다.',
+            style: theme.textTheme.bodySmall?.copyWith(color: _textMuted),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SettingsTab extends StatelessWidget {
+  const _SettingsTab({
+    required this.onOpenSchedule,
+    required this.onOpenSaveFolder,
+    required this.onOpenAdvanced,
+  });
+
+  final Future<void> Function() onOpenSchedule;
+  final Future<void> Function() onOpenSaveFolder;
+  final Future<void> Function() onOpenAdvanced;
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _SettingsSection(
+            title: '스케줄 설정',
+            items: [
+              SettingsDestination(
+                icon: Icons.schedule,
+                title: '스케줄 설정',
+                description: '진료/녹음 시간을 관리합니다.',
+                onTap: onOpenSchedule,
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _SettingsSection(
+            title: '저장 설정',
+            items: [
+              SettingsDestination(
+                icon: Icons.folder_open,
+                title: '저장 위치',
+                description: '녹음 파일 저장 폴더를 변경합니다.',
+                onTap: onOpenSaveFolder,
+              ),
+              SettingsDestination(
+                icon: Icons.history,
+                title: '저장 기간',
+                description: '녹음 파일의 보관 기간을 설정합니다.',
+                onTap: onOpenAdvanced,
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _SettingsSection(
+            title: '고급 설정',
+            items: [
+              SettingsDestination(
+                icon: Icons.mic,
+                title: '음성 활동 감지 (VAD)',
+                description: '음성이 감지될 때만 녹음하도록 설정합니다.',
+                onTap: onOpenAdvanced,
+              ),
+              SettingsDestination(
+                icon: Icons.play_circle,
+                title: '윈도우 시작 시 자동 실행',
+                description: '컴퓨터 시작 시 앱을 자동으로 실행합니다.',
+                onTap: onOpenAdvanced,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class SettingsDestination {
+  SettingsDestination({
+    required this.icon,
+    required this.title,
+    required this.description,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String description;
+  final Future<void> Function() onTap;
+}
+
+class _SettingsSection extends StatelessWidget {
+  const _SettingsSection({
+    required this.title,
+    required this.items,
+  });
+
+  final String title;
+  final List<SettingsDestination> items;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: _cardBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
+            child: Text(
+              title,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: const Color(0xFF101C22),
+              ),
+            ),
+          ),
+          ...items.map((item) => _SettingsTile(item: item)).toList(),
+        ],
+      ),
+    );
+  }
+}
+
+class _SettingsTile extends StatelessWidget {
+  const _SettingsTile({required this.item});
+
+  final SettingsDestination item;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return InkWell(
+      onTap: () => item.onTap(),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: _primaryColor.withAlpha((0.12 * 255).round()),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(item.icon, color: _primaryColor),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.title,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: const Color(0xFF101C22),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    item.description,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: _textMuted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right, color: _textMuted),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SummaryTile extends StatelessWidget {
+  const _SummaryTile({
+    required this.title,
+    this.value,
+    this.valueLines,
+    this.alignment = TextAlign.left,
+  });
+
+  final String title;
+  final String? value;
+  final List<String>? valueLines;
+  final TextAlign alignment;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final lines = valueLines;
+    return Column(
+      crossAxisAlignment: alignment == TextAlign.left
+          ? CrossAxisAlignment.start
+          : CrossAxisAlignment.end,
+      children: [
+        Text(
+          title,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: _textMuted,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 6),
+        if (value != null)
+          Text(
+            value!,
+            textAlign: alignment,
+            style: theme.textTheme.headlineMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: const Color(0xFF101C22),
+            ),
+          )
+        else if (lines != null && lines.isNotEmpty)
+          Column(
+            crossAxisAlignment: alignment == TextAlign.left
+                ? CrossAxisAlignment.start
+                : CrossAxisAlignment.end,
+            children: lines
+                .map(
+                  (line) => Text(
+                    line,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: const Color(0xFF101C22),
+                    ),
+                  ),
+                )
+                .toList(),
+          ),
+      ],
+    );
+  }
+}
+
+class _LiveIndicator extends StatefulWidget {
+  const _LiveIndicator({required this.color});
+
+  final Color color;
+
+  @override
+  State<_LiveIndicator> createState() => _LiveIndicatorState();
+}
+
+class _LiveIndicatorState extends State<_LiveIndicator>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 1),
+      lowerBound: 0.4,
+      upperBound: 1.0,
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        return Opacity(
+          opacity: _controller.value,
+          child: child,
+        );
+      },
+      child: Container(
+        width: 14,
+        height: 14,
+        decoration: BoxDecoration(
+          color: widget.color,
+          shape: BoxShape.circle,
+        ),
+      ),
+    );
   }
 }

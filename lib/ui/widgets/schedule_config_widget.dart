@@ -52,7 +52,8 @@ class _ScheduleConfigWidgetState extends State<ScheduleConfigWidget> {
           thumbVisibility: true,
           child: ListView.separated(
             controller: _scrollController,
-            padding: const EdgeInsets.only(right: AppSpacing.xs, bottom: AppSpacing.sm),
+            padding: const EdgeInsets.only(
+                right: AppSpacing.xs, bottom: AppSpacing.sm),
             itemCount: 7,
             separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.sm),
             itemBuilder: (_, index) => _buildDayCard(index + 1),
@@ -117,12 +118,14 @@ class _ScheduleConfigWidgetState extends State<ScheduleConfigWidget> {
                 ChoiceChip(
                   label: const Text('종일'),
                   selected: editor.mode == DaySessionMode.fullDay,
-                  onSelected: (_) => _onModeChanged(index, DaySessionMode.fullDay),
+                  onSelected: (_) =>
+                      _onModeChanged(index, DaySessionMode.fullDay),
                 ),
                 ChoiceChip(
                   label: const Text('오전·오후'),
                   selected: editor.mode == DaySessionMode.split,
-                  onSelected: (_) => _onModeChanged(index, DaySessionMode.split),
+                  onSelected: (_) =>
+                      _onModeChanged(index, DaySessionMode.split),
                 ),
               ],
             ),
@@ -136,12 +139,18 @@ class _ScheduleConfigWidgetState extends State<ScheduleConfigWidget> {
             else
               _SplitEditor(
                 state: editor,
-                onToggleMorning: (enabled) => _onSessionToggle(index, morning: enabled),
-                onToggleAfternoon: (enabled) => _onSessionToggle(index, afternoon: enabled),
-                onMorningStart: (time) => _onSessionTimeChanged(index, morningStart: time),
-                onMorningEnd: (time) => _onSessionTimeChanged(index, morningEnd: time),
-                onAfternoonStart: (time) => _onSessionTimeChanged(index, afternoonStart: time),
-                onAfternoonEnd: (time) => _onSessionTimeChanged(index, afternoonEnd: time),
+                onToggleMorning: (enabled) =>
+                    _onSessionToggle(index, morning: enabled),
+                onToggleAfternoon: (enabled) =>
+                    _onSessionToggle(index, afternoon: enabled),
+                onMorningStart: (time) =>
+                    _onSessionTimeChanged(index, morningStart: time),
+                onMorningEnd: (time) =>
+                    _onSessionTimeChanged(index, morningEnd: time),
+                onAfternoonStart: (time) =>
+                    _onSessionTimeChanged(index, afternoonStart: time),
+                onAfternoonEnd: (time) =>
+                    _onSessionTimeChanged(index, afternoonEnd: time),
               ),
           ],
         ],
@@ -155,7 +164,8 @@ class _ScheduleConfigWidgetState extends State<ScheduleConfigWidget> {
       editor.working = value;
       if (!value) {
         editor.mode = DaySessionMode.fullDay;
-      } else if (editor.mode == DaySessionMode.split && !editor.hasEnabledSplitSession) {
+      } else if (editor.mode == DaySessionMode.split &&
+          !editor.hasEnabledSplitSession) {
         editor.morningEnabled = true;
       }
       _schedule = _schedule.copyWith(
@@ -240,7 +250,8 @@ class _ScheduleConfigWidgetState extends State<ScheduleConfigWidget> {
 
   Future<void> _save() async {
     final updated = WeeklySchedule(weekDays: {
-      for (final entry in _editorStates.entries) entry.key: entry.value.toSchedule(),
+      for (final entry in _editorStates.entries)
+        entry.key: entry.value.toSchedule(),
     });
 
     try {
@@ -263,7 +274,8 @@ class _ScheduleConfigWidgetState extends State<ScheduleConfigWidget> {
   Map<int, _DayEditorState> _buildEditorStates(WeeklySchedule schedule) {
     final map = <int, _DayEditorState>{};
     for (int i = 0; i <= 6; i++) {
-      map[i] = _DayEditorState.fromSchedule(schedule.weekDays[i] ?? DaySchedule.rest());
+      map[i] = _DayEditorState.fromSchedule(
+          schedule.weekDays[i] ?? DaySchedule.rest());
     }
     return map;
   }
@@ -581,25 +593,29 @@ class _DayEditorState {
 
     final morningSlot = sessions.isNotEmpty ? sessions.first : null;
     final afternoonSlot = sessions.length > 1 ? sessions[1] : null;
-    final inferredMorning = morningSlot != null && morningSlot.start.hour < 12;
+    final morningSession = (morningSlot != null && morningSlot.start.hour < 12)
+        ? morningSlot
+        : null;
+    final morningStartTime = morningSession?.start ?? defaultMorningStart;
+    final morningEndTime = morningSession?.end ?? defaultMorningEnd;
+    final fallbackSession = afternoonSlot ??
+        morningSession ??
+        WorkingSession(
+          start: defaultAfternoonStart,
+          end: defaultAfternoonEnd,
+        );
 
     return _DayEditorState(
       working: true,
       mode: DaySessionMode.split,
       fullDayStart: const TimeOfDay(hour: 9, minute: 0),
       fullDayEnd: const TimeOfDay(hour: 18, minute: 0),
-      morningEnabled: inferredMorning,
-      morningStart: inferredMorning ? morningSlot!.start : defaultMorningStart,
-      morningEnd: inferredMorning ? morningSlot!.end : defaultMorningEnd,
-      afternoonEnabled: afternoonSlot != null || !inferredMorning,
-      afternoonStart: (afternoonSlot ?? morningSlot ?? WorkingSession(
-        start: defaultAfternoonStart,
-        end: defaultAfternoonEnd,
-      )).start,
-      afternoonEnd: (afternoonSlot ?? morningSlot ?? WorkingSession(
-        start: defaultAfternoonStart,
-        end: defaultAfternoonEnd,
-      )).end,
+      morningEnabled: morningSession != null,
+      morningStart: morningStartTime,
+      morningEnd: morningEndTime,
+      afternoonEnabled: afternoonSlot != null || morningSession == null,
+      afternoonStart: fallbackSession.start,
+      afternoonEnd: fallbackSession.end,
     );
   }
 
@@ -640,7 +656,8 @@ class _DayEditorState {
       return DaySchedule.rest();
     }
 
-    return DaySchedule(isWorkingDay: true, sessions: slots, mode: ScheduleMode.split);
+    return DaySchedule(
+        isWorkingDay: true, sessions: slots, mode: ScheduleMode.split);
   }
 }
 

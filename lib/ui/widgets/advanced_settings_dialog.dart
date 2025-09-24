@@ -15,11 +15,14 @@ class AdvancedSettingsDialog extends StatefulWidget {
   State<AdvancedSettingsDialog> createState() => _AdvancedSettingsDialogState();
 }
 
+enum RetentionOption { forever, week, month, threeMonths, sixMonths, year }
+
 class _AdvancedSettingsDialogState extends State<AdvancedSettingsDialog> {
   bool _vadEnabled = true;
   double _vadThreshold = 0.01;
   bool _launchAtStartup = true;
   bool _loading = true;
+  RetentionOption _retentionOption = RetentionOption.forever;
 
   @override
   void initState() {
@@ -31,11 +34,13 @@ class _AdvancedSettingsDialogState extends State<AdvancedSettingsDialog> {
     final settings = SettingsService();
     final (vadEnabled, vadThreshold) = await settings.getVad();
     final launch = await settings.getLaunchAtStartup();
+    final retention = await settings.getRetentionDuration();
     if (!mounted) return;
     setState(() {
       _vadEnabled = vadEnabled;
       _vadThreshold = vadThreshold;
       _launchAtStartup = launch;
+      _retentionOption = _optionFromDuration(retention);
       _loading = false;
     });
   }
@@ -49,7 +54,10 @@ class _AdvancedSettingsDialogState extends State<AdvancedSettingsDialog> {
     return AlertDialog(
       title: const Text('고급 설정'),
       content: _loading
-          ? const SizedBox(width: 320, height: 120, child: Center(child: CircularProgressIndicator()))
+          ? const SizedBox(
+              width: 320,
+              height: 120,
+              child: Center(child: CircularProgressIndicator()))
           : ConstrainedBox(
               constraints: BoxConstraints(
                 maxWidth: maxWidth,
@@ -83,6 +91,52 @@ class _AdvancedSettingsDialogState extends State<AdvancedSettingsDialog> {
                                 ? (v) => setState(() => _vadThreshold = v)
                                 : null,
                           ),
+                          const SizedBox(height: AppSpacing.xs),
+                          Text(
+                            '값을 낮출수록 조용한 소리까지 감지하고, 높일수록 큰 소리에서만 녹음이 이어집니다. 환경 소음이 많다면 값을 조금 높여주세요.',
+                            style:
+                                Theme.of(context).textTheme.bodySmall?.copyWith(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurfaceVariant,
+                                    ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    AppSectionCard(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('녹음 파일 자동 삭제 기간'),
+                          const SizedBox(height: AppSpacing.sm),
+                          DropdownButton<RetentionOption>(
+                            value: _retentionOption,
+                            items: RetentionOption.values
+                                .map(
+                                  (option) => DropdownMenuItem(
+                                    value: option,
+                                    child: Text(_labelForOption(option)),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: (value) {
+                              if (value != null) {
+                                setState(() => _retentionOption = value);
+                              }
+                            },
+                          ),
+                          const SizedBox(height: AppSpacing.sm),
+                          Text(
+                            '기본값은 영구 보존이며, 선택한 기간이 지나면 앱이 날짜별 폴더를 포함해 자동 정리합니다.',
+                            style:
+                                Theme.of(context).textTheme.bodySmall?.copyWith(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurfaceVariant,
+                                    ),
+                          ),
                         ],
                       ),
                     ),
@@ -92,14 +146,16 @@ class _AdvancedSettingsDialogState extends State<AdvancedSettingsDialog> {
                         contentPadding: EdgeInsets.zero,
                         title: const Text('Windows 로그인 시 자동 실행'),
                         value: _launchAtStartup,
-                        onChanged: (v) => setState(() => _launchAtStartup = v ?? true),
-                        subtitle: const Text('개발 단계에서는 실행 경로에 따라 동작이 제한될 수 있습니다.'),
+                        onChanged: (v) =>
+                            setState(() => _launchAtStartup = v ?? true),
+                        subtitle:
+                            const Text('개발 단계에서는 실행 경로에 따라 동작이 제한될 수 있습니다.'),
                       ),
                     ),
                   ],
                 ),
+              ),
             ),
-          ),
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
@@ -117,6 +173,7 @@ class _AdvancedSettingsDialogState extends State<AdvancedSettingsDialog> {
     final settings = SettingsService();
     await settings.setVad(enabled: _vadEnabled, threshold: _vadThreshold);
     await settings.setLaunchAtStartup(_launchAtStartup);
+    await settings.setRetentionDuration(_durationForOption(_retentionOption));
 
     // 베타: Windows에서만 자동 실행 등록 시도
     if (!kIsWeb && Platform.isWindows) {
@@ -146,5 +203,57 @@ class _AdvancedSettingsDialogState extends State<AdvancedSettingsDialog> {
     if (mounted) {
       Navigator.of(context).pop('saved');
     }
+  }
+}
+
+RetentionOption _optionFromDuration(Duration? duration) {
+  if (duration == null) return RetentionOption.forever;
+  switch (duration.inDays) {
+    case 7:
+      return RetentionOption.week;
+    case 30:
+      return RetentionOption.month;
+    case 90:
+      return RetentionOption.threeMonths;
+    case 180:
+      return RetentionOption.sixMonths;
+    case 365:
+      return RetentionOption.year;
+    default:
+      return RetentionOption.forever;
+  }
+}
+
+Duration? _durationForOption(RetentionOption option) {
+  switch (option) {
+    case RetentionOption.forever:
+      return null;
+    case RetentionOption.week:
+      return const Duration(days: 7);
+    case RetentionOption.month:
+      return const Duration(days: 30);
+    case RetentionOption.threeMonths:
+      return const Duration(days: 90);
+    case RetentionOption.sixMonths:
+      return const Duration(days: 180);
+    case RetentionOption.year:
+      return const Duration(days: 365);
+  }
+}
+
+String _labelForOption(RetentionOption option) {
+  switch (option) {
+    case RetentionOption.forever:
+      return '삭제 없음 (영구 보존)';
+    case RetentionOption.week:
+      return '1주 후 자동 삭제';
+    case RetentionOption.month:
+      return '1개월 후 자동 삭제';
+    case RetentionOption.threeMonths:
+      return '3개월 후 자동 삭제';
+    case RetentionOption.sixMonths:
+      return '6개월 후 자동 삭제';
+    case RetentionOption.year:
+      return '1년 후 자동 삭제';
   }
 }
