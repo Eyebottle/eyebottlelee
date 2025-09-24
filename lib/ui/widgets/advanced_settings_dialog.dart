@@ -5,8 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:launch_at_startup/launch_at_startup.dart';
 
 import '../../services/settings_service.dart';
-import '../style/app_spacing.dart';
-import 'app_section_card.dart';
 
 class AdvancedSettingsDialog extends StatefulWidget {
   const AdvancedSettingsDialog({super.key});
@@ -48,71 +46,113 @@ class _AdvancedSettingsDialogState extends State<AdvancedSettingsDialog> {
   @override
   Widget build(BuildContext context) {
     final mediaSize = MediaQuery.of(context).size;
-    final maxWidth = (mediaSize.width * 0.9).clamp(0.0, 360.0);
-    final maxHeight = mediaSize.height * 0.7;
+    final maxWidth = (mediaSize.width * 0.8).clamp(360.0, 540.0);
+    final maxHeight = (mediaSize.height * 0.82).clamp(420.0, 640.0);
 
-    return AlertDialog(
-      title: const Text('고급 설정'),
-      content: _loading
-          ? const SizedBox(
-              width: 320,
-              height: 120,
-              child: Center(child: CircularProgressIndicator()))
-          : ConstrainedBox(
-              constraints: BoxConstraints(
-                maxWidth: maxWidth,
-                maxHeight: maxHeight,
-              ),
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.only(right: AppSpacing.xs),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    AppSectionCard(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          SwitchListTile(
-                            contentPadding: EdgeInsets.zero,
-                            title: const Text('VAD(무음 자동 스킵) 사용'),
-                            value: _vadEnabled,
-                            onChanged: (v) => setState(() => _vadEnabled = v),
+    return Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: maxWidth, maxHeight: maxHeight),
+        child: _loading
+            ? const SizedBox(
+                height: 240,
+                child: Center(child: CircularProgressIndicator()),
+              )
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 20, 24, 12),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '고급 설정',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleLarge
+                                    ?.copyWith(fontWeight: FontWeight.w700),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                'VAD, 파일 보관 기간, 자동 실행을 개별적으로 조정하세요.',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.copyWith(color: Colors.grey.shade600),
+                              ),
+                            ],
                           ),
-                          const SizedBox(height: AppSpacing.sm),
-                          const Text('VAD 임계값'),
-                          Slider(
-                            value: _vadThreshold.clamp(0.001, 0.2),
-                            min: 0.001,
-                            max: 0.1,
-                            divisions: 99,
-                            label: _vadThreshold.toStringAsFixed(3),
-                            onChanged: _vadEnabled
-                                ? (v) => setState(() => _vadThreshold = v)
-                                : null,
-                          ),
-                          const SizedBox(height: AppSpacing.xs),
-                          Text(
-                            '값을 낮출수록 조용한 소리까지 감지하고, 높일수록 큰 소리에서만 녹음이 이어집니다. 환경 소음이 많다면 값을 조금 높여주세요.',
-                            style:
-                                Theme.of(context).textTheme.bodySmall?.copyWith(
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .onSurfaceVariant,
-                                    ),
-                          ),
-                        ],
-                      ),
+                        ),
+                        IconButton(
+                          tooltip: '닫기',
+                          onPressed: () => Navigator.of(context).pop(),
+                          icon: const Icon(Icons.close),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: AppSpacing.md),
-                    AppSectionCard(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text('녹음 파일 자동 삭제 기간'),
-                          const SizedBox(height: AppSpacing.sm),
-                          DropdownButton<RetentionOption>(
-                            value: _retentionOption,
+                  ),
+                  const Divider(height: 1),
+                  Expanded(
+                    child: ListView(
+                      padding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
+                      children: [
+                        _AdvancedCard(
+                          key: const ValueKey('vad-card'),
+                          icon: Icons.mic,
+                          title: 'VAD (무음 자동 스킵)',
+                          description:
+                              '값을 낮출수록 조용한 소리까지 감지하고, 값을 높이면 큰 소리에서만 녹음이 이어집니다. 환경 소음이 많다면 값을 조금 높여주세요.',
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              SwitchListTile.adaptive(
+                                contentPadding: EdgeInsets.zero,
+                                title: const Text('VAD 사용'),
+                                value: _vadEnabled,
+                                onChanged: (v) =>
+                                    setState(() => _vadEnabled = v),
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                'VAD 임계값',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodyMedium
+                                    ?.copyWith(fontWeight: FontWeight.w600),
+                              ),
+                              Slider(
+                                value: _vadThreshold.clamp(0.001, 0.2),
+                                min: 0.001,
+                                max: 0.1,
+                                divisions: 99,
+                                label: _vadThreshold.toStringAsFixed(3),
+                                onChanged: _vadEnabled
+                                    ? (v) => setState(() => _vadThreshold = v)
+                                    : null,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        _AdvancedCard(
+                          key: const ValueKey('retention-card'),
+                          icon: Icons.history,
+                          title: '녹음 파일 자동 삭제 기간',
+                          description: '선택한 기간이 지나면 앱이 날짜별 폴더를 포함해 자동으로 정리합니다.',
+                          child: DropdownButtonFormField<RetentionOption>(
+                            initialValue: _retentionOption,
+                            decoration: InputDecoration(
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 12),
+                            ),
                             items: RetentionOption.values
                                 .map(
                                   (option) => DropdownMenuItem(
@@ -127,45 +167,46 @@ class _AdvancedSettingsDialogState extends State<AdvancedSettingsDialog> {
                               }
                             },
                           ),
-                          const SizedBox(height: AppSpacing.sm),
-                          Text(
-                            '기본값은 영구 보존이며, 선택한 기간이 지나면 앱이 날짜별 폴더를 포함해 자동 정리합니다.',
-                            style:
-                                Theme.of(context).textTheme.bodySmall?.copyWith(
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .onSurfaceVariant,
-                                    ),
+                        ),
+                        const SizedBox(height: 16),
+                        _AdvancedCard(
+                          key: const ValueKey('auto-launch-card'),
+                          icon: Icons.play_circle,
+                          title: 'Windows 로그인 시 자동 실행',
+                          description: '개발 단계에서는 실행 경로에 따라 동작이 제한될 수 있습니다.',
+                          child: SwitchListTile.adaptive(
+                            contentPadding: EdgeInsets.zero,
+                            title: const Text('자동 실행 사용'),
+                            value: _launchAtStartup,
+                            onChanged: (v) =>
+                                setState(() => _launchAtStartup = v),
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: AppSpacing.md),
-                    AppSectionCard(
-                      child: CheckboxListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: const Text('Windows 로그인 시 자동 실행'),
-                        value: _launchAtStartup,
-                        onChanged: (v) =>
-                            setState(() => _launchAtStartup = v ?? true),
-                        subtitle:
-                            const Text('개발 단계에서는 실행 경로에 따라 동작이 제한될 수 있습니다.'),
-                      ),
+                  ),
+                  const Divider(height: 1),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 24, vertical: 16),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          child: const Text('닫기'),
+                        ),
+                        const SizedBox(width: 12),
+                        FilledButton(
+                          onPressed: _save,
+                          child: const Text('저장'),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('닫기'),
-        ),
-        ElevatedButton(
-          onPressed: _save,
-          child: const Text('저장'),
-        ),
-      ],
+      ),
     );
   }
 
@@ -203,6 +244,77 @@ class _AdvancedSettingsDialogState extends State<AdvancedSettingsDialog> {
     if (mounted) {
       Navigator.of(context).pop('saved');
     }
+  }
+}
+
+class _AdvancedCard extends StatelessWidget {
+  const _AdvancedCard({
+    super.key,
+    required this.icon,
+    required this.title,
+    required this.description,
+    required this.child,
+  });
+
+  final IconData icon;
+  final String title;
+  final String description;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final accent = theme.colorScheme.primary;
+    final muted = theme.colorScheme.onSurfaceVariant;
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(18),
+        border:
+            Border.all(color: theme.colorScheme.outlineVariant.withAlpha(60)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0F000000),
+            blurRadius: 12,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: accent.withAlpha(30),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: accent),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  title,
+                  style: theme.textTheme.titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w700),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            description,
+            style: theme.textTheme.bodySmall?.copyWith(color: muted),
+          ),
+          const SizedBox(height: 16),
+          child,
+        ],
+      ),
+    );
   }
 }
 
