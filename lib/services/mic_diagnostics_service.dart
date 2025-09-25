@@ -144,8 +144,9 @@ class MicDiagnosticsService {
     }
   }
 
-  static const double _okThreshold = 0.08;
-  static const double _cautionThreshold = 0.03;
+  // 진료실 환경의 상대적으로 작은 음성을 고려해 임계값을 낮춘다.
+  static const double _okThreshold = 0.04;
+  static const double _cautionThreshold = 0.018;
 
   double _normalizeAmplitude(Amplitude amplitude) {
     double sample = amplitude.current;
