@@ -145,20 +145,8 @@ class _HelpContent extends StatelessWidget {
               '창을 닫아도 앱은 트레이에서 계속 실행됩니다. 좌/더블 클릭으로 창을 복원하고, 우클릭 메뉴로 녹음 토글·마이크 점검·설정·종료를 실행하세요.',
         ),
         HelpSection(
-          icon: Icons.sync,
-          title: '6. WSL ↔ Windows 동기화',
-          description:
-              '커밋 후 post-commit 훅이 자동으로 동기화합니다. 필요 시 수동으로 `bash scripts/sync_wsl_to_windows.sh`를 실행하세요.',
-          actions: [
-            TextButton(
-              onPressed: () => _openDocsSection('docs/sync-workflow.md'),
-              child: const Text('동기화 가이드'),
-            ),
-          ],
-        ),
-        HelpSection(
           icon: Icons.help_outline,
-          title: '7. 문제 해결 & FAQ',
+          title: '6. 문제 해결 & FAQ',
           description:
               '마이크 권한, 자동 시작, 스케줄 적용 문제는 사용자 가이드의 FAQ 섹션에서 확인할 수 있습니다.',
           actions: [
