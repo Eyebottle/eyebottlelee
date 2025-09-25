@@ -684,31 +684,17 @@ class _DashboardTab extends StatelessWidget {
     final diagnostic = lastDiagnostic;
     final status = diagnostic?.status;
 
-    final (Color badgeColor, IconData badgeIcon, String badgeText) = switch (status) {
-      MicDiagnosticStatus.ok => (const Color(0xFF2E7D32), Icons.check_circle, '마이크 정상'),
-      MicDiagnosticStatus.lowInput =>
-        (const Color(0xFFFFA000), Icons.hearing, '입력이 약함'),
-      MicDiagnosticStatus.permissionDenied =>
-        (const Color(0xFFD32F2F), Icons.lock, '권한 필요'),
-      MicDiagnosticStatus.noInputDevice =>
-        (const Color(0xFFD32F2F), Icons.headset_off, '장치 없음'),
-      MicDiagnosticStatus.recorderBusy =>
-        (const Color(0xFFFF7043), Icons.pause_circle, '녹음 중'),
-      MicDiagnosticStatus.failure =>
-        (const Color(0xFFD32F2F), Icons.error, '점검 실패'),
-      null => (const Color(0xFF546E7A), Icons.mic, '점검 대기'),
-    };
-
-    final message = diagnostic?.message ??
-        '창이 열릴 때 자동으로 마이크 상태를 확인합니다. "다시 점검"을 눌러 수동으로 점검할 수 있어요.';
-    final hints = diagnostic?.hints ?? const <String>[];
+    final visuals = _diagnosticVisuals(status);
+    final primaryMessage = _diagnosticPrimaryMessage(status);
+    final detailMessage = _diagnosticDetailMessage(status, diagnostic?.message);
+    final hints = _diagnosticHints(status, diagnostic?.hints);
     final peak = diagnostic?.peakRms;
     final lastTimeText = diagnostic == null
-        ? '최근 기록 없음'
-        : '최근 점검: ${_formatDateTime(diagnostic.timestamp)}';
+        ? '최근 점검 기록 없음'
+        : _formatShortDateTime(diagnostic.timestamp);
 
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
@@ -719,45 +705,46 @@ class _DashboardTab extends StatelessWidget {
         children: [
           Row(
             children: [
-              Container(
-                decoration: BoxDecoration(
-                  color: badgeColor.withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                child: Row(
-                  children: [
-                    Icon(badgeIcon, color: badgeColor, size: 20),
-                    const SizedBox(width: 8),
-                    Text(
-                      badgeText,
-                      style: theme.textTheme.labelLarge?.copyWith(
-                        color: badgeColor,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
+              _StatusBadge(
+                color: visuals.color,
+                icon: visuals.icon,
+                label: visuals.label,
               ),
               const Spacer(),
               Text(
                 lastTimeText,
-                style: theme.textTheme.bodySmall?.copyWith(color: _textMuted),
+                style: theme.textTheme.labelMedium?.copyWith(color: _textMuted),
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 10),
           Text(
-            message,
-            style: theme.textTheme.bodyMedium?.copyWith(color: _textMuted),
+            primaryMessage,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: visuals.color,
+            ),
           ),
-          if (peak != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 12),
+          if (detailMessage != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              detailMessage,
+              style:
+                  theme.textTheme.bodyMedium?.copyWith(color: _textMuted),
+            ),
+          ],
+          if (peak != null) ...[
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF3F6F8),
+                borderRadius: BorderRadius.circular(12),
+              ),
               child: Row(
                 children: [
                   Text(
-                    '최고 입력 레벨',
+                    '최대 입력',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: _textMuted,
                       fontWeight: FontWeight.w600,
@@ -766,90 +753,162 @@ class _DashboardTab extends StatelessWidget {
                   const SizedBox(width: 12),
                   Expanded(
                     child: ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(4),
                       child: LinearProgressIndicator(
                         value: peak.clamp(0.0, 1.0),
-                        backgroundColor: const Color(0xFFE8EEF2),
-                        color: badgeColor,
-                        minHeight: 6,
+                        backgroundColor: const Color(0xFFE0E7EC),
+                        color: visuals.color,
+                        minHeight: 4,
                       ),
                     ),
                   ),
                   const SizedBox(width: 12),
-                  Text('${(peak * 100).clamp(0, 100).toStringAsFixed(0)}%'),
-                ],
-              ),
-            ),
-          if (hints.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
                   Text(
-                    '다음 단계를 확인해 보세요:',
+                    '${(peak * 100).clamp(0, 100).toStringAsFixed(0)}%',
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color: _textMuted,
+                      color: visuals.color,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                  const SizedBox(height: 6),
-                  ...hints.map(
-                    (hint) => Padding(
-                      padding: const EdgeInsets.only(bottom: 2),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text('• '),
-                          Expanded(
-                            child: Text(
-                              hint,
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: _textMuted,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
                 ],
               ),
             ),
-          const SizedBox(height: 20),
-          Row(
-            children: [
-              FilledButton.icon(
-                onPressed: diagnosticInProgress ? null : onRunDiagnostic,
-                icon: const Icon(Icons.refresh),
-                label: Text(diagnosticInProgress ? '점검 중...' : '다시 점검'),
-              ),
-              if (diagnosticInProgress) ...[
-                const SizedBox(width: 16),
-                const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2.4),
+          ],
+          if (hints.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '빠른 해결 방법',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: _textMuted,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                ...hints.map(
+                  (hint) => Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 2),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.check_circle, size: 14, color: visuals.color),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            hint,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: _textMuted,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ],
-            ],
+            ),
+          ],
+          const SizedBox(height: 14),
+          SizedBox(
+            height: 38,
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: diagnosticInProgress ? null : onRunDiagnostic,
+              icon: diagnosticInProgress
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2.4),
+                    )
+                  : const Icon(Icons.refresh),
+              label: Text(diagnosticInProgress ? '점검 중…' : '다시 점검'),
+            ),
           ),
         ],
       ),
     );
   }
 
-  String _formatDateTime(DateTime dateTime) {
-    final local = dateTime.toLocal();
-    final year = local.year.toString().padLeft(4, '0');
-    final month = local.month.toString().padLeft(2, '0');
-    final day = local.day.toString().padLeft(2, '0');
-    final hour = local.hour.toString().padLeft(2, '0');
-    final minute = local.minute.toString().padLeft(2, '0');
-    final second = local.second.toString().padLeft(2, '0');
-    return '$year-$month-$day $hour:$minute:$second';
+  _DiagnosticVisuals _diagnosticVisuals(MicDiagnosticStatus? status) {
+    return switch (status) {
+      MicDiagnosticStatus.ok => _DiagnosticVisuals(
+          label: '정상', color: const Color(0xFF2E7D32), icon: Icons.check_circle),
+      MicDiagnosticStatus.lowInput => _DiagnosticVisuals(
+          label: '입력이 약함', color: const Color(0xFFFFA000), icon: Icons.hearing),
+      MicDiagnosticStatus.permissionDenied => _DiagnosticVisuals(
+          label: '권한 필요', color: const Color(0xFFD32F2F), icon: Icons.lock),
+      MicDiagnosticStatus.noInputDevice => _DiagnosticVisuals(
+          label: '장치 없음', color: const Color(0xFFD32F2F), icon: Icons.headset_off),
+      MicDiagnosticStatus.recorderBusy => _DiagnosticVisuals(
+          label: '녹음 중', color: const Color(0xFFFF7043), icon: Icons.pause_circle),
+      MicDiagnosticStatus.failure => _DiagnosticVisuals(
+          label: '점검 실패', color: const Color(0xFFD32F2F), icon: Icons.error),
+      null => _DiagnosticVisuals(
+          label: '점검 대기', color: const Color(0xFF546E7A), icon: Icons.mic),
+    };
   }
 
+  String _diagnosticPrimaryMessage(MicDiagnosticStatus? status) {
+    return switch (status) {
+      MicDiagnosticStatus.ok => '마이크가 정상으로 동작 중입니다.',
+      MicDiagnosticStatus.lowInput => '마이크 입력이 거의 감지되지 않습니다.',
+      MicDiagnosticStatus.permissionDenied => '마이크 권한이 꺼져 있어요.',
+      MicDiagnosticStatus.noInputDevice => '사용 가능한 마이크가 연결되지 않았어요.',
+      MicDiagnosticStatus.recorderBusy => '녹음이 진행 중이라 점검을 잠시 중단했어요.',
+      MicDiagnosticStatus.failure => '점검을 완료하지 못했습니다.',
+      null => '아직 점검 결과가 없습니다.',
+    };
+  }
+
+  String? _diagnosticDetailMessage(
+    MicDiagnosticStatus? status,
+    String? originalMessage,
+  ) {
+    return switch (status) {
+      MicDiagnosticStatus.ok => '필요 시 “다시 점검”으로 상태를 재확인할 수 있어요.',
+      MicDiagnosticStatus.lowInput => '마이크 위치나 입력 볼륨을 조정한 뒤 다시 점검해 주세요.',
+      MicDiagnosticStatus.permissionDenied =>
+          'Windows 설정 > 개인정보 보호 > 마이크에서 권한을 허용해주세요.',
+      MicDiagnosticStatus.noInputDevice =>
+          'USB/블루투스 연결을 확인하고 기본 입력 장치를 선택해 주세요.',
+      MicDiagnosticStatus.recorderBusy =>
+          '녹음이 끝난 뒤 다시 점검을 실행하면 정확한 상태를 볼 수 있습니다.',
+      MicDiagnosticStatus.failure => originalMessage,
+      null => '창이 열리면 자동으로 마이크 상태를 점검합니다.',
+    };
+  }
+
+  List<String> _diagnosticHints(
+    MicDiagnosticStatus? status,
+    List<String>? rawHints,
+  ) {
+    if (rawHints != null && rawHints.isNotEmpty) {
+      return rawHints.take(2).toList();
+    }
+
+    return switch (status) {
+      MicDiagnosticStatus.lowInput =>
+          ['마이크와의 거리를 한 뼘 안쪽으로 조정하세요.', 'Windows 입력 볼륨을 70% 이상으로 맞춰 주세요.'],
+      MicDiagnosticStatus.permissionDenied =>
+          ['Windows 설정 > 개인정보 보호 > 마이크에서 권한을 허용하세요.', '앱 목록에서 “아이보틀 진료 녹음”을 켭니다.'],
+      MicDiagnosticStatus.noInputDevice =>
+          ['USB·블루투스 케이블 연결을 확인하세요.', 'Windows 소리 설정에서 기본 입력 장치를 선택하세요.'],
+      MicDiagnosticStatus.failure =>
+          ['앱을 재실행한 뒤 다시 점검을 시도해 보세요.', '그래도 실패하면 지원팀에 로그와 함께 문의해주세요.'],
+      MicDiagnosticStatus.recorderBusy =>
+          ['현재 녹음을 중지한 뒤 점검을 다시 실행하세요.'],
+      _ => const [],
+    };
+  }
+
+  String _formatShortDateTime(DateTime dateTime) {
+    final local = dateTime.toLocal();
+    final date = '${local.year.toString().padLeft(4, '0')}-${local.month.toString().padLeft(2, '0')}-${local.day.toString().padLeft(2, '0')}';
+    final time = '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
+    return '$date $time';
+  }
   Widget _buildRecordingCard(BuildContext context) {
     final theme = Theme.of(context);
     final statusText = isRecording ? '녹음 진행 중' : '대기 중';
@@ -989,6 +1048,56 @@ class _DashboardTab extends StatelessWidget {
     );
   }
 
+}
+
+
+class _StatusBadge extends StatelessWidget {
+  const _StatusBadge({
+    required this.color,
+    required this.icon,
+    required this.label,
+  });
+
+  final Color color;
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: color, size: 18),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: color,
+                  fontWeight: FontWeight.w700,
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DiagnosticVisuals {
+  const _DiagnosticVisuals({
+    required this.label,
+    required this.color,
+    required this.icon,
+  });
+
+  final String label;
+  final Color color;
+  final IconData icon;
 }
 
 class _SettingsTab extends StatelessWidget {
