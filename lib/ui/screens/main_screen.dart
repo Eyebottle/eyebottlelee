@@ -54,6 +54,7 @@ class _MainScreenState extends State<MainScreen>
   MicDiagnosticResult? _lastMicDiagnostic;
   bool _micDiagnosticRunning = false;
   bool? _autoLaunchEnabled;
+  bool _vadEnabled = true;
 
   @override
   void initState() {
@@ -132,6 +133,11 @@ class _MainScreenState extends State<MainScreen>
 
     final (vadEnabled, vadThreshold) = await _settings.getVad();
     _audioService.configureVad(enabled: vadEnabled, threshold: vadThreshold);
+    if (mounted) {
+      setState(() {
+        _vadEnabled = vadEnabled;
+      });
+    }
 
     final retention = await _settings.getRetentionDuration();
     _audioService.configureRetention(retention);
@@ -222,7 +228,7 @@ class _MainScreenState extends State<MainScreen>
                         onOpenRetention: () => _openRetentionSettings(),
                         onOpenAutoLaunch: () => _openAutoLaunchSettings(),
                         saveFolder: _currentSaveFolder,
-                        vadEnabled: _audioService.vadEnabled,
+                        vadEnabled: _vadEnabled,
                         autoLaunchEnabled:
                             _autoLaunchEnabled ?? true,
                         onRefreshAutoLaunch: () async {
@@ -1153,17 +1159,17 @@ class _SettingsTab extends StatelessWidget {
                 statusText: vadEnabled ? '켜짐' : '꺼짐',
                 onTap: onOpenVad,
               ),
-              SettingsDestination(
-                icon: Icons.play_circle,
-                title: '윈도우 시작 시 자동 실행',
-                description: '컴퓨터 시작 시 앱을 자동으로 실행합니다.',
-                statusText: autoLaunchEnabled ? '켜짐' : '꺼짐',
-                onTap: () async {
-                  await onOpenAutoLaunch();
-                  await onRefreshAutoLaunch();
-                },
-              ),
-            ],
+                SettingsDestination(
+                  icon: Icons.play_circle,
+                  title: '윈도우 시작 시 자동 실행',
+                  description: '컴퓨터 시작 시 앱을 자동으로 실행합니다.',
+                  statusText: autoLaunchEnabled ? '켜짐' : '꺼짐',
+                  onTap: () async {
+                    await onOpenAutoLaunch();
+                    await onRefreshAutoLaunch();
+                  },
+                ),
+              ],
           ),
         ],
       ),
