@@ -4,12 +4,14 @@ import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 
+import '../../models/mic_diagnostic_result.dart';
 import '../../models/schedule_model.dart';
 import '../../services/audio_service.dart';
 import '../../services/logging_service.dart';
 import '../../services/schedule_service.dart';
 import '../../services/settings_service.dart';
 import '../../services/tray_service.dart';
+import '../../services/mic_diagnostics_service.dart';
 import '../widgets/advanced_settings_dialog.dart';
 import '../widgets/animated_volume_meter.dart';
 import '../widgets/schedule_config_widget.dart';
@@ -35,6 +37,7 @@ class _MainScreenState extends State<MainScreen>
   final SettingsService _settings = SettingsService();
   final TrayService _trayService = TrayService();
   final LoggingService _loggingService = LoggingService();
+  final MicDiagnosticsService _micDiagnosticsService = MicDiagnosticsService();
 
   late final TabController _tabController;
 
@@ -48,6 +51,8 @@ class _MainScreenState extends State<MainScreen>
   String _currentDayKey = '';
   String _currentSaveFolder = '경로 확인 중...';
   WeeklySchedule? _currentSchedule;
+  MicDiagnosticResult? _lastMicDiagnostic;
+  bool _micDiagnosticRunning = false;
 
   @override
   void initState() {
@@ -130,6 +135,13 @@ class _MainScreenState extends State<MainScreen>
     final retention = await _settings.getRetentionDuration();
     _audioService.configureRetention(retention);
 
+    final storedDiagnostic = await _settings.loadMicDiagnosticResult();
+    if (mounted) {
+      setState(() {
+        _lastMicDiagnostic = storedDiagnostic;
+      });
+    }
+
     try {
       await _trayService.initialize();
       _trayService.onStartRecording = () => _startRecording();
@@ -140,6 +152,7 @@ class _MainScreenState extends State<MainScreen>
     await _loadTodayRecordingDuration();
     await _syncRecordingWithSchedule(initial: true);
     await _refreshSaveFolderDisplay();
+    await _runMicDiagnostic(initial: true);
   }
 
   @override
@@ -188,6 +201,9 @@ class _MainScreenState extends State<MainScreen>
                         saveFolder: _currentSaveFolder,
                         volumeLevel: _volumeLevel,
                         volumeHistory: _volumeHistory,
+                        lastDiagnostic: _lastMicDiagnostic,
+                        diagnosticInProgress: _micDiagnosticRunning,
+                        onRunDiagnostic: () => _runMicDiagnostic(),
                         onStartRecording: () => _startRecording(),
                         onPauseRecording: () => _pauseRecording(),
                         onStopRecording: () => _stopRecording(),
@@ -542,6 +558,42 @@ class _MainScreenState extends State<MainScreen>
     }
   }
 
+  Future<void> _runMicDiagnostic({bool initial = false}) async {
+    if (_micDiagnosticRunning) return;
+    if (!initial && _audioService.isRecording) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('녹음 중에는 마이크 점검을 할 수 없습니다. 녹음을 멈추고 다시 시도하세요.'),
+          ),
+        );
+      }
+      return;
+    }
+
+    if (mounted) {
+      setState(() => _micDiagnosticRunning = true);
+    }
+
+    final result = await _micDiagnosticsService.runDiagnostic();
+    _loggingService.info(
+      'Mic diagnostic result: ${result.status.name} (peak=${result.peakRms?.toStringAsFixed(3) ?? 'n/a'})',
+    );
+    await _settings.saveMicDiagnosticResult(result);
+    if (mounted) {
+      setState(() {
+        _lastMicDiagnostic = result;
+        _micDiagnosticRunning = false;
+      });
+    }
+
+    if (!initial && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(result.message ?? '마이크 점검이 완료되었습니다.')),
+      );
+    }
+  }
+
   void _handleLoggingError(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -591,6 +643,9 @@ class _DashboardTab extends StatelessWidget {
     required this.saveFolder,
     required this.volumeLevel,
     required this.volumeHistory,
+    required this.lastDiagnostic,
+    required this.diagnosticInProgress,
+    required this.onRunDiagnostic,
     required this.onStartRecording,
     required this.onPauseRecording,
     required this.onStopRecording,
@@ -603,6 +658,9 @@ class _DashboardTab extends StatelessWidget {
   final String saveFolder;
   final double volumeLevel;
   final List<double> volumeHistory;
+  final MicDiagnosticResult? lastDiagnostic;
+  final bool diagnosticInProgress;
+  final Future<void> Function() onRunDiagnostic;
   final Future<void> Function() onStartRecording;
   final Future<void> Function() onPauseRecording;
   final Future<void> Function() onStopRecording;
@@ -615,12 +673,185 @@ class _DashboardTab extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          _buildDiagnosticCard(context),
+          const SizedBox(height: 16),
           _buildRecordingCard(context),
           const SizedBox(height: 16),
           _buildInfoCard(context),
         ],
       ),
     );
+  }
+
+  Widget _buildDiagnosticCard(BuildContext context) {
+    final theme = Theme.of(context);
+    final diagnostic = lastDiagnostic;
+    final status = diagnostic?.status;
+
+    final (Color badgeColor, IconData badgeIcon, String badgeText) = switch (status) {
+      MicDiagnosticStatus.ok => (const Color(0xFF2E7D32), Icons.check_circle, '마이크 정상'),
+      MicDiagnosticStatus.lowInput =>
+        (const Color(0xFFFFA000), Icons.hearing, '입력이 약함'),
+      MicDiagnosticStatus.permissionDenied =>
+        (const Color(0xFFD32F2F), Icons.lock, '권한 필요'),
+      MicDiagnosticStatus.noInputDevice =>
+        (const Color(0xFFD32F2F), Icons.headset_off, '장치 없음'),
+      MicDiagnosticStatus.recorderBusy =>
+        (const Color(0xFFFF7043), Icons.pause_circle, '녹음 중'),
+      MicDiagnosticStatus.failure =>
+        (const Color(0xFFD32F2F), Icons.error, '점검 실패'),
+      null => (const Color(0xFF546E7A), Icons.mic, '점검 대기'),
+    };
+
+    final message = diagnostic?.message ??
+        '창이 열릴 때 자동으로 마이크 상태를 확인합니다. "다시 점검"을 눌러 수동으로 점검할 수 있어요.';
+    final hints = diagnostic?.hints ?? const <String>[];
+    final peak = diagnostic?.peakRms;
+    final lastTimeText = diagnostic == null
+        ? '최근 기록 없음'
+        : '최근 점검: ${_formatDateTime(diagnostic.timestamp)}';
+
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: _cardBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                decoration: BoxDecoration(
+                  color: badgeColor.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                child: Row(
+                  children: [
+                    Icon(badgeIcon, color: badgeColor, size: 20),
+                    const SizedBox(width: 8),
+                    Text(
+                      badgeText,
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        color: badgeColor,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Spacer(),
+              Text(
+                lastTimeText,
+                style: theme.textTheme.bodySmall?.copyWith(color: _textMuted),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            message,
+            style: theme.textTheme.bodyMedium?.copyWith(color: _textMuted),
+          ),
+          if (peak != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: Row(
+                children: [
+                  Text(
+                    '최고 입력 레벨',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: _textMuted,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: LinearProgressIndicator(
+                        value: peak.clamp(0.0, 1.0),
+                        backgroundColor: const Color(0xFFE8EEF2),
+                        color: badgeColor,
+                        minHeight: 6,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Text('${(peak * 100).clamp(0, 100).toStringAsFixed(0)}%'),
+                ],
+              ),
+            ),
+          if (hints.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '다음 단계를 확인해 보세요:',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: _textMuted,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  ...hints.map(
+                    (hint) => Padding(
+                      padding: const EdgeInsets.only(bottom: 2),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('• '),
+                          Expanded(
+                            child: Text(
+                              hint,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: _textMuted,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              FilledButton.icon(
+                onPressed: diagnosticInProgress ? null : onRunDiagnostic,
+                icon: const Icon(Icons.refresh),
+                label: Text(diagnosticInProgress ? '점검 중...' : '다시 점검'),
+              ),
+              if (diagnosticInProgress) ...[
+                const SizedBox(width: 16),
+                const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2.4),
+                ),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatDateTime(DateTime dateTime) {
+    final local = dateTime.toLocal();
+    final year = local.year.toString().padLeft(4, '0');
+    final month = local.month.toString().padLeft(2, '0');
+    final day = local.day.toString().padLeft(2, '0');
+    final hour = local.hour.toString().padLeft(2, '0');
+    final minute = local.minute.toString().padLeft(2, '0');
+    final second = local.second.toString().padLeft(2, '0');
+    return '$year-$month-$day $hour:$minute:$second';
   }
 
   Widget _buildRecordingCard(BuildContext context) {

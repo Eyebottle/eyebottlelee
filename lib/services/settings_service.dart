@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../models/mic_diagnostic_result.dart';
 import '../models/schedule_model.dart';
 
 class SettingsService {
@@ -12,6 +13,7 @@ class SettingsService {
   static const _keyVadThreshold = 'vad_threshold';
   static const _keyDailyRecordingSeconds = 'daily_recording_seconds';
   static const _keyRetentionDays = 'retention_days';
+  static const _keyMicDiagnostic = 'last_mic_diagnostic';
 
   Future<void> saveSchedule(WeeklySchedule schedule) async {
     final prefs = await SharedPreferences.getInstance();
@@ -90,6 +92,18 @@ class SettingsService {
       return null; // 영구 보존
     }
     return Duration(days: saved);
+  }
+
+  Future<void> saveMicDiagnosticResult(MicDiagnosticResult result) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyMicDiagnostic, result.toJsonString());
+  }
+
+  Future<MicDiagnosticResult?> loadMicDiagnosticResult() async {
+    final prefs = await SharedPreferences.getInstance();
+    return MicDiagnosticResult.fromJsonString(
+      prefs.getString(_keyMicDiagnostic),
+    );
   }
 
   Future<void> addRecordingDuration(DateTime date, Duration duration) async {
