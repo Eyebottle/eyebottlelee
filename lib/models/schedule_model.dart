@@ -41,10 +41,10 @@ class WeeklySchedule {
         1: DaySchedule.split(
           morning: WorkingSession(
             start: const TimeOfDay(hour: 9, minute: 0),
-            end: const TimeOfDay(hour: 12, minute: 0),
+            end: const TimeOfDay(hour: 13, minute: 0),
           ),
           afternoon: WorkingSession(
-            start: const TimeOfDay(hour: 13, minute: 0),
+            start: const TimeOfDay(hour: 14, minute: 0),
             end: const TimeOfDay(hour: 18, minute: 0),
           ),
         ),
