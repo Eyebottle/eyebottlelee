@@ -48,6 +48,12 @@
   - “고급 설정” 다이얼로그(VAD 토글/임계값, 값 설명 문구, Windows 자동 시작 토글, 녹음 파일 보관 기간 선택)
   - 대시보드 하단 카드에서 현재 저장 경로 및 자동 정리 정책 안내
 
+### 2025-09-25 주요 업데이트
+- 대시보드 마이크 진단 카드를 헤더·요약·힌트·버튼 구조로 컴팩트하게 재구성하고, 상태 아이콘/색상/기본 가이드를 통일된 헬퍼로 관리(`refactor: compact mic diagnostic card`).
+- 설정 탭의 "고급 설정" 항목 옆에 VAD, 자동 실행 상태를 즉시 확인할 수 있는 ON/OFF 배지를 추가(`feat: show toggle states in settings`).
+- 앱 초기/최소 창 크기를 660×980 / 640×900으로 확장해 기본 레이아웃을 여유 있게 확인할 수 있도록 조정(`chore: increase default window size`).
+- 녹음 일시정지/재개 버튼을 제거해 녹음 흐름을 `시작 ↔ 중지` 두 단계로 단순화(`chore: remove pause recording feature`).
+
 ### 2025-09-24 주요 업데이트
 - 메인 화면을 `대시보드 / 설정` 탭 구조로 재구성하고, 녹음 상태 카드·애니메이션 볼륨 미터·저장 경로 안내 카드를 새 디자인으로 통일(`feat: refresh dashboard layout and window sizing`).
 - 스케줄 설정 다이얼로그를 카드형 UI로 전면 수정하고 SegmentedButton·Switch 기반 컨트롤을 도입해 일관된 사용자 경험 제공(`feat: redesign schedule configuration dialog`).
