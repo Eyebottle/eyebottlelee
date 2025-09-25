@@ -53,6 +53,7 @@
 - 설정 탭의 "고급 설정" 항목 옆에 VAD, 자동 실행 상태를 즉시 확인할 수 있는 ON/OFF 배지를 추가(`feat: show toggle states in settings`).
 - 앱 초기/최소 창 크기를 660×980 / 640×900으로 확장해 기본 레이아웃을 여유 있게 확인할 수 있도록 조정(`chore: increase default window size`).
 - 녹음 일시정지/재개 버튼을 제거해 녹음 흐름을 `시작 ↔ 중지` 두 단계로 단순화(`chore: remove pause recording feature`).
+- 저장 기간 항목에 현재 선택한 보관 기간(영구/1주일/1개월 등)을 배지로 노출하고, 다이얼로그 저장 후 즉시 갱신하도록 개선(`feat: show retention duration badge`).
 
 ### 2025-09-24 주요 업데이트
 - 메인 화면을 `대시보드 / 설정` 탭 구조로 재구성하고, 녹음 상태 카드·애니메이션 볼륨 미터·저장 경로 안내 카드를 새 디자인으로 통일(`feat: refresh dashboard layout and window sizing`).
