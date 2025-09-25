@@ -53,6 +53,7 @@ class _MainScreenState extends State<MainScreen>
   WeeklySchedule? _currentSchedule;
   MicDiagnosticResult? _lastMicDiagnostic;
   bool _micDiagnosticRunning = false;
+  bool? _autoLaunchEnabled;
 
   @override
   void initState() {
@@ -135,6 +136,13 @@ class _MainScreenState extends State<MainScreen>
     final retention = await _settings.getRetentionDuration();
     _audioService.configureRetention(retention);
 
+    final autoLaunch = await _settings.getLaunchAtStartup();
+    if (mounted) {
+      setState(() {
+        _autoLaunchEnabled = autoLaunch;
+      });
+    }
+
     final storedDiagnostic = await _settings.loadMicDiagnosticResult();
     if (mounted) {
       setState(() {
@@ -215,6 +223,9 @@ class _MainScreenState extends State<MainScreen>
                         onOpenRetention: () => _openRetentionSettings(),
                         onOpenAutoLaunch: () => _openAutoLaunchSettings(),
                         saveFolder: _currentSaveFolder,
+                        vadEnabled: _audioService.vadEnabled,
+                        autoLaunchEnabled:
+                            _autoLaunchEnabled ?? true,
                       ),
                     ],
                   ),
@@ -1108,6 +1119,8 @@ class _SettingsTab extends StatelessWidget {
     required this.onOpenRetention,
     required this.onOpenAutoLaunch,
     required this.saveFolder,
+    required this.vadEnabled,
+    required this.autoLaunchEnabled,
   });
 
   final Future<void> Function() onOpenSchedule;
@@ -1116,6 +1129,8 @@ class _SettingsTab extends StatelessWidget {
   final Future<void> Function() onOpenRetention;
   final Future<void> Function() onOpenAutoLaunch;
   final String saveFolder;
+  final bool vadEnabled;
+  final bool autoLaunchEnabled;
 
   @override
   Widget build(BuildContext context) {
@@ -1164,12 +1179,14 @@ class _SettingsTab extends StatelessWidget {
                 icon: Icons.mic,
                 title: '음성 활동 감지 (VAD)',
                 description: '음성이 감지될 때만 녹음하도록 설정합니다.',
+                statusText: vadEnabled ? '켜짐' : '꺼짐',
                 onTap: onOpenVad,
               ),
               SettingsDestination(
                 icon: Icons.play_circle,
                 title: '윈도우 시작 시 자동 실행',
                 description: '컴퓨터 시작 시 앱을 자동으로 실행합니다.',
+                statusText: autoLaunchEnabled ? '켜짐' : '꺼짐',
                 onTap: onOpenAutoLaunch,
               ),
             ],
@@ -1186,12 +1203,14 @@ class SettingsDestination {
     required this.title,
     required this.description,
     required this.onTap,
+    this.statusText,
   });
 
   final IconData icon;
   final String title;
   final String description;
   final Future<void> Function() onTap;
+  final String? statusText;
 }
 
 class _SaveFolderSummary extends StatelessWidget {
@@ -1333,6 +1352,27 @@ class _SettingsTile extends StatelessWidget {
                 ],
               ),
             ),
+            if (item.statusText != null) ...[
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: item.statusText == '켜짐'
+                      ? _primaryColor.withOpacity(0.12)
+                      : _textMuted.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  item.statusText!,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color:
+                        item.statusText == '켜짐' ? _primaryColor : _textMuted,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+            ],
             const Icon(Icons.chevron_right, color: _textMuted),
           ],
         ),

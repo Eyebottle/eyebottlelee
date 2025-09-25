@@ -32,6 +32,7 @@ class AudioService {
       onRecordingStopped;
 
   bool get isRecording => _isRecording;
+  bool get vadEnabled => _vadEnabled;
   DateTime? _sessionStartTime;
 
   AudioService() {
