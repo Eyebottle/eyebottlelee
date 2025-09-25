@@ -1089,30 +1089,30 @@ class _StatusBadge extends StatelessWidget {
       ),
     );
   }
+}
 
-  String _formatRetentionLabel(Duration? duration) {
-    if (duration == null) return '영구';
-    final days = duration.inDays;
-    switch (days) {
-      case 7:
-        return '1주일';
-      case 30:
-        return '1개월';
-      case 90:
-        return '3개월';
-      case 180:
-        return '6개월';
-      case 365:
-        return '1년';
-      default:
-        if (days % 30 == 0) {
-          return '${(days / 30).round()}개월';
-        }
-        if (days % 7 == 0) {
-          return '${(days / 7).round()}주';
-        }
-        return '${days}일';
-    }
+String _formatRetentionLabel(Duration? duration) {
+  if (duration == null) return '영구';
+  final days = duration.inDays;
+  switch (days) {
+    case 7:
+      return '1주일';
+    case 30:
+      return '1개월';
+    case 90:
+      return '3개월';
+    case 180:
+      return '6개월';
+    case 365:
+      return '1년';
+    default:
+      if (days % 30 == 0) {
+        return '${(days / 30).round()}개월';
+      }
+      if (days % 7 == 0) {
+        return '${(days / 7).round()}주';
+      }
+      return '${days}일';
   }
 }
 
