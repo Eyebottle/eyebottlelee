@@ -1,104 +1,130 @@
-# 아이보틀 진료 녹음 - 플레이스홀더 아이콘 생성 스크립트
-# PowerShell에서 실행: .\scripts\windows\generate-placeholder-icons.ps1
+<#
+ .SYNOPSIS
+  Eyebottle icon generator for development and release builds.
 
-Write-Host "=== 플레이스홀더 아이콘 생성 ===" -ForegroundColor Green
-Write-Host "개발/테스트용 기본 아이콘 생성" -ForegroundColor Cyan
+ .DESCRIPTION
+  Creates Windows ICO assets from the official Eyebottle logo. Requires
+  ImageMagick (`magick`) to be installed and available on PATH. If ImageMagick
+  is missing or the logo file cannot be found, the script falls back to
+  lightweight text placeholders so that the build can still proceed, but it
+  warns the developer to supply real icons before release.
+#>
 
-# ImageMagick 설치 확인
-function Test-Command($cmdname) {
-    return [bool](Get-Command -Name $cmdname -ErrorAction SilentlyContinue)
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+
+function Test-Command {
+    param([Parameter(Mandatory = $true)][string]$Name)
+    return [bool](Get-Command -Name $Name -ErrorAction SilentlyContinue)
 }
 
-# 아이콘 폴더 경로
-$iconPath = "assets\icons"
+function New-PlaceholderIcons {
+    param(
+        [string]$IconDirectory
+    )
 
-# 폴더 생성
-if (-not (Test-Path $iconPath)) {
-    New-Item -ItemType Directory -Path $iconPath -Force | Out-Null
-    Write-Host "아이콘 폴더 생성: $iconPath" -ForegroundColor Yellow
-}
-
-# ImageMagick 확인
-if (-not (Test-Command magick)) {
-    Write-Host "ImageMagick이 설치되지 않았습니다." -ForegroundColor Red
-    Write-Host "간단한 텍스트 기반 ICO 파일을 생성합니다..." -ForegroundColor Yellow
-
-    # 기본 텍스트 플레이스홀더 생성
-    $placeholderContent = @"
-; 플레이스홀더 아이콘 파일
-; 실제 배포 전에 적절한 ICO 파일로 교체해주세요.
-
-이 파일은 개발용 플레이스홀더입니다.
-Windows ICO 형식의 실제 아이콘이 필요합니다.
+    Write-Warning 'ImageMagick을 찾을 수 없습니다. 텍스트 플레이스홀더를 생성합니다.'
+    $placeholder = @"
+; 아이보틀 진료 녹음 - 아이콘 플레이스홀더
+; ImageMagick을 설치하고 공식 로고를 사용해 실제 ICO 파일로 교체해주세요.
 "@
 
-    # 각 아이콘 파일 생성
-    @("icon.ico", "tray_recording.ico", "tray_waiting.ico", "tray_error.ico") | ForEach-Object {
-        $filePath = Join-Path $iconPath $_
-        $placeholderContent | Out-File -FilePath $filePath -Encoding UTF8
-        Write-Host "생성됨: $filePath (텍스트 플레이스홀더)" -ForegroundColor Gray
+    foreach ($name in @('icon.ico', 'tray_recording.ico', 'tray_waiting.ico', 'tray_error.ico')) {
+        $path = Join-Path $IconDirectory $name
+        $placeholder | Out-File -FilePath $path -Encoding UTF8
+        Write-Host "생성됨 (플레이스홀더): $path" -ForegroundColor DarkGray
     }
 
-    Write-Host "`n⚠ 주의사항:" -ForegroundColor Yellow
-    Write-Host "- 생성된 파일들은 텍스트 플레이스홀더입니다" -ForegroundColor White
-    Write-Host "- 실제 빌드/배포 전에 적절한 ICO 파일로 교체해야 합니다" -ForegroundColor White
-    Write-Host "- msix 패키징 시 실제 아이콘이 필요합니다" -ForegroundColor White
+    Write-Host "⚠ 실제 배포 전에는 진짜 ICO 아이콘이 필요합니다." -ForegroundColor Yellow
+}
 
-} else {
-    Write-Host "ImageMagick 발견! 실제 아이콘 생성 중..." -ForegroundColor Green
+function Invoke-MagickCommand {
+    param(
+        [Parameter(Mandatory = $true)][string[]]$Arguments,
+        [Parameter(Mandatory = $true)][string]$Description
+    )
 
-    # 메인 앱 아이콘 (파란색, 마이크 심볼)
-    $mainIconCmd = @"
-magick -size 256x256 xc:blue -fill white -font Arial -pointsize 120 -gravity center -annotate +0+0 "🎤" "$iconPath\icon.ico"
-"@
-
-    # 녹음 중 트레이 아이콘 (빨간색)
-    $recordingIconCmd = @"
-magick -size 64x64 xc:red -fill white -font Arial -pointsize 32 -gravity center -annotate +0+0 "●" "$iconPath\tray_recording.ico"
-"@
-
-    # 대기 중 트레이 아이콘 (초록색)
-    $waitingIconCmd = @"
-magick -size 64x64 xc:green -fill white -font Arial -pointsize 32 -gravity center -annotate +0+0 "⏸" "$iconPath\tray_waiting.ico"
-"@
-
-    # 오류 상태 트레이 아이콘 (노란색)
-    $errorIconCmd = @"
-magick -size 64x64 xc:yellow -fill black -font Arial -pointsize 32 -gravity center -annotate +0+0 "⚠" "$iconPath\tray_error.ico"
-"@
-
-    try {
-        Invoke-Expression $mainIconCmd
-        Write-Host "✓ 메인 아이콘 생성: icon.ico" -ForegroundColor Green
-
-        Invoke-Expression $recordingIconCmd
-        Write-Host "✓ 녹음 중 아이콘 생성: tray_recording.ico" -ForegroundColor Green
-
-        Invoke-Expression $waitingIconCmd
-        Write-Host "✓ 대기 중 아이콘 생성: tray_waiting.ico" -ForegroundColor Green
-
-        Invoke-Expression $errorIconCmd
-        Write-Host "✓ 오류 상태 아이콘 생성: tray_error.ico" -ForegroundColor Green
-
-        Write-Host "`n✅ 모든 아이콘이 생성되었습니다!" -ForegroundColor Green
-
-    } catch {
-        Write-Error "아이콘 생성 중 오류: $_"
-        Write-Host "수동으로 아이콘 파일들을 추가해주세요." -ForegroundColor Yellow
+    Write-Host "- $Description" -ForegroundColor Cyan
+    & magick @Arguments
+    if ($LASTEXITCODE -ne 0) {
+        throw "magick 명령이 실패했습니다 (exit code: $LASTEXITCODE)"
     }
 }
 
-# 생성된 파일 목록 표시
-Write-Host "`n📁 생성된 아이콘 파일들:" -ForegroundColor Blue
-Get-ChildItem $iconPath -Filter "*.ico" | ForEach-Object {
-    $size = [math]::Round($_.Length / 1KB, 1)
-    Write-Host "  $($_.Name) (${size} KB)" -ForegroundColor White
+function New-TrayIcon {
+    param(
+        [string]$LogoPath,
+        [string]$TargetPath,
+        [string]$BadgeColor,
+        [string]$BadgeLabel
+    )
+
+    $args = @(
+        $LogoPath,
+        '-resize', '64x64',
+        '-background', 'none',
+        '-gravity', 'center',
+        '-extent', '64x64',
+        '(',
+            '-size', '18x18',
+            'xc:none',
+            '-fill', $BadgeColor,
+            '-draw', 'circle 9,9 9,1',
+        ')',
+        '-gravity', 'southeast',
+        '-geometry', '+6+6',
+        '-compose', 'over',
+        '-composite',
+        '-define', 'icon:auto-resize=64,48,32,24,16',
+        $TargetPath
+    )
+
+    Invoke-MagickCommand -Arguments $args -Description "트레이 아이콘 생성: $BadgeLabel"
 }
 
-Write-Host "`n🔧 권장사항:" -ForegroundColor Yellow
-Write-Host "- 전문적인 아이콘 제작 도구 사용 (예: Icon Workshop, GIMP)" -ForegroundColor White
-Write-Host "- 멀티 해상도 지원 (16x16, 32x32, 48x48, 256x256)" -ForegroundColor White
-Write-Host "- 의료/녹음 관련 심볼 사용" -ForegroundColor White
-Write-Host "- 일관된 색상 스킴 적용" -ForegroundColor White
+Write-Host "=== 아이보틀 아이콘 생성 ===" -ForegroundColor Green
 
-Write-Host "`n플레이스홀더 아이콘 생성 완료!" -ForegroundColor Green
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..' '..')).Path
+$iconDir = Join-Path $repoRoot 'assets' 'icons'
+$logoPath = Join-Path $repoRoot 'assets' 'logos' 'eyebottle-logo.png'
+
+if (-not (Test-Path $iconDir)) {
+    New-Item -ItemType Directory -Path $iconDir | Out-Null
+    Write-Host "아이콘 폴더 생성: $iconDir" -ForegroundColor Yellow
+}
+
+if (-not (Test-Command -Name 'magick')) {
+    New-PlaceholderIcons -IconDirectory $iconDir
+    return
+}
+
+if (-not (Test-Path $logoPath)) {
+    Write-Warning "로고 파일을 찾을 수 없습니다: $logoPath"
+    New-PlaceholderIcons -IconDirectory $iconDir
+    return
+}
+
+Write-Host "ImageMagick 감지됨. 로고 기반 ICO를 생성합니다." -ForegroundColor Green
+
+$mainIconPath = Join-Path $iconDir 'icon.ico'
+Invoke-MagickCommand -Description '앱 아이콘 생성 (멀티 해상도)' -Arguments @(
+    $logoPath,
+    '-background', 'none',
+    '-alpha', 'set',
+    '-define', 'icon:auto-resize=256,192,128,96,64,48,32,24,16',
+    $mainIconPath
+)
+
+New-TrayIcon -LogoPath $logoPath -TargetPath (Join-Path $iconDir 'tray_recording.ico') -BadgeColor '#FF4D4F' -BadgeLabel '녹음 중(R)'
+New-TrayIcon -LogoPath $logoPath -TargetPath (Join-Path $iconDir 'tray_waiting.ico') -BadgeColor '#2CC38E' -BadgeLabel '대기 중'
+New-TrayIcon -LogoPath $logoPath -TargetPath (Join-Path $iconDir 'tray_error.ico') -BadgeColor '#FFC53D' -BadgeLabel '오류'
+
+Write-Host "\n📁 생성된 아이콘 파일:" -ForegroundColor Blue
+Get-ChildItem $iconDir -Filter '*.ico' | Sort-Object Name | ForEach-Object {
+    $sizeKB = [math]::Round($_.Length / 1KB, 1)
+    Write-Host "  $($_.Name) (${sizeKB} KB)" -ForegroundColor White
+}
+
+Write-Host "\n✅ 아이콘 생성 완료" -ForegroundColor Green
+Write-Host "필요 시 $iconDir 경로의 ICO를 교체하거나 세부 조정하세요." -ForegroundColor Yellow
+

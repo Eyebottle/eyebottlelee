@@ -1,11 +1,9 @@
 // ignore_for_file: invalid_use_of_protected_member
 
-import 'dart:io' show Platform;
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:launch_at_startup/launch_at_startup.dart';
 
+import '../../services/auto_launch_service.dart';
 import '../../services/settings_service.dart';
 
 enum RetentionOption { forever, week, month, threeMonths, sixMonths, year }
@@ -289,23 +287,16 @@ class _AdvancedSettingsDialogState extends State<AdvancedSettingsDialog> {
     await settings.setLaunchAtStartup(_launchAtStartup);
     await settings.setRetentionDuration(_durationForOption(_retentionOption));
 
-    if (!kIsWeb && Platform.isWindows) {
+    if (!kIsWeb) {
       try {
-        final exePath = Platform.resolvedExecutable;
-        LaunchAtStartup.instance.setup(
-          appName: 'Eyebottle Medical Recorder',
-          appPath: exePath,
-          args: const <String>[],
-        );
-        if (_launchAtStartup) {
-          await LaunchAtStartup.instance.enable();
-        } else {
-          await LaunchAtStartup.instance.disable();
-        }
+        await AutoLaunchService().apply(_launchAtStartup);
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('자동 실행 설정 적용 중 오류가 발생했습니다: $e')),
+            SnackBar(
+              content:
+                  Text('자동 실행 설정 적용 중 오류가 발생했습니다: $e'),
+            ),
           );
         }
       }

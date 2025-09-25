@@ -38,6 +38,10 @@
 - 트레이 연동(가드 적용)
   - 트레이 초기화 및 상태 아이콘 업데이트(아이콘 미존재 시 무시)
   - 로깅 서비스 에러 이벤트를 받아 트레이 아이콘을 오류 상태로 전환하고 사용자에게 알림
+  - 창 닫기/Alt+F4 시 앱은 종료되지 않고 트레이로 숨겨지며, 녹음 상태는 유지됨
+  - 트레이 메뉴의 "종료" 선택 시에만 완전 종료되며, 종료 직전에 녹음 세션을 안전하게 중단
+  - 트레이 아이콘 좌/더블 클릭 시 메인 창 복원, 우클릭 시 컨텍스트 메뉴가 열린다
+  - 트레이 메뉴에서 녹음 시작·중지 토글, 마이크 점검, 설정 열기, 종료를 직접 실행할 수 있다
 - 자동 마이크 점검
   - 앱이 켜질 때 3초간 샘플을 녹음해 권한/장치/입력 레벨을 확인하고, 결과를 대시보드 카드에 표시
   - `SharedPreferences`에 마지막 검사 결과와 안내 문구를 저장해 재시작 후에도 상태를 바로 보여줌
@@ -128,12 +132,14 @@ lib/
 ---
 
 ## 5) 아이콘/트레이 리소스
-- 현재 `assets/icons/`에 아이콘 미포함 → 트레이 초기화가 조용히 실패할 수 있음(앱 동작엔 영향 없음)
-- 임시 아이콘 생성(Windows PowerShell):
-  - `scripts/windows/generate-placeholder-icons.ps1`
-  - 생성 대상: `icon.ico`, `tray_recording.ico`, `tray_waiting.ico`, `tray_error.ico`
+- 공식 로고: `assets/logos/eyebottle-logo.png` (512×512) → 모든 ICO 생성의 소스
+- 아이콘 생성 스크립트(PowerShell): `scripts/windows/generate-placeholder-icons.ps1`
+  - ImageMagick(`magick`)이 설치되어 있으면 로고 기반 멀티 해상도 ICO를 생성합니다.
+  - 미설치 시 텍스트 플레이스홀더를 생성하고 경고를 출력합니다.
+- 결과물: `assets/icons/icon.ico`, `tray_recording.ico`, `tray_waiting.ico`, `tray_error.ico`
+  - 트레이 아이콘은 로고 + 상태 배지(빨강/초록/노랑 16px)를 포함합니다.
 
-`pubspec.yaml`에 `assets/icons/`가 이미 포함되어 있으므로 파일만 존재하면 사용됩니다.
+`pubspec.yaml`에 `assets/icons/`가 이미 포함되어 있으므로 스크립트를 실행해 파일을 생성하면 바로 앱과 패키징에 반영됩니다.
 
 ---
 
@@ -166,6 +172,8 @@ lib/
 - [ ] `flutter run -d windows` 로컬 실행 OK
 - [ ] 폴더 선택으로 OneDrive 경로 지정(예: `C:\\Users\\<user>\\OneDrive\\진료녹음`)
 - [ ] 트레이 아이콘 생성 및 표시 확인
+- [ ] 창 닫기 → 트레이로 숨김 → 트레이에서 복원/종료 플로우 확인
+- [ ] 트레이 메뉴에서 녹음 시작/중지, 마이크 점검, 설정 열기 동작 확인
 - [ ] 30~60분 시범 녹음 → 세그먼트/보관정리 동작 확인
 
 ---
@@ -173,7 +181,7 @@ lib/
 ## 8) 알려진 제약/주의
 - Windows 권한/장치: `record.hasPermission()` 동작이 플랫폼별 상이할 수 있어 UI 레벨미터로 사전 확인
 - 트레이 리소스: 아이콘 없으면 초기화 실패(앱 기능엔 영향 없음) → 아이콘 생성 권장
-- 자동 시작: 개발 경로/권한으로 실패 가능, 배포 후 고정 경로에서 재검증 필요
+- 자동 시작: 개발 경로/권한으로 실패할 수 있으므로 로그 확인 필요하며, 앱 기동 시 설정 값과 동기화를 시도함. 배포 후 고정 경로에서 재검증 필요
 - VAD: 단순 RMS 기반(잡음 환경 오검지 가능) → 임계값 튜닝 필요
 
 ---
@@ -182,7 +190,7 @@ lib/
 ```
 flutter pub get
 flutter run -d windows
-# (선택) 트레이 아이콘 생성
+# (선택) 공식 로고 기반 아이콘 생성 (ImageMagick 필요)
 # pwsh -File scripts/windows/generate-placeholder-icons.ps1
 # (선택) MSIX
 # flutter build windows --release && dart run msix:create

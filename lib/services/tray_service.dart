@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:system_tray/system_tray.dart';
 import 'package:window_manager/window_manager.dart';
@@ -7,12 +9,20 @@ enum TrayIconState { recording, waiting, error }
 class TrayService {
   final SystemTray _systemTray = SystemTray();
   bool _isInitialized = false;
+  bool _isRecording = false;
+
+  MenuItemLabel? _toggleRecordingItem;
+  MenuItemLabel? _diagnosticItem;
+  MenuItemLabel? _showWindowItem;
+  MenuItemLabel? _settingsItem;
+  MenuItemLabel? _exitItem;
 
   // 콜백 함수들
   Function()? onStartRecording;
   Function()? onStopRecording;
   Function()? onShowWindow;
   Function()? onExit;
+  Function()? onRunDiagnostic;
 
   /// 시스템 트레이 초기화
   Future<void> initialize() async {
@@ -25,6 +35,7 @@ class TrayService {
         iconPath: _getIconPath(TrayIconState.waiting),
       );
 
+      _registerEventHandlers();
       await _setupTrayMenu();
       _isInitialized = true;
 
@@ -34,34 +45,61 @@ class TrayService {
     }
   }
 
+  void _registerEventHandlers() {
+    _systemTray.registerSystemTrayEventHandler((eventName) {
+      debugPrint('트레이 이벤트: $eventName');
+      switch (eventName) {
+        case kSystemTrayEventClick:
+        case kSystemTrayEventDoubleClick:
+          _showMainWindow();
+          break;
+        case kSystemTrayEventRightClick:
+          unawaited(_systemTray.popUpContextMenu());
+          break;
+        default:
+          break;
+      }
+    });
+  }
+
   /// 트레이 메뉴 설정
   Future<void> _setupTrayMenu() async {
     final Menu menu = Menu();
 
+    _showWindowItem = MenuItemLabel(
+      label: '창 다시 열기',
+      onClicked: (menuItem) => _showMainWindow(),
+    );
+
+    _toggleRecordingItem = MenuItemLabel(
+      label: _toggleLabel(),
+      onClicked: (menuItem) => _handleToggleRecording(),
+    );
+
+    _diagnosticItem = MenuItemLabel(
+      label: '마이크 점검',
+      onClicked: (menuItem) => _handleRunDiagnostic(),
+    );
+
+    _settingsItem = MenuItemLabel(
+      label: '설정 열기',
+      onClicked: (menuItem) => _showSettings(),
+    );
+
+    _exitItem = MenuItemLabel(
+      label: '종료',
+      onClicked: (menuItem) => _handleExit(),
+    );
+
     await menu.buildFrom([
-      MenuItemLabel(
-        label: '창 보기',
-        onClicked: (menuItem) => _showMainWindow(),
-      ),
+      _showWindowItem!,
       MenuSeparator(),
-      MenuItemLabel(
-        label: '녹음 시작',
-        onClicked: (menuItem) => _handleStartRecording(),
-      ),
-      MenuItemLabel(
-        label: '녹음 중지',
-        onClicked: (menuItem) => _handleStopRecording(),
-      ),
+      _toggleRecordingItem!,
+      _diagnosticItem!,
       MenuSeparator(),
-      MenuItemLabel(
-        label: '설정',
-        onClicked: (menuItem) => _showSettings(),
-      ),
+      _settingsItem!,
       MenuSeparator(),
-      MenuItemLabel(
-        label: '종료',
-        onClicked: (menuItem) => _handleExit(),
-      ),
+      _exitItem!,
     ]);
 
     await _systemTray.setContextMenu(menu);
@@ -122,16 +160,11 @@ class TrayService {
   }
 
   /// 녹음 시작 처리
-  void _handleStartRecording() {
-    if (onStartRecording != null) {
-      onStartRecording!();
-    }
-  }
-
-  /// 녹음 중지 처리
-  void _handleStopRecording() {
-    if (onStopRecording != null) {
-      onStopRecording!();
+  void _handleToggleRecording() {
+    if (_isRecording) {
+      onStopRecording?.call();
+    } else {
+      onStartRecording?.call();
     }
   }
 
@@ -146,6 +179,23 @@ class TrayService {
       onExit!();
     }
   }
+
+  void _handleRunDiagnostic() {
+    onRunDiagnostic?.call();
+  }
+
+  /// 녹음 상태를 업데이트하고 메뉴 라벨을 갱신한다.
+  Future<void> setRecordingState(bool isRecording) async {
+    _isRecording = isRecording;
+    if (!_isInitialized) return;
+    try {
+      await _toggleRecordingItem?.setLabel(_toggleLabel());
+    } catch (e) {
+      debugPrint('트레이 메뉴 라벨 갱신 실패: $e');
+    }
+  }
+
+  String _toggleLabel() => _isRecording ? '녹음 중지' : '녹음 시작';
 
   /// 알림 표시
   Future<void> showNotification(String title, String message) async {

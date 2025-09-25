@@ -4,6 +4,7 @@ import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 
+import '../../services/auto_launch_service.dart';
 import '../../models/mic_diagnostic_result.dart';
 import '../../models/schedule_model.dart';
 import '../../services/audio_service.dart';
@@ -29,7 +30,7 @@ class MainScreen extends StatefulWidget {
 }
 
 class _MainScreenState extends State<MainScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WindowListener {
   static const _volumeHistoryLimit = 48;
 
   final AudioService _audioService = AudioService();
@@ -56,10 +57,14 @@ class _MainScreenState extends State<MainScreen>
   bool? _autoLaunchEnabled;
   bool _vadEnabled = true;
   Duration? _retentionDuration;
+  bool _hasShownTrayReminder = false;
+  bool _isHiddenToTray = false;
+  bool _shutdownRequested = false;
 
   @override
   void initState() {
     super.initState();
+    windowManager.addListener(this);
     _tabController = TabController(length: 2, vsync: this);
     _initializeServices();
   }
@@ -78,6 +83,27 @@ class _MainScreenState extends State<MainScreen>
       }
     }
     _loggingService.addErrorListener(_handleLoggingError);
+
+    try {
+      await windowManager.setPreventClose(true);
+      await windowManager.setSkipTaskbar(false);
+    } catch (e, stackTrace) {
+      _loggingService.warning('창 닫힘 방지 초기화 실패', error: e, stackTrace: stackTrace);
+    }
+
+    try {
+      await AutoLaunchService().applySavedPreference();
+    } catch (e, stackTrace) {
+      _loggingService.warning('자동 실행 설정 동기화 실패', error: e, stackTrace: stackTrace);
+      if (mounted) {
+        Future.microtask(() {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('자동 실행 설정을 동기화하지 못했습니다: $e')),
+          );
+        });
+      }
+    }
 
     _audioService.onAmplitudeChanged = (level) {
       if (!mounted) return;
@@ -105,6 +131,7 @@ class _MainScreenState extends State<MainScreen>
       });
       _startSessionTicker();
       _updateTodayRecordingDisplay();
+      unawaited(_trayService.setRecordingState(true));
     };
 
     _audioService.onRecordingStopped =
@@ -117,6 +144,7 @@ class _MainScreenState extends State<MainScreen>
           _isRecording = false;
         });
       }
+      unawaited(_trayService.setRecordingState(false));
       await _recordSessionDuration(startTime, stopTime);
     };
 
@@ -167,6 +195,9 @@ class _MainScreenState extends State<MainScreen>
       _trayService.onStartRecording = () => _startRecording();
       _trayService.onStopRecording = () => _stopRecording();
       _trayService.onShowWindow = () => _bringToFront();
+      _trayService.onExit = () => _handleTrayExit();
+      _trayService.onRunDiagnostic = () => _runMicDiagnostic();
+      await _trayService.setRecordingState(_audioService.isRecording);
     } catch (_) {}
 
     await _loadTodayRecordingDuration();
@@ -182,6 +213,8 @@ class _MainScreenState extends State<MainScreen>
     _audioService.dispose();
     _trayService.dispose();
     _loggingService.removeErrorListener(_handleLoggingError);
+    windowManager.removeListener(this);
+    unawaited(windowManager.setPreventClose(false));
     super.dispose();
   }
 
@@ -443,6 +476,7 @@ class _MainScreenState extends State<MainScreen>
         _isRecording = true;
       });
       unawaited(_trayService.updateTrayIcon(TrayIconState.recording));
+      unawaited(_trayService.setRecordingState(true));
       if (showFeedback) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('녹음을 시작했습니다.')),
@@ -473,6 +507,7 @@ class _MainScreenState extends State<MainScreen>
         _isRecording = false;
       });
       unawaited(_trayService.updateTrayIcon(TrayIconState.waiting));
+      unawaited(_trayService.setRecordingState(false));
       if (showFeedback) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('녹음을 중지했습니다.')),
@@ -489,16 +524,78 @@ class _MainScreenState extends State<MainScreen>
   void _bringToFront() {
     () async {
       try {
+        await windowManager.setSkipTaskbar(false);
         final isMinimized = await windowManager.isMinimized();
         if (isMinimized) {
           await windowManager.restore();
         }
         await windowManager.show();
         await windowManager.focus();
+        _isHiddenToTray = false;
       } catch (e) {
         _loggingService.warning('창 포커스 이동 실패', error: e);
       }
     }();
+  }
+
+  void _handleTrayExit() {
+    if (_shutdownRequested) return;
+    _shutdownRequested = true;
+
+    () async {
+      try {
+        if (_audioService.isRecording) {
+          await _stopRecording(showFeedback: false);
+        }
+      } catch (e, stackTrace) {
+        _loggingService.error('종료 전 녹음 중지 실패', error: e, stackTrace: stackTrace);
+      }
+
+      windowManager.removeListener(this);
+      await windowManager.setPreventClose(false);
+      await windowManager.setSkipTaskbar(false);
+      await Future<void>.delayed(const Duration(milliseconds: 80));
+
+      try {
+        await windowManager.close();
+      } catch (e, stackTrace) {
+        _loggingService.error('창 종료 실패', error: e, stackTrace: stackTrace);
+      }
+    }();
+  }
+
+  @override
+  void onWindowClose() {
+    if (_shutdownRequested) {
+      return;
+    }
+
+    if (_isHiddenToTray) {
+      return;
+    }
+
+    _isHiddenToTray = true;
+
+    () async {
+      try {
+        await windowManager.hide();
+        await windowManager.setSkipTaskbar(true);
+      } catch (e, stackTrace) {
+        _loggingService.error('창 숨김 실패', error: e, stackTrace: stackTrace);
+      }
+    }();
+
+    if (!_hasShownTrayReminder && mounted) {
+      _hasShownTrayReminder = true;
+      Future.microtask(() {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('앱이 백그라운드에서 계속 실행됩니다. 트레이 아이콘으로 다시 열 수 있어요.'),
+          ),
+        );
+      });
+    }
   }
 
   Future<void> _loadTodayRecordingDuration() async {
