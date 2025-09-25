@@ -212,7 +212,6 @@ class _MainScreenState extends State<MainScreen>
                         diagnosticInProgress: _micDiagnosticRunning,
                         onRunDiagnostic: () => _runMicDiagnostic(),
                         onStartRecording: () => _startRecording(),
-                        onPauseRecording: () => _pauseRecording(),
                         onStopRecording: () => _stopRecording(),
                         onSyncSchedule: () => _syncRecordingWithSchedule(),
                       ),
@@ -671,7 +670,6 @@ class _DashboardTab extends StatelessWidget {
   final bool diagnosticInProgress;
   final Future<void> Function() onRunDiagnostic;
   final Future<void> Function() onStartRecording;
-  final Future<void> Function() onPauseRecording;
   final Future<void> Function() onStopRecording;
   final Future<void> Function() onSyncSchedule;
 
@@ -1005,16 +1003,15 @@ class _DashboardTab extends StatelessWidget {
                 children: [
                   SizedBox(
                     width:
-                        isWide ? constraints.maxWidth / 2 - 8 : double.infinity,
+                    isWide ? constraints.maxWidth / 2 - 8 : double.infinity,
                     child: OutlinedButton.icon(
-                      onPressed: isRecording ? () => onPauseRecording() : null,
-                      icon: const Icon(Icons.pause),
-                      label: const Text('일시정지'),
+                      onPressed: isRecording ? () => onStopRecording() : onStartRecording(),
+                      icon: Icon(isRecording ? Icons.stop : Icons.fiber_manual_record),
+                      label: Text(isRecording ? '중지' : '녹음 시작'),
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 16),
-                        foregroundColor: _textMuted,
-                        disabledForegroundColor:
-                            _textMuted.withAlpha((0.4 * 255).round()),
+                        foregroundColor:
+                            isRecording ? Colors.redAccent : _primaryColor,
                       ),
                     ),
                   ),
@@ -1022,37 +1019,14 @@ class _DashboardTab extends StatelessWidget {
                     width:
                         isWide ? constraints.maxWidth / 2 - 8 : double.infinity,
                     child: FilledButton.icon(
-                      onPressed: () =>
-                          isRecording ? onStopRecording() : onStartRecording(),
-                      icon: Icon(
-                          isRecording ? Icons.stop : Icons.fiber_manual_record),
-                      label: Text(isRecording ? '중지' : '녹음 시작'),
-                      style: FilledButton.styleFrom(
-                        backgroundColor:
-                            isRecording ? Colors.redAccent : _primaryColor,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                      ),
+                      onPressed: () => onSyncSchedule(),
+                      icon: const Icon(Icons.sync),
+                      label: const Text('스케줄 동기화'),
                     ),
                   ),
                 ],
               );
             },
-          ),
-          const SizedBox(height: 16),
-          Align(
-            alignment: Alignment.center,
-            child: TextButton.icon(
-              onPressed: () => onSyncSchedule(),
-              icon: const Icon(Icons.sync),
-              label: const Text('스케줄과 동기화'),
-              style: TextButton.styleFrom(
-                foregroundColor: _primaryColor,
-              ),
-            ),
           ),
         ],
       ),

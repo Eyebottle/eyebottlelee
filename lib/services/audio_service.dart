@@ -81,28 +81,6 @@ class AudioService {
     }
   }
 
-  /// 녹음 일시정지
-  Future<void> pauseRecording() async {
-    try {
-      await _recorder.pause();
-      _logging.info('녹음 일시정지됨');
-    } catch (e) {
-      _logging.error('녹음 일시정지 실패', error: e);
-      throw Exception('녹음 일시정지 실패: $e');
-    }
-  }
-
-  /// 녹음 재개
-  Future<void> resumeRecording() async {
-    try {
-      await _recorder.resume();
-      _logging.info('녹음 재개됨');
-    } catch (e) {
-      _logging.error('녹음 재개 실패', error: e);
-      throw Exception('녹음 재개 실패: $e');
-    }
-  }
-
   /// 녹음 중지
   Future<String?> stopRecording() async {
     try {
