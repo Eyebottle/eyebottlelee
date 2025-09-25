@@ -225,6 +225,12 @@ class _MainScreenState extends State<MainScreen>
                         vadEnabled: _audioService.vadEnabled,
                         autoLaunchEnabled:
                             _autoLaunchEnabled ?? true,
+                        onRefreshAutoLaunch: () async {
+                          final value = await _settings.getLaunchAtStartup();
+                          if (mounted) {
+                            setState(() => _autoLaunchEnabled = value);
+                          }
+                        },
                       ),
                     ],
                   ),
@@ -1095,6 +1101,7 @@ class _SettingsTab extends StatelessWidget {
     required this.saveFolder,
     required this.vadEnabled,
     required this.autoLaunchEnabled,
+    required this.onRefreshAutoLaunch,
   });
 
   final Future<void> Function() onOpenSchedule;
@@ -1105,6 +1112,7 @@ class _SettingsTab extends StatelessWidget {
   final String saveFolder;
   final bool vadEnabled;
   final bool autoLaunchEnabled;
+  final Future<void> Function() onRefreshAutoLaunch;
 
   @override
   Widget build(BuildContext context) {
@@ -1161,7 +1169,10 @@ class _SettingsTab extends StatelessWidget {
                 title: '윈도우 시작 시 자동 실행',
                 description: '컴퓨터 시작 시 앱을 자동으로 실행합니다.',
                 statusText: autoLaunchEnabled ? '켜짐' : '꺼짐',
-                onTap: onOpenAutoLaunch,
+                onTap: () async {
+                  await onOpenAutoLaunch();
+                  await onRefreshAutoLaunch();
+                },
               ),
             ],
           ),
