@@ -230,76 +230,69 @@ class _MainScreenState extends State<MainScreen>
 
   @override
   Widget build(BuildContext context) {
-    return ShowCaseWidget(
-      enableAutoScroll: true,
-      builder: Builder(
-        builder: (context) {
-          return Scaffold(
-            backgroundColor: _backgroundColor,
-            body: SafeArea(
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(
-                    minWidth: 620,
-                    maxWidth: 960,
+    return Scaffold(
+      backgroundColor: _backgroundColor,
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(
+              minWidth: 620,
+              maxWidth: 960,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 16,
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                  child: _buildHeader(),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: _buildTabBar(),
+                ),
+                const SizedBox(height: 16),
+                Expanded(
+                  child: TabBarView(
+                    controller: _tabController,
+                    physics: const NeverScrollableScrollPhysics(),
                     children: [
-                      Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 24,
-                          vertical: 16,
-                        ),
-                        child: _buildHeader(),
+                      _DashboardTab(
+                        isRecording: _isRecording,
+                        todayRecordingTime: _todayRecordingTime,
+                        plannedSessions: _plannedSessionsForToday(),
+                        volumeLevel: _volumeLevel,
+                        volumeHistory: _volumeHistory,
+                        lastDiagnostic: _lastMicDiagnostic,
+                        diagnosticInProgress: _micDiagnosticRunning,
+                        onRunDiagnostic: () => _runMicDiagnostic(),
+                        onStartRecording: () => _startRecording(),
+                        onStopRecording: () => _stopRecording(),
+                        onSyncSchedule: () => _syncRecordingWithSchedule(),
+                        recordingShowcaseKey: _tutorialRecordingKey,
+                        scheduleShowcaseKey: _tutorialScheduleKey,
+                        trayShowcaseKey: _tutorialTrayKey,
                       ),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 24),
-                        child: _buildTabBar(),
-                      ),
-                      const SizedBox(height: 16),
-                      Expanded(
-                        child: TabBarView(
-                          controller: _tabController,
-                          physics: const NeverScrollableScrollPhysics(),
-                          children: [
-                            _DashboardTab(
-                              isRecording: _isRecording,
-                              todayRecordingTime: _todayRecordingTime,
-                              plannedSessions: _plannedSessionsForToday(),
-                              volumeLevel: _volumeLevel,
-                              volumeHistory: _volumeHistory,
-                              lastDiagnostic: _lastMicDiagnostic,
-                              diagnosticInProgress: _micDiagnosticRunning,
-                              onRunDiagnostic: () => _runMicDiagnostic(),
-                              onStartRecording: () => _startRecording(),
-                              onStopRecording: () => _stopRecording(),
-                              onSyncSchedule: () => _syncRecordingWithSchedule(),
-                              recordingShowcaseKey: _tutorialRecordingKey,
-                              scheduleShowcaseKey: _tutorialScheduleKey,
-                              trayShowcaseKey: _tutorialTrayKey,
-                            ),
-                            _SettingsTab(
-                              onOpenSchedule: () => _showScheduleDialog(),
-                              onOpenSaveFolder: () => _showFolderDialog(),
-                              onOpenVad: () => _openVadSettings(),
-                              onOpenRetention: () => _openRetentionSettings(),
-                              onOpenAutoLaunch: () => _openAutoLaunchSettings(),
-                              saveFolder: _currentSaveFolder,
-                              vadEnabled: _vadEnabled,
-                              autoLaunchEnabled: _autoLaunchEnabled ?? true,
-                              retentionDuration: _retentionDuration,
-                            ),
-                          ],
-                        ),
+                      _SettingsTab(
+                        onOpenSchedule: () => _showScheduleDialog(),
+                        onOpenSaveFolder: () => _showFolderDialog(),
+                        onOpenVad: () => _openVadSettings(),
+                        onOpenRetention: () => _openRetentionSettings(),
+                        onOpenAutoLaunch: () => _openAutoLaunchSettings(),
+                        saveFolder: _currentSaveFolder,
+                        vadEnabled: _vadEnabled,
+                        autoLaunchEnabled: _autoLaunchEnabled ?? true,
+                        retentionDuration: _retentionDuration,
                       ),
                     ],
                   ),
                 ),
-              ),
+              ],
             ),
-          );
-        },
+          ),
+        ),
       ),
     );
   }

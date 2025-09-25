@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:showcaseview/showcaseview.dart';
 import 'package:window_manager/window_manager.dart';
 import 'ui/screens/main_screen.dart';
 
@@ -29,7 +30,11 @@ void main() async {
         initialSize: initialSize, minimumSize: minimumSize);
   });
 
-  runApp(const MedicalRecorderApp());
+  runApp(
+    ShowCaseWidget(
+      builder: (context) => const MedicalRecorderApp(),
+    ),
+  );
 }
 
 Future<void> _applyWindowMetrics({
