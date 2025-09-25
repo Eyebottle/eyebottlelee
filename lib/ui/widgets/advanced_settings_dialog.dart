@@ -268,10 +268,14 @@ class _AdvancedSettingsDialogState extends State<AdvancedSettingsDialog> {
         return _SettingsCard(
           icon: Icons.play_circle,
           title: 'Windows 로그인 시 자동 실행',
-          description: '개발 단계에서는 실행 경로에 따라 동작이 제한될 수 있습니다.',
+          description:
+              'Windows 로그인 시 앱을 자동으로 실행합니다. 만약 자동 실행이 동작하지 않으면 Windows 설정 > 앱 > 시작 프로그램에서 “Eyebottle Medical Recorder” 항목을 켜고, 조직 정책으로 차단된 경우 IT 담당자에게 예외 설정을 요청하세요.',
           child: SwitchListTile.adaptive(
             contentPadding: EdgeInsets.zero,
             title: const Text('자동 실행 사용'),
+            subtitle: const Text(
+              '로그인 후 자동 실행이 되지 않으면 Windows 시작 프로그램 설정에서 항목을 활성화하거나 IT 담당자에게 예외 승인을 요청하세요.',
+            ),
             value: _launchAtStartup,
             onChanged: (v) => setState(() => _launchAtStartup = v),
           ),
