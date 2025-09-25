@@ -55,6 +55,7 @@ class _MainScreenState extends State<MainScreen>
   bool _micDiagnosticRunning = false;
   bool? _autoLaunchEnabled;
   bool _vadEnabled = true;
+  Duration? _retentionDuration;
 
   @override
   void initState() {
@@ -141,6 +142,11 @@ class _MainScreenState extends State<MainScreen>
 
     final retention = await _settings.getRetentionDuration();
     _audioService.configureRetention(retention);
+    if (mounted) {
+      setState(() {
+        _retentionDuration = retention;
+      });
+    }
 
     final autoLaunch = await _settings.getLaunchAtStartup();
     if (mounted) {
@@ -231,12 +237,7 @@ class _MainScreenState extends State<MainScreen>
                         vadEnabled: _vadEnabled,
                         autoLaunchEnabled:
                             _autoLaunchEnabled ?? true,
-                        onRefreshAutoLaunch: () async {
-                          final value = await _settings.getLaunchAtStartup();
-                          if (mounted) {
-                            setState(() => _autoLaunchEnabled = value);
-                          }
-                        },
+                        retentionDuration: _retentionDuration,
                       ),
                     ],
                   ),
@@ -373,6 +374,11 @@ class _MainScreenState extends State<MainScreen>
     if (result == 'saved') {
       final (enabled, threshold) = await _settings.getVad();
       _audioService.configureVad(enabled: enabled, threshold: threshold);
+      if (mounted) {
+        setState(() {
+          _vadEnabled = enabled;
+        });
+      }
     }
   }
 
@@ -384,14 +390,25 @@ class _MainScreenState extends State<MainScreen>
     if (result == 'saved') {
       final retention = await _settings.getRetentionDuration();
       _audioService.configureRetention(retention);
+      if (mounted) {
+        setState(() {
+          _retentionDuration = retention;
+        });
+      }
     }
   }
 
   Future<void> _openAutoLaunchSettings() async {
-    await AdvancedSettingsDialog.show(
+    final result = await AdvancedSettingsDialog.show(
       context,
       AdvancedSettingSection.autoLaunch,
     );
+    if (result == 'saved') {
+      final value = await _settings.getLaunchAtStartup();
+      if (mounted) {
+        setState(() => _autoLaunchEnabled = value);
+      }
+    }
   }
 
   Future<void> _refreshSaveFolderDisplay() async {
@@ -1072,6 +1089,31 @@ class _StatusBadge extends StatelessWidget {
       ),
     );
   }
+
+  String _formatRetentionLabel(Duration? duration) {
+    if (duration == null) return '영구';
+    final days = duration.inDays;
+    switch (days) {
+      case 7:
+        return '1주일';
+      case 30:
+        return '1개월';
+      case 90:
+        return '3개월';
+      case 180:
+        return '6개월';
+      case 365:
+        return '1년';
+      default:
+        if (days % 30 == 0) {
+          return '${(days / 30).round()}개월';
+        }
+        if (days % 7 == 0) {
+          return '${(days / 7).round()}주';
+        }
+        return '${days}일';
+    }
+  }
 }
 
 class _DiagnosticVisuals {
@@ -1096,7 +1138,7 @@ class _SettingsTab extends StatelessWidget {
     required this.saveFolder,
     required this.vadEnabled,
     required this.autoLaunchEnabled,
-    required this.onRefreshAutoLaunch,
+    required this.retentionDuration,
   });
 
   final Future<void> Function() onOpenSchedule;
@@ -1107,7 +1149,7 @@ class _SettingsTab extends StatelessWidget {
   final String saveFolder;
   final bool vadEnabled;
   final bool autoLaunchEnabled;
-  final Future<void> Function() onRefreshAutoLaunch;
+  final Duration? retentionDuration;
 
   @override
   Widget build(BuildContext context) {
@@ -1141,6 +1183,7 @@ class _SettingsTab extends StatelessWidget {
                 icon: Icons.history,
                 title: '저장 기간',
                 description: '녹음 파일의 보관 기간을 설정합니다.',
+                statusText: _formatRetentionLabel(retentionDuration),
                 onTap: onOpenRetention,
               ),
             ],
@@ -1159,17 +1202,14 @@ class _SettingsTab extends StatelessWidget {
                 statusText: vadEnabled ? '켜짐' : '꺼짐',
                 onTap: onOpenVad,
               ),
-                SettingsDestination(
-                  icon: Icons.play_circle,
-                  title: '윈도우 시작 시 자동 실행',
-                  description: '컴퓨터 시작 시 앱을 자동으로 실행합니다.',
-                  statusText: autoLaunchEnabled ? '켜짐' : '꺼짐',
-                  onTap: () async {
-                    await onOpenAutoLaunch();
-                    await onRefreshAutoLaunch();
-                  },
-                ),
-              ],
+              SettingsDestination(
+                icon: Icons.play_circle,
+                title: '윈도우 시작 시 자동 실행',
+                description: '컴퓨터 시작 시 앱을 자동으로 실행합니다.',
+                statusText: autoLaunchEnabled ? '켜짐' : '꺼짐',
+                onTap: onOpenAutoLaunch,
+              ),
+            ],
           ),
         ],
       ),
