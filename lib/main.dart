@@ -8,8 +8,8 @@ void main() async {
   // Windows Desktop 초기화
   await windowManager.ensureInitialized();
 
-  const initialSize = Size(650, 840);
-  const minimumSize = Size(620, 780);
+  const initialSize = Size(660, 980);
+  const minimumSize = Size(640, 900);
 
   WindowOptions windowOptions = const WindowOptions(
     center: true,
