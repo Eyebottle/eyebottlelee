@@ -433,24 +433,6 @@ class _MainScreenState extends State<MainScreen>
     }
   }
 
-  Future<void> _pauseRecording() async {
-    if (!_audioService.isRecording) {
-      return;
-    }
-    try {
-      await _audioService.pauseRecording();
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('녹음을 일시정지했습니다.')),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('일시정지 실패: $e')),
-      );
-    }
-  }
-
   Future<void> _stopRecording({bool showFeedback = true}) async {
     if (!_audioService.isRecording) {
       if (showFeedback && mounted) {
@@ -662,7 +644,6 @@ class _DashboardTab extends StatelessWidget {
     required this.diagnosticInProgress,
     required this.onRunDiagnostic,
     required this.onStartRecording,
-    required this.onPauseRecording,
     required this.onStopRecording,
     required this.onSyncSchedule,
   });
@@ -1011,7 +992,13 @@ class _DashboardTab extends StatelessWidget {
                     width:
                     isWide ? constraints.maxWidth / 2 - 8 : double.infinity,
                     child: OutlinedButton.icon(
-                      onPressed: isRecording ? () => onStopRecording() : onStartRecording(),
+                      onPressed: () {
+                        if (isRecording) {
+                          onStopRecording();
+                        } else {
+                          onStartRecording();
+                        }
+                      },
                       icon: Icon(isRecording ? Icons.stop : Icons.fiber_manual_record),
                       label: Text(isRecording ? '중지' : '녹음 시작'),
                       style: OutlinedButton.styleFrom(
@@ -1025,7 +1012,9 @@ class _DashboardTab extends StatelessWidget {
                     width:
                         isWide ? constraints.maxWidth / 2 - 8 : double.infinity,
                     child: FilledButton.icon(
-                      onPressed: () => onSyncSchedule(),
+                      onPressed: () {
+                        onSyncSchedule();
+                      },
                       icon: const Icon(Icons.sync),
                       label: const Text('스케줄 동기화'),
                     ),
