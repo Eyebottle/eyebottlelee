@@ -6,7 +6,8 @@ import 'help_section.dart';
 class HelpCenterDialog {
   static Future<void> show(
     BuildContext context, {
-    VoidCallback? onStartTutorial,
+    VoidCallback? onStartDashboardTutorial,
+    VoidCallback? onStartSettingsTutorial,
   }) {
     return showDialog(
       context: context,
@@ -25,7 +26,10 @@ class HelpCenterDialog {
                 Expanded(
                   child: SingleChildScrollView(
                     padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
-                    child: _HelpContent(onStartTutorial: onStartTutorial),
+                    child: _HelpContent(
+                      onStartDashboardTutorial: onStartDashboardTutorial,
+                      onStartSettingsTutorial: onStartSettingsTutorial,
+                    ),
                   ),
                 ),
                 const Divider(height: 1),
@@ -82,9 +86,13 @@ class HelpCenterDialog {
 }
 
 class _HelpContent extends StatelessWidget {
-  const _HelpContent({this.onStartTutorial});
+  const _HelpContent({
+    this.onStartDashboardTutorial,
+    this.onStartSettingsTutorial,
+  });
 
-  final VoidCallback? onStartTutorial;
+  final VoidCallback? onStartDashboardTutorial;
+  final VoidCallback? onStartSettingsTutorial;
 
   @override
   Widget build(BuildContext context) {
@@ -110,13 +118,13 @@ class _HelpContent extends StatelessWidget {
           description:
               '녹음 상태 카드에서 수동으로 시작/중지할 수 있고, 오늘 일정과 저장 정책을 한눈에 볼 수 있습니다.',
           actions: [
-            if (onStartTutorial != null)
+            if (onStartDashboardTutorial != null)
               FilledButton.tonal(
                 onPressed: () {
                   Navigator.of(context).pop();
-                  onStartTutorial!();
+                  onStartDashboardTutorial!();
                 },
-                child: const Text('튜토리얼 시작'),
+                child: const Text('대시보드 튜토리얼'),
               ),
           ],
         ),
@@ -125,6 +133,16 @@ class _HelpContent extends StatelessWidget {
           title: '3. 진료 시간표 & 보관 설정',
           description:
               '설정 탭에서 요일별 오전/오후 시간을 조절하고, 무음 감지 민감도와 보관 기간을 관리하세요.',
+          actions: [
+            if (onStartSettingsTutorial != null)
+              FilledButton.tonal(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  onStartSettingsTutorial!();
+                },
+                child: const Text('설정 튜토리얼'),
+              ),
+          ],
         ),
         HelpSection(
           icon: Icons.mic_external_on,

@@ -45,6 +45,11 @@ class _MainScreenState extends State<MainScreen>
   final GlobalKey _tutorialRecordingKey = GlobalKey();
   final GlobalKey _tutorialScheduleKey = GlobalKey();
   final GlobalKey _tutorialTrayKey = GlobalKey();
+  final GlobalKey _settingsScheduleKey = GlobalKey();
+  final GlobalKey _settingsSaveKey = GlobalKey();
+  final GlobalKey _settingsRetentionKey = GlobalKey();
+  final GlobalKey _settingsVadKey = GlobalKey();
+  final GlobalKey _settingsAutoLaunchKey = GlobalKey();
 
   late final TabController _tabController;
 
@@ -205,7 +210,8 @@ class _MainScreenState extends State<MainScreen>
       _trayService.onRunDiagnostic = () => _runMicDiagnostic();
       _trayService.onOpenHelp = () => HelpCenterDialog.show(
             context,
-            onStartTutorial: _startTutorial,
+            onStartDashboardTutorial: _startDashboardTutorial,
+            onStartSettingsTutorial: _startSettingsTutorial,
           );
       await _trayService.setRecordingState(_audioService.isRecording);
     } catch (_) {}
@@ -281,6 +287,11 @@ class _MainScreenState extends State<MainScreen>
                         onOpenVad: () => _openVadSettings(),
                         onOpenRetention: () => _openRetentionSettings(),
                         onOpenAutoLaunch: () => _openAutoLaunchSettings(),
+                        scheduleShowcaseKey: _settingsScheduleKey,
+                        saveFolderShowcaseKey: _settingsSaveKey,
+                        retentionShowcaseKey: _settingsRetentionKey,
+                        vadShowcaseKey: _settingsVadKey,
+                        autoLaunchShowcaseKey: _settingsAutoLaunchKey,
                         saveFolder: _currentSaveFolder,
                         vadEnabled: _vadEnabled,
                         autoLaunchEnabled: _autoLaunchEnabled ?? true,
@@ -336,7 +347,8 @@ class _MainScreenState extends State<MainScreen>
         TextButton.icon(
           onPressed: () => HelpCenterDialog.show(
             context,
-            onStartTutorial: _startTutorial,
+            onStartDashboardTutorial: _startDashboardTutorial,
+            onStartSettingsTutorial: _startSettingsTutorial,
           ),
           icon: const Icon(Icons.menu_book_outlined),
           label: const Text('도움말'),
@@ -679,16 +691,45 @@ class _MainScreenState extends State<MainScreen>
     return '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
   }
 
-  void _startTutorial() {
+  void _startDashboardTutorial() {
     final showCase = ShowCaseWidget.of(context);
-    if (showCase == null) {
-      return;
+    if (showCase == null) return;
+
+    if (_tabController.index != 0) {
+      _tabController.animateTo(0);
     }
-    showCase.startShowCase([
-      _tutorialRecordingKey,
-      _tutorialScheduleKey,
-      _tutorialTrayKey,
-    ]);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      showCase.startShowCase([
+        _tutorialRecordingKey,
+        _tutorialScheduleKey,
+        _tutorialTrayKey,
+      ]);
+    });
+  }
+
+  void _startSettingsTutorial() {
+    final showCase = ShowCaseWidget.of(context);
+    if (showCase == null) return;
+
+    void startShowcase() {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        showCase.startShowCase([
+          _settingsScheduleKey,
+          _settingsSaveKey,
+          _settingsRetentionKey,
+          _settingsVadKey,
+          _settingsAutoLaunchKey,
+        ]);
+      });
+    }
+
+    if (_tabController.index != 1) {
+      _tabController.animateTo(1);
+      Future.delayed(const Duration(milliseconds: 300), startShowcase);
+    } else {
+      startShowcase();
+    }
   }
 
   Future<void> _syncRecordingWithSchedule({bool initial = false}) async {
@@ -1315,6 +1356,11 @@ class _SettingsTab extends StatelessWidget {
     required this.onOpenVad,
     required this.onOpenRetention,
     required this.onOpenAutoLaunch,
+    required this.scheduleShowcaseKey,
+    required this.saveFolderShowcaseKey,
+    required this.retentionShowcaseKey,
+    required this.vadShowcaseKey,
+    required this.autoLaunchShowcaseKey,
     required this.saveFolder,
     required this.vadEnabled,
     required this.autoLaunchEnabled,
@@ -1326,6 +1372,11 @@ class _SettingsTab extends StatelessWidget {
   final Future<void> Function() onOpenVad;
   final Future<void> Function() onOpenRetention;
   final Future<void> Function() onOpenAutoLaunch;
+  final GlobalKey scheduleShowcaseKey;
+  final GlobalKey saveFolderShowcaseKey;
+  final GlobalKey retentionShowcaseKey;
+  final GlobalKey vadShowcaseKey;
+  final GlobalKey autoLaunchShowcaseKey;
   final String saveFolder;
   final bool vadEnabled;
   final bool autoLaunchEnabled;
@@ -1346,6 +1397,9 @@ class _SettingsTab extends StatelessWidget {
                 title: '스케줄 설정',
                 description: '진료/녹음 시간을 관리합니다.',
                 onTap: onOpenSchedule,
+                showcaseKey: scheduleShowcaseKey,
+                showcaseDescription:
+                    '진료 시간표에서 오전/오후 구간을 조정해 자동 녹음 시간을 관리하세요.',
               ),
             ],
           ),
@@ -1358,6 +1412,9 @@ class _SettingsTab extends StatelessWidget {
                 title: '저장 위치',
                 description: '녹음 파일 저장 폴더를 변경합니다.',
                 onTap: onOpenSaveFolder,
+                showcaseKey: saveFolderShowcaseKey,
+                showcaseDescription:
+                    '녹음 파일을 저장할 폴더(예: OneDrive)를 지정합니다.',
               ),
               SettingsDestination(
                 icon: Icons.history,
@@ -1365,6 +1422,9 @@ class _SettingsTab extends StatelessWidget {
                 description: '녹음 파일의 보관 기간을 설정합니다.',
                 statusText: _formatRetentionLabel(retentionDuration),
                 onTap: onOpenRetention,
+                showcaseKey: retentionShowcaseKey,
+                showcaseDescription:
+                    '자동 보관 기간을 설정해 오래된 파일을 정리할 수 있습니다.',
               ),
             ],
             footer: _SaveFolderSummary(
@@ -1381,6 +1441,9 @@ class _SettingsTab extends StatelessWidget {
                 description: '음성이 감지될 때만 녹음하도록 설정합니다.',
                 statusText: vadEnabled ? '켜짐' : '꺼짐',
                 onTap: onOpenVad,
+                showcaseKey: vadShowcaseKey,
+                showcaseDescription:
+                    '무음 감지 민감도를 조정해 조용한 환경에서도 녹음이 잘 이어지도록 설정하세요.',
               ),
               SettingsDestination(
                 icon: Icons.play_circle,
@@ -1388,6 +1451,9 @@ class _SettingsTab extends StatelessWidget {
                 description: '컴퓨터 시작 시 앱을 자동으로 실행합니다.',
                 statusText: autoLaunchEnabled ? '켜짐' : '꺼짐',
                 onTap: onOpenAutoLaunch,
+                showcaseKey: autoLaunchShowcaseKey,
+                showcaseDescription:
+                    'Windows 로그인 시 앱을 자동 실행하도록 설정합니다.',
               ),
             ],
           ),
@@ -1404,6 +1470,8 @@ class SettingsDestination {
     required this.description,
     required this.onTap,
     this.statusText,
+    this.showcaseKey,
+    this.showcaseDescription,
   });
 
   final IconData icon;
@@ -1411,6 +1479,8 @@ class SettingsDestination {
   final String description;
   final Future<void> Function() onTap;
   final String? statusText;
+  final GlobalKey? showcaseKey;
+  final String? showcaseDescription;
 }
 
 class _SaveFolderSummary extends StatelessWidget {
@@ -1515,7 +1585,7 @@ class _SettingsTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return InkWell(
+    Widget content = InkWell(
       onTap: () => item.onTap(),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
@@ -1578,6 +1648,16 @@ class _SettingsTile extends StatelessWidget {
         ),
       ),
     );
+
+    if (item.showcaseKey != null && item.showcaseDescription != null) {
+      content = Showcase(
+        key: item.showcaseKey!,
+        description: item.showcaseDescription!,
+        child: content,
+      );
+    }
+
+    return content;
   }
 }
 
