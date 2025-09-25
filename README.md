@@ -10,10 +10,12 @@
 - **OneDrive 동기화**: 개인 OneDrive 폴더 자동 백업 + 보관 기간 관리
 - **시스템 트레이**: 닫아도 백그라운드 유지, 아이콘 좌/우클릭 메뉴로 녹음 토글·마이크 점검·설정·종료 제어
 - **자동 마이크 점검**: 앱 시작 시 3초 샘플로 장치/권한/입력 레벨 검사
+- **도움말 & 튜토리얼**: 앱 내 도움말 다이얼로그와 쇼케이스 가이드로 바로 사용법 익히기
 
 ## 📚 문서
 
 - 개발 가이드: [docs/developing.md](docs/developing.md)
+- 사용자 가이드: [docs/user-guide.md](docs/user-guide.md)
 - 제품 요구사항(PRD): [docs/medical-recording-prd.md](docs/medical-recording-prd.md)
 - WSL ↔ Windows 동기화 가이드: [docs/sync-workflow.md](docs/sync-workflow.md)
 

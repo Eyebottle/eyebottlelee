@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
+import 'package:show_case_view/show_case_view.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../../services/auto_launch_service.dart';
@@ -16,6 +17,7 @@ import '../../services/mic_diagnostics_service.dart';
 import '../widgets/advanced_settings_dialog.dart';
 import '../widgets/animated_volume_meter.dart';
 import '../widgets/schedule_config_widget.dart';
+import '../widgets/help/help_center_dialog.dart';
 
 const _backgroundColor = Color(0xFFF6F7F8);
 const _primaryColor = Color(0xFF1193D4);
@@ -39,6 +41,10 @@ class _MainScreenState extends State<MainScreen>
   final TrayService _trayService = TrayService();
   final LoggingService _loggingService = LoggingService();
   final MicDiagnosticsService _micDiagnosticsService = MicDiagnosticsService();
+
+  final GlobalKey _tutorialRecordingKey = GlobalKey();
+  final GlobalKey _tutorialScheduleKey = GlobalKey();
+  final GlobalKey _tutorialTrayKey = GlobalKey();
 
   late final TabController _tabController;
 
@@ -197,6 +203,10 @@ class _MainScreenState extends State<MainScreen>
       _trayService.onShowWindow = () => _bringToFront();
       _trayService.onExit = () => _handleTrayExit();
       _trayService.onRunDiagnostic = () => _runMicDiagnostic();
+      _trayService.onOpenHelp = () => HelpCenterDialog.show(
+            context,
+            onStartTutorial: _startTutorial,
+          );
       await _trayService.setRecordingState(_audioService.isRecording);
     } catch (_) {}
 
@@ -220,65 +230,76 @@ class _MainScreenState extends State<MainScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: _backgroundColor,
-      body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(
-              minWidth: 620,
-              maxWidth: 960,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                  child: _buildHeader(),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: _buildTabBar(),
-                ),
-                const SizedBox(height: 16),
-                Expanded(
-                  child: TabBarView(
-                    controller: _tabController,
-                    physics: const NeverScrollableScrollPhysics(),
+    return ShowCaseWidget(
+      enableAutoScroll: true,
+      builder: Builder(
+        builder: (context) {
+          return Scaffold(
+            backgroundColor: _backgroundColor,
+            body: SafeArea(
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    minWidth: 620,
+                    maxWidth: 960,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      _DashboardTab(
-                        isRecording: _isRecording,
-                        todayRecordingTime: _todayRecordingTime,
-                        plannedSessions: _plannedSessionsForToday(),
-                        volumeLevel: _volumeLevel,
-                        volumeHistory: _volumeHistory,
-                        lastDiagnostic: _lastMicDiagnostic,
-                        diagnosticInProgress: _micDiagnosticRunning,
-                        onRunDiagnostic: () => _runMicDiagnostic(),
-                        onStartRecording: () => _startRecording(),
-                        onStopRecording: () => _stopRecording(),
-                        onSyncSchedule: () => _syncRecordingWithSchedule(),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 16,
+                        ),
+                        child: _buildHeader(),
                       ),
-                      _SettingsTab(
-                        onOpenSchedule: () => _showScheduleDialog(),
-                        onOpenSaveFolder: () => _showFolderDialog(),
-                        onOpenVad: () => _openVadSettings(),
-                        onOpenRetention: () => _openRetentionSettings(),
-                        onOpenAutoLaunch: () => _openAutoLaunchSettings(),
-                        saveFolder: _currentSaveFolder,
-                        vadEnabled: _vadEnabled,
-                        autoLaunchEnabled:
-                            _autoLaunchEnabled ?? true,
-                        retentionDuration: _retentionDuration,
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        child: _buildTabBar(),
+                      ),
+                      const SizedBox(height: 16),
+                      Expanded(
+                        child: TabBarView(
+                          controller: _tabController,
+                          physics: const NeverScrollableScrollPhysics(),
+                          children: [
+                            _DashboardTab(
+                              isRecording: _isRecording,
+                              todayRecordingTime: _todayRecordingTime,
+                              plannedSessions: _plannedSessionsForToday(),
+                              volumeLevel: _volumeLevel,
+                              volumeHistory: _volumeHistory,
+                              lastDiagnostic: _lastMicDiagnostic,
+                              diagnosticInProgress: _micDiagnosticRunning,
+                              onRunDiagnostic: () => _runMicDiagnostic(),
+                              onStartRecording: () => _startRecording(),
+                              onStopRecording: () => _stopRecording(),
+                              onSyncSchedule: () => _syncRecordingWithSchedule(),
+                              recordingShowcaseKey: _tutorialRecordingKey,
+                              scheduleShowcaseKey: _tutorialScheduleKey,
+                              trayShowcaseKey: _tutorialTrayKey,
+                            ),
+                            _SettingsTab(
+                              onOpenSchedule: () => _showScheduleDialog(),
+                              onOpenSaveFolder: () => _showFolderDialog(),
+                              onOpenVad: () => _openVadSettings(),
+                              onOpenRetention: () => _openRetentionSettings(),
+                              onOpenAutoLaunch: () => _openAutoLaunchSettings(),
+                              saveFolder: _currentSaveFolder,
+                              vadEnabled: _vadEnabled,
+                              autoLaunchEnabled: _autoLaunchEnabled ?? true,
+                              retentionDuration: _retentionDuration,
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
                 ),
-              ],
+              ),
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }
@@ -320,13 +341,12 @@ class _MainScreenState extends State<MainScreen>
           ),
         ),
         TextButton.icon(
-          onPressed: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('사용법은 준비 중입니다.')),
-            );
-          },
+          onPressed: () => HelpCenterDialog.show(
+            context,
+            onStartTutorial: _startTutorial,
+          ),
           icon: const Icon(Icons.menu_book_outlined),
-          label: const Text('사용법'),
+          label: const Text('도움말'),
           style: TextButton.styleFrom(foregroundColor: _primaryColor),
         ),
       ],
@@ -666,6 +686,18 @@ class _MainScreenState extends State<MainScreen>
     return '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
   }
 
+  void _startTutorial() {
+    final showCase = ShowCaseWidget.of(context);
+    if (showCase == null) {
+      return;
+    }
+    showCase.startShowCase([
+      _tutorialRecordingKey,
+      _tutorialScheduleKey,
+      _tutorialTrayKey,
+    ]);
+  }
+
   Future<void> _syncRecordingWithSchedule({bool initial = false}) async {
     final shouldRecord = _scheduleService.isCurrentlyWorkingTime();
 
@@ -766,6 +798,9 @@ class _DashboardTab extends StatelessWidget {
     required this.onStartRecording,
     required this.onStopRecording,
     required this.onSyncSchedule,
+    required this.recordingShowcaseKey,
+    required this.scheduleShowcaseKey,
+    required this.trayShowcaseKey,
   });
 
   final bool isRecording;
@@ -779,6 +814,9 @@ class _DashboardTab extends StatelessWidget {
   final Future<void> Function() onStartRecording;
   final Future<void> Function() onStopRecording;
   final Future<void> Function() onSyncSchedule;
+  final GlobalKey recordingShowcaseKey;
+  final GlobalKey scheduleShowcaseKey;
+  final GlobalKey trayShowcaseKey;
 
   @override
   Widget build(BuildContext context) {
@@ -787,9 +825,19 @@ class _DashboardTab extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _buildRecordingCard(context),
+          Showcase(
+            key: recordingShowcaseKey,
+            description: '녹음 상태 카드에서 현재 녹음 여부를 확인하고 수동으로 시작/중지할 수 있습니다.',
+            child: _buildRecordingCard(context),
+          ),
           const SizedBox(height: 16),
           _buildDiagnosticCard(context),
+          const SizedBox(height: 16),
+          Showcase(
+            key: trayShowcaseKey,
+            description: '창을 닫으면 앱은 트레이에서 계속 실행됩니다. 좌/더블클릭으로 창을 복원하고 우클릭 메뉴로 기능을 제어하세요.',
+            child: _buildTrayInfoBanner(context),
+          ),
         ],
       ),
     );
@@ -947,6 +995,44 @@ class _DashboardTab extends StatelessWidget {
     );
   }
 
+  Widget _buildTrayInfoBanner(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F7ABF).withOpacity(0.08),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF0F7ABF).withOpacity(0.25)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.system_update_tv, color: Color(0xFF0F7ABF)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '트레이에서 계속 실행됩니다',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFF0F7ABF),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  '창을 닫아도 녹음은 중단되지 않아요. 트레이 아이콘을 좌/더블클릭해서 창을 다시 열고, 우클릭 메뉴에서 녹음 제어·마이크 점검·설정·종료를 실행할 수 있습니다.',
+                  style: theme.textTheme.bodySmall?.copyWith(color: const Color(0xFF0F7ABF)),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   _DiagnosticVisuals _diagnosticVisuals(MicDiagnosticStatus? status) {
     return switch (status) {
       MicDiagnosticStatus.ok => _DiagnosticVisuals(
@@ -1091,10 +1177,14 @@ class _DashboardTab extends StatelessWidget {
               ),
               const SizedBox(width: 16),
               Expanded(
-                child: _SummaryTile(
-                  title: '예정 녹음 시간',
-                  valueLines: plannedSessions,
-                  alignment: TextAlign.right,
+                child: Showcase(
+                  key: scheduleShowcaseKey,
+                  description: '예정된 진료 세션을 확인하고 필요 시 설정 탭에서 시간표를 수정하세요.',
+                  child: _SummaryTile(
+                    title: '예정 녹음 시간',
+                    valueLines: plannedSessions,
+                    alignment: TextAlign.right,
+                  ),
                 ),
               ),
             ],

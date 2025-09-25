@@ -16,6 +16,7 @@ class TrayService {
   MenuItemLabel? _showWindowItem;
   MenuItemLabel? _settingsItem;
   MenuItemLabel? _exitItem;
+  MenuItemLabel? _helpItem;
 
   // 콜백 함수들
   Function()? onStartRecording;
@@ -23,6 +24,7 @@ class TrayService {
   Function()? onShowWindow;
   Function()? onExit;
   Function()? onRunDiagnostic;
+  Function()? onOpenHelp;
 
   /// 시스템 트레이 초기화
   Future<void> initialize() async {
@@ -86,6 +88,11 @@ class TrayService {
       onClicked: (menuItem) => _showSettings(),
     );
 
+    _helpItem = MenuItemLabel(
+      label: '도움말',
+      onClicked: (menuItem) => _handleOpenHelp(),
+    );
+
     _exitItem = MenuItemLabel(
       label: '종료',
       onClicked: (menuItem) => _handleExit(),
@@ -96,6 +103,7 @@ class TrayService {
       MenuSeparator(),
       _toggleRecordingItem!,
       _diagnosticItem!,
+      _helpItem!,
       MenuSeparator(),
       _settingsItem!,
       MenuSeparator(),
@@ -182,6 +190,10 @@ class TrayService {
 
   void _handleRunDiagnostic() {
     onRunDiagnostic?.call();
+  }
+
+  void _handleOpenHelp() {
+    onOpenHelp?.call();
   }
 
   /// 녹음 상태를 업데이트하고 메뉴 라벨을 갱신한다.
