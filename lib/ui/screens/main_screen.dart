@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
-import 'package:show_case_view/show_case_view.dart';
+import 'package:showcaseview/showcaseview.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../../services/auto_launch_service.dart';

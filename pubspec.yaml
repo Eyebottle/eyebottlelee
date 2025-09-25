@@ -30,7 +30,7 @@ dependencies:
   # 유틸
   logger: ^2.4.0
   package_info_plus: ^8.0.1
-  show_case_view: ^2.0.5
+  showcaseview: ^4.0.1
   url_launcher: ^6.3.0
 
   # UI
