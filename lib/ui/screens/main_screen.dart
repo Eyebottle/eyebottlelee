@@ -673,13 +673,51 @@ class _DashboardTab extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _buildDiagnosticCard(context),
-          const SizedBox(height: 16),
           _buildRecordingCard(context),
           const SizedBox(height: 16),
-          _buildInfoCard(context),
+          _buildEnvironmentRow(context),
         ],
       ),
+    );
+  }
+
+  Widget _buildEnvironmentRow(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final diagnosticCard = _buildDiagnosticCard(context);
+        final infoCard = _buildInfoCard(context);
+        final isWide = constraints.maxWidth >= 640;
+
+        if (isWide) {
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(minHeight: 220),
+                  child: diagnosticCard,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(minHeight: 220),
+                  child: infoCard,
+                ),
+              ),
+            ],
+          );
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            diagnosticCard,
+            const SizedBox(height: 16),
+            infoCard,
+          ],
+        );
+      },
     );
   }
 
@@ -1012,17 +1050,33 @@ class _DashboardTab extends StatelessWidget {
               color: const Color(0xFF101C22),
             ),
           ),
-          const SizedBox(height: 8),
-          SelectableText(
-            saveFolder,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: _textMuted,
-            ),
+          const SizedBox(height: 12),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(Icons.folder_open, size: 20, color: _textMuted),
+              const SizedBox(width: 8),
+              Expanded(
+                child: SelectableText(
+                  saveFolder,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: _textMuted,
+                  ),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           Text(
             '녹음 파일은 날짜별 하위 폴더에 자동 정리됩니다.',
             style: theme.textTheme.bodySmall?.copyWith(color: _textMuted),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'OneDrive 동기화가 늦어지면 이 경로를 열어 최신 파일이 있는지 먼저 확인하세요.',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: _textMuted.withOpacity(0.85),
+            ),
           ),
         ],
       ),
