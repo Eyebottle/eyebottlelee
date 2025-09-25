@@ -198,7 +198,6 @@ class _MainScreenState extends State<MainScreen>
                         isRecording: _isRecording,
                         todayRecordingTime: _todayRecordingTime,
                         plannedSessions: _plannedSessionsForToday(),
-                        saveFolder: _currentSaveFolder,
                         volumeLevel: _volumeLevel,
                         volumeHistory: _volumeHistory,
                         lastDiagnostic: _lastMicDiagnostic,
@@ -215,6 +214,7 @@ class _MainScreenState extends State<MainScreen>
                         onOpenVad: () => _openVadSettings(),
                         onOpenRetention: () => _openRetentionSettings(),
                         onOpenAutoLaunch: () => _openAutoLaunchSettings(),
+                        saveFolder: _currentSaveFolder,
                       ),
                     ],
                   ),
@@ -640,7 +640,6 @@ class _DashboardTab extends StatelessWidget {
     required this.isRecording,
     required this.todayRecordingTime,
     required this.plannedSessions,
-    required this.saveFolder,
     required this.volumeLevel,
     required this.volumeHistory,
     required this.lastDiagnostic,
@@ -655,7 +654,6 @@ class _DashboardTab extends StatelessWidget {
   final bool isRecording;
   final String todayRecordingTime;
   final List<String> plannedSessions;
-  final String saveFolder;
   final double volumeLevel;
   final List<double> volumeHistory;
   final MicDiagnosticResult? lastDiagnostic;
@@ -675,49 +673,9 @@ class _DashboardTab extends StatelessWidget {
         children: [
           _buildRecordingCard(context),
           const SizedBox(height: 16),
-          _buildEnvironmentRow(context),
+          _buildDiagnosticCard(context),
         ],
       ),
-    );
-  }
-
-  Widget _buildEnvironmentRow(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final diagnosticCard = _buildDiagnosticCard(context);
-        final infoCard = _buildInfoCard(context);
-        final isWide = constraints.maxWidth >= 640;
-
-        if (isWide) {
-          return Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(minHeight: 220),
-                  child: diagnosticCard,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(minHeight: 220),
-                  child: infoCard,
-                ),
-              ),
-            ],
-          );
-        }
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            diagnosticCard,
-            const SizedBox(height: 16),
-            infoCard,
-          ],
-        );
-      },
     );
   }
 
@@ -1031,57 +989,6 @@ class _DashboardTab extends StatelessWidget {
     );
   }
 
-  Widget _buildInfoCard(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: _cardBorder),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '저장 위치',
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w600,
-              color: const Color(0xFF101C22),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Icon(Icons.folder_open, size: 20, color: _textMuted),
-              const SizedBox(width: 8),
-              Expanded(
-                child: SelectableText(
-                  saveFolder,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: _textMuted,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            '녹음 파일은 날짜별 하위 폴더에 자동 정리됩니다.',
-            style: theme.textTheme.bodySmall?.copyWith(color: _textMuted),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'OneDrive 동기화가 늦어지면 이 경로를 열어 최신 파일이 있는지 먼저 확인하세요.',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: _textMuted.withOpacity(0.85),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 class _SettingsTab extends StatelessWidget {
@@ -1091,6 +998,7 @@ class _SettingsTab extends StatelessWidget {
     required this.onOpenVad,
     required this.onOpenRetention,
     required this.onOpenAutoLaunch,
+    required this.saveFolder,
   });
 
   final Future<void> Function() onOpenSchedule;
@@ -1098,6 +1006,7 @@ class _SettingsTab extends StatelessWidget {
   final Future<void> Function() onOpenVad;
   final Future<void> Function() onOpenRetention;
   final Future<void> Function() onOpenAutoLaunch;
+  final String saveFolder;
 
   @override
   Widget build(BuildContext context) {
@@ -1134,6 +1043,9 @@ class _SettingsTab extends StatelessWidget {
                 onTap: onOpenRetention,
               ),
             ],
+            footer: _SaveFolderSummary(
+              saveFolder: saveFolder,
+            ),
           ),
           const SizedBox(height: 16),
           _SettingsSection(
@@ -1173,14 +1085,64 @@ class SettingsDestination {
   final Future<void> Function() onTap;
 }
 
+class _SaveFolderSummary extends StatelessWidget {
+  const _SaveFolderSummary({
+    required this.saveFolder,
+  });
+
+  final String saveFolder;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '현재 저장 경로',
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: _textMuted,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(Icons.folder_open, size: 18, color: _textMuted),
+            const SizedBox(width: 6),
+            Expanded(
+              child: SelectableText(
+                saveFolder,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: _textMuted,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Text(
+          '경로는 “저장 위치” 메뉴에서 언제든지 바꿀 수 있어요.',
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: _textMuted.withOpacity(0.8),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _SettingsSection extends StatelessWidget {
   const _SettingsSection({
     required this.title,
     required this.items,
+    this.footer,
   });
 
   final String title;
   final List<SettingsDestination> items;
+  final Widget? footer;
 
   @override
   Widget build(BuildContext context) {
@@ -1194,17 +1156,23 @@ class _SettingsSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
-            child: Text(
-              title,
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-                color: const Color(0xFF101C22),
-              ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
+          child: Text(
+            title,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: const Color(0xFF101C22),
             ),
           ),
+        ),
           ...items.map((item) => _SettingsTile(item: item)).toList(),
+          if (footer != null) const Divider(height: 1),
+          if (footer != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+              child: footer!,
+            ),
         ],
       ),
     );
