@@ -30,7 +30,7 @@
 - 스케줄링/설정
   - 주간 진료 시간표 저장/로드(`SharedPreferences`)
   - 앱 시작 시 저장된 스케줄 적용(없으면 기본값) 및 현재 시간이 진료 시간대라면 자동으로 녹음/중지 상태 동기화
-  - 요일별로 `종일` 또는 `오전/오후` 분할 근무를 선택할 수 있으며, 오전·오후 시간은 독립적으로 활성화/비활성화 가능
+  - 요일별로 `종일` 또는 `오전/오후` 분할 근무를 선택할 수 있으며, 기본 오전/오후 시간은 09:00~13:00 / 14:00~18:00으로 제공
   - 저장 폴더 지정: `file_selector`로 폴더 선택(OneDrive 폴더 권장)
 - 파일 보관/정리
   - 기본값은 영구 보존이며, 고급 설정에서 1주·1개월·3개월·6개월·1년 옵션을 선택하면 해당 기간 경과 후 앱이 자동 삭제
@@ -59,6 +59,13 @@
 - 앱 초기/최소 창 크기를 660×980 / 640×900으로 확장해 기본 레이아웃을 여유 있게 확인할 수 있도록 조정(`chore: increase default window size`).
 - 녹음 일시정지/재개 버튼을 제거해 녹음 흐름을 `시작 ↔ 중지` 두 단계로 단순화(`chore: remove pause recording feature`).
 - 저장 기간 항목에 현재 선택한 보관 기간(영구/1주일/1개월 등)을 배지로 노출하고, 다이얼로그 저장 후 즉시 갱신하도록 개선(`feat: show retention duration badge`).
+
+### 2025-09-26 주요 업데이트
+- 도움말 다이얼로그 추가: 대시보드/설정 튜토리얼 분리, 트레이 메뉴와 헤더에서 호출 가능(`feat: add in-app help dialog and tutorial`).
+- 설정 탭 튜토리얼: 시간표·저장 위치·보관 기간·VAD·자동 실행 항목을 쇼케이스로 안내(`feat: add settings tab tutorial walkthrough`).
+- 녹음 상태 카드의 헤더와 볼륨 미터를 컴팩트하게 조정해 화면 밀도를 개선(`ui: compact recording card and meter layout`).
+- 마이크 진단 임계값을 낮춰 조용한 진료실에서도 "정상" 판정이 쉽게 나오도록 조정(OK=0.04, Caution=0.018) (`tweak: lower mic diagnostic sensitivity thresholds`).
+- 기본 진료 시간표 오전/오후 구간을 09:00~13:00 / 14:00~18:00으로 수정(`chore: update default clinic schedule hours`).
 
 ### 2025-09-24 주요 업데이트
 - 메인 화면을 `대시보드 / 설정` 탭 구조로 재구성하고, 녹음 상태 카드·애니메이션 볼륨 미터·저장 경로 안내 카드를 새 디자인으로 통일(`feat: refresh dashboard layout and window sizing`).
