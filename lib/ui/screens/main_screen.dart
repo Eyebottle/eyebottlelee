@@ -1147,12 +1147,12 @@ class _DashboardTab extends StatelessWidget {
   }
   Widget _buildRecordingCard(BuildContext context) {
     final theme = Theme.of(context);
-    final statusText = isRecording ? '녹음 진행 중' : '대기 중';
+    final statusText = isRecording ? '녹음 중' : '대기 중';
     final statusColor = isRecording ? _primaryColor : _textMuted;
     final indicatorColor = isRecording ? _primaryColor : _textMuted;
 
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
@@ -1168,38 +1168,33 @@ class _DashboardTab extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Column(
+          Row(
             children: [
               Text(
-                statusText,
-                style: theme.textTheme.titleLarge?.copyWith(
+                '녹음 상태',
+                style: theme.textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w700,
-                  color: statusColor,
+                  color: const Color(0xFF101C22),
                 ),
               ),
-              const SizedBox(height: 12),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  _LiveIndicator(color: indicatorColor),
-                  const SizedBox(width: 8),
-                  Text(
-                    isRecording ? '실시간' : '대기 중',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: indicatorColor,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
+              const Spacer(),
+              _LiveIndicator(color: indicatorColor),
+              const SizedBox(width: 6),
+              Text(
+                statusText,
+                style: theme.textTheme.titleSmall?.copyWith(
+                  color: statusColor,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
           AnimatedVolumeMeter(
             history: volumeHistory,
-            maxHeight: 120,
+            maxHeight: 80,
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
           Row(
             children: [
               Expanded(
@@ -1209,7 +1204,7 @@ class _DashboardTab extends StatelessWidget {
                   alignment: TextAlign.left,
                 ),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 12),
               Expanded(
                 child: Showcase(
                   key: scheduleShowcaseKey,
@@ -1223,7 +1218,7 @@ class _DashboardTab extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
           LayoutBuilder(
             builder: (context, constraints) {
               final isWide = constraints.maxWidth > 480;

@@ -7,7 +7,7 @@ class AnimatedVolumeMeter extends StatelessWidget {
     super.key,
     required this.history,
     this.barCount = 24,
-    this.maxHeight = 120,
+    this.maxHeight = 96,
   });
 
   final List<double> history;
@@ -19,7 +19,7 @@ class AnimatedVolumeMeter extends StatelessWidget {
     final theme = Theme.of(context);
     final bars = _buildBars();
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
@@ -32,7 +32,7 @@ class AnimatedVolumeMeter extends StatelessWidget {
         child: Align(
           alignment: Alignment.bottomCenter,
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             crossAxisAlignment: CrossAxisAlignment.end,
             children: bars,
           ),
@@ -61,7 +61,7 @@ class AnimatedVolumeMeter extends StatelessWidget {
             duration: const Duration(milliseconds: 140),
             curve: Curves.easeOut,
             height: height,
-            margin: const EdgeInsets.symmetric(horizontal: 2),
+            margin: const EdgeInsets.symmetric(horizontal: 1.5),
             decoration: BoxDecoration(
               color: color,
               borderRadius: BorderRadius.circular(6),
