@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/mic_diagnostic_result.dart';
 import '../models/schedule_model.dart';
+import '../models/recording_profile.dart';
 
 class SettingsService {
   static const _keyScheduleJson = 'weekly_schedule_json';
@@ -14,6 +15,8 @@ class SettingsService {
   static const _keyDailyRecordingSeconds = 'daily_recording_seconds';
   static const _keyRetentionDays = 'retention_days';
   static const _keyMicDiagnostic = 'last_mic_diagnostic';
+  static const _keyRecordingProfile = 'recording_profile';
+  static const _keyMakeupGainDb = 'makeup_gain_db';
 
   Future<void> saveSchedule(WeeklySchedule schedule) async {
     final prefs = await SharedPreferences.getInstance();
@@ -63,8 +66,36 @@ class SettingsService {
   Future<(bool enabled, double threshold)> getVad() async {
     final prefs = await SharedPreferences.getInstance();
     final enabled = prefs.getBool(_keyVadEnabled) ?? true;
-    final threshold = prefs.getDouble(_keyVadThreshold) ?? 0.01;
+    final threshold = prefs.getDouble(_keyVadThreshold) ?? 0.006;
     return (enabled, threshold);
+  }
+
+  Future<void> setRecordingProfile(RecordingQualityProfile profile) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyRecordingProfile, profile.name);
+  }
+
+  Future<RecordingQualityProfile> getRecordingProfile() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getString(_keyRecordingProfile);
+    if (saved != null) {
+      for (final entry in RecordingQualityProfile.values) {
+        if (entry.name == saved) {
+          return entry;
+        }
+      }
+    }
+    return RecordingQualityProfile.balanced;
+  }
+
+  Future<void> setMakeupGainDb(double gainDb) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble(_keyMakeupGainDb, gainDb);
+  }
+
+  Future<double> getMakeupGainDb() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getDouble(_keyMakeupGainDb) ?? 0.0;
   }
 
   Future<Duration> getRecordingDuration(DateTime date) async {

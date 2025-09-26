@@ -14,6 +14,9 @@ class MicDiagnosticResult {
     required this.timestamp,
     required this.status,
     this.peakRms,
+    this.peakDb,
+    this.ambientDb,
+    this.snrDb,
     this.message,
     this.hints = const <String>[],
   });
@@ -21,6 +24,9 @@ class MicDiagnosticResult {
   final DateTime timestamp;
   final MicDiagnosticStatus status;
   final double? peakRms;
+  final double? peakDb;
+  final double? ambientDb;
+  final double? snrDb;
   final String? message;
   final List<String> hints;
 
@@ -31,6 +37,9 @@ class MicDiagnosticResult {
       'timestamp': timestamp.toIso8601String(),
       'status': status.name,
       'peakRms': peakRms,
+      'peakDb': peakDb,
+      'ambientDb': ambientDb,
+      'snrDb': snrDb,
       'message': message,
       'hints': hints,
     };
@@ -48,6 +57,9 @@ class MicDiagnosticResult {
           DateTime.now(),
       status: status,
       peakRms: (json['peakRms'] as num?)?.toDouble(),
+      peakDb: (json['peakDb'] as num?)?.toDouble(),
+      ambientDb: (json['ambientDb'] as num?)?.toDouble(),
+      snrDb: (json['snrDb'] as num?)?.toDouble(),
       message: json['message'] as String?,
       hints: ((json['hints'] as List?)?.cast<String>()) ?? const <String>[],
     );

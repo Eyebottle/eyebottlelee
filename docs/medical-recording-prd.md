@@ -62,6 +62,7 @@ const schedule = {
 - **10분 단위 자동 분할**: 긴 녹음을 관리하기 쉬운 단위로 분할
 - **체계적 파일명**: `2025-08-24_14-30_진료녹음.m4a` 형식
 - **자동 압축**: AAC-LC 64kbps(M4A)로 용량 최적화 (플랫폼 기본 인코더 활용)
+- **저용량 품질 프리셋**: 64/48/32kbps AAC-LC 프로필을 제공해 진료실 환경과 저장 용량에 맞춰 선택 가능
 - **OneDrive 동기화**: 로컬 저장 후 개인 OneDrive 폴더로 자동 백업
 
 ### 2.2 실시간 모니터링
@@ -71,6 +72,7 @@ const schedule = {
 - **볼륨 레벨 미터**: 실시간 입력 레벨 시각화
 - **입력 레벨 모니터링**: 실시간 볼륨 미터로 상태 확인(자동 경고는 향후 추가)
 - **자동 진단 임계값**: RMS 0.04 이상을 정상, 0.018~0.04는 주의로 판단해 안내 메시지 표시
+- **dBFS·SNR 기반 점검**: 3초 샘플에서 평균 레벨(dBFS)과 신호대잡음비(SNR)를 계산해 조용한 진료실에서도 정상 판정 제공
 - **시스템 트레이 표시**: 녹음 상태를 트레이 아이콘으로 확인
 
 #### 2.2.2 Voice Activity Detection (VAD)
@@ -83,6 +85,7 @@ const vadConfig = {
 };
 ```
 - **무음 자동 스킵**: RMS 레벨이 임계값(기본 0.01) 미만으로 3초 지속 시 일시정지
+- **조용한 환경 최적화**: 기본 임계값을 0.006으로 낮추고 4초 무음 후 일시정지해 작은 목소리도 안정적으로 기록
 - **용량 절약**: 실제 대화만 녹음하여 파일 크기 50% 절약(측정 진행 중)
 - **에너지 기반 감지**: 간단하고 빠른 RMS 기반 구현
 - **사용자 조정 가능**: VAD 토글 및 임계값 슬라이더 제공
@@ -225,7 +228,7 @@ class AudioService {
   StreamSubscription<Amplitude>? _ampSub;
   Timer? _segmentTimer;
   bool _vadEnabled = true;
-  double vadThreshold = 0.01; // RMS 근사값 기준
+  double vadThreshold = 0.006; // RMS 근사값 기준
 
   Future<void> start({required String path, Duration segment = const Duration(minutes: 10)}) async {
     // Windows에선 OS 권한 창이 없을 수 있음. 공통 처리 유지.

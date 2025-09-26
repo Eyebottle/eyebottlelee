@@ -8,6 +8,7 @@ import 'package:record/record.dart';
 
 import 'settings_service.dart';
 import 'logging_service.dart';
+import '../models/recording_profile.dart';
 
 class AudioService {
   final AudioRecorder _recorder = AudioRecorder();
@@ -17,12 +18,17 @@ class AudioService {
 
   bool _isRecording = false;
   bool _vadEnabled = true;
-  double vadThreshold = 0.01; // RMS 기반 VAD 임계값
+  double vadThreshold = 0.006; // RMS 기반 VAD 임계값
   int _silenceMs = 0;
   bool _pausedByVad = false;
   Timer? _resumeTimer;
   // 보관 주기 (기본 7일)
   Duration? retention;
+  RecordingProfile _profile =
+      RecordingProfile.presets[RecordingQualityProfile.balanced]!;
+
+  DateTime? _currentSegmentStartedAt;
+  double _makeupGainDb = 0.0;
 
   // 콜백 함수들
   Function(double)? onAmplitudeChanged;
@@ -50,6 +56,7 @@ class AudioService {
       }
 
       final filePath = await _generateFilePath();
+      _currentSegmentStartedAt = DateTime.now();
       await _recorder.start(
         _buildRecordConfig(),
         path: filePath,
@@ -74,6 +81,9 @@ class AudioService {
 
       _logging.info('녹음 시작');
       _logging.debug('녹음 파일 경로: $filePath');
+      _logging.debug(
+        '녹음 품질 프로필: ${_profile.id.name} / bitRate=${_profile.bitRate} / sampleRate=${_profile.sampleRate}',
+      );
     } catch (e) {
       _isRecording = false;
       _logging.error('녹음 시작 실패', error: e);
@@ -84,6 +94,7 @@ class AudioService {
   /// 녹음 중지
   Future<String?> stopRecording() async {
     try {
+      final stoppedAt = DateTime.now();
       final filePath = await _recorder.stop();
       _isRecording = false;
 
@@ -92,11 +103,10 @@ class AudioService {
       _amplitudeSubscription?.cancel();
 
       final startTime = _sessionStartTime;
-      final stopTime = DateTime.now();
       if (startTime != null) {
-        final duration = stopTime.difference(startTime);
+        final duration = stoppedAt.difference(startTime);
         if (onRecordingStopped != null && duration > Duration.zero) {
-          onRecordingStopped!(startTime, stopTime, duration);
+          onRecordingStopped!(startTime, stoppedAt, duration);
         }
       }
       _sessionStartTime = null;
@@ -107,7 +117,10 @@ class AudioService {
       _logging.info('녹음 중지됨');
       if (filePath != null) {
         _logging.debug('마지막 세그먼트 경로: $filePath');
+        final segmentDuration = _estimateSegmentDuration(stoppedAt);
+        unawaited(_logSegmentMetadata(filePath, segmentDuration));
       }
+      _currentSegmentStartedAt = null;
       return filePath;
     } catch (e) {
       _logging.error('녹음 중지 실패', error: e);
@@ -121,6 +134,7 @@ class AudioService {
 
     try {
       // 현재 녹음 중지
+      final segmentStopTime = DateTime.now();
       final completedPath = await _recorder.stop();
 
       // 완료된 파일 콜백 호출
@@ -130,10 +144,13 @@ class AudioService {
       if (completedPath != null) {
         _logging.info('세그먼트 저장 완료');
         _logging.debug('완료된 세그먼트 경로: $completedPath');
+        final segmentDuration = _estimateSegmentDuration(segmentStopTime);
+        unawaited(_logSegmentMetadata(completedPath, segmentDuration));
       }
 
       // 새로운 세그먼트로 즉시 재시작
       final newFilePath = await _generateFilePath();
+      _currentSegmentStartedAt = DateTime.now();
       await _recorder.start(
         _buildRecordConfig(),
         path: newFilePath,
@@ -159,14 +176,15 @@ class AudioService {
         .onAmplitudeChanged(const Duration(milliseconds: 200))
         .listen((amplitude) {
       final level = _normalizeAmplitude(amplitude);
+      final adjustedLevel = _applyMakeupGain(level);
 
       // UI 콜백 호출
       if (onAmplitudeChanged != null) {
-        onAmplitudeChanged!(level);
+        onAmplitudeChanged!(adjustedLevel);
       }
 
       // 간단한 VAD 로직 (선택적)
-      if (_vadEnabled) _processVAD(level);
+      if (_vadEnabled) _processVAD(adjustedLevel);
     });
   }
 
@@ -195,7 +213,7 @@ class AudioService {
   /// Voice Activity Detection 처리
   void _processVAD(double level) {
     const windowMs = 200; // onAmplitudeChanged 주기와 동일
-    const silenceHoldMs = 3000; // 3초 무음 시 일시정지
+    const silenceHoldMs = 4000; // 4초 무음 시 일시정지
     const resumeDelayMs = 500; // 재개 지연
 
     // 무음 누적/해제
@@ -249,6 +267,21 @@ class AudioService {
     } else {
       _logging.info('보관 주기 설정: ${duration.inDays}일');
     }
+  }
+
+  void configureRecordingProfile(RecordingQualityProfile profileId) {
+    _profile = RecordingProfile.resolve(profileId);
+    _logging.info(
+      '녹음 품질 프로필 변경: ${_profile.id.name} (bitRate=${_profile.bitRate}, sampleRate=${_profile.sampleRate})',
+    );
+  }
+
+  RecordingProfile get currentProfile => _profile;
+
+  void configureMakeupGain(double gainDb) {
+    final normalized = gainDb.clamp(0, 12).toDouble();
+    _makeupGainDb = normalized;
+    _logging.info('메이크업 게인 설정: ${_makeupGainDb.toStringAsFixed(1)} dB');
   }
 
   /// 파일 경로 생성
@@ -383,11 +416,49 @@ class AudioService {
   }
 
   RecordConfig _buildRecordConfig() {
-    return const RecordConfig(
+    return RecordConfig(
       encoder: AudioEncoder.aacLc,
-      bitRate: 128000,
-      sampleRate: 44100,
+      bitRate: _profile.bitRate,
+      sampleRate: _profile.sampleRate,
       numChannels: 1,
+      autoGain: _makeupGainDb > 0.0,
     );
+  }
+
+  Duration? _estimateSegmentDuration(DateTime stopTime) {
+    final startedAt = _currentSegmentStartedAt;
+    if (startedAt == null) {
+      return null;
+    }
+    final duration = stopTime.difference(startedAt);
+    if (duration.isNegative) {
+      return null;
+    }
+    return duration;
+  }
+
+  Future<void> _logSegmentMetadata(String filePath, Duration? duration) async {
+    try {
+      final file = File(filePath);
+      final bytes = await file.length();
+      final sizeInMb = bytes / (1024 * 1024);
+      final durationText =
+          duration == null ? 'unknown' : '${duration.inSeconds}s';
+
+      _logging.debug(
+        '세그먼트 메타: profile=${_profile.id.name}, codec=aacLc, bitRate=${_profile.bitRate}, sampleRate=${_profile.sampleRate}, gain=${_makeupGainDb.toStringAsFixed(1)}dB, duration=$durationText, size=${sizeInMb.toStringAsFixed(2)} MB',
+      );
+    } catch (e) {
+      _logging.debug('세그먼트 메타 기록 실패: $e');
+    }
+  }
+
+  double _applyMakeupGain(double level) {
+    if (_makeupGainDb <= 0) {
+      return level;
+    }
+    final linear = math.pow(10, _makeupGainDb / 20).toDouble();
+    final amplified = (level * linear).clamp(0.0, 1.0);
+    return amplified;
   }
 }

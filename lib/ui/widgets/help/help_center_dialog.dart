@@ -132,7 +132,7 @@ class _HelpContent extends StatelessWidget {
           icon: Icons.schedule,
           title: '3. 진료 시간표 & 보관 설정',
           description:
-              '설정 탭에서 요일별 오전/오후 시간을 조절하고, 무음 감지 민감도와 보관 기간을 관리하세요.',
+              '설정 탭에서 요일별 오전/오후 시간을 조절하고, 녹음 품질·민감도(저장 공간 절약), 무음 감지, 보관 기간을 관리하세요.',
           actions: [
             if (onStartSettingsTutorial != null)
               FilledButton.tonal(

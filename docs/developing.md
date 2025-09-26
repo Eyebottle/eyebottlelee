@@ -19,13 +19,14 @@
 핵심 구현 요약(시험 구현 기준, MVP 지향):
 
 - 녹음/분할/레벨
-  - `record` 패키지로 AAC-LC 64kbps, mono, 16kHz 녹음
+  - `record` 패키지로 AAC-LC 64/48/32kbps 모노 프로필 지원(기본 64kbps), 32kHz 이하 샘플레이트를 사용해 용량 최적화
+  - 조용한 환경 보정을 위해 +0~+12dB 메이크업 게인을 선택적으로 적용(RecordConfig.autoGain 활성화 + UI 슬라이더)
   - 10분 단위 자동 분할(`Timer.periodic`)
   - UI로 입력 레벨 시각화(200ms 주기)
 - 메인 화면의 "오늘 녹음" 카드는 세션 누적 시간을 실시간으로 집계해 표시
 - VAD(무음 자동 스킵)
-  - 임계값 기본 `0.01`(정규화 레벨)
-  - 3초 무음 지속 시 `pause()`, 음성 감지 후 500ms 뒤 `resume()`
+  - 임계값 기본 `0.006`(정규화 레벨)
+  - 4초 무음 지속 시 `pause()`, 음성 감지 후 500ms 뒤 `resume()`
   - 고급 설정에서 활성화/임계값 조정 가능
 - 스케줄링/설정
   - 주간 진료 시간표 저장/로드(`SharedPreferences`)
@@ -45,12 +46,13 @@
   - 트레이 메뉴는 도움말 다이얼로그도 호출 가능하며, 튜토리얼을 재생할 수 있다
 - 자동 마이크 점검
   - 앱이 켜질 때 3초간 샘플을 녹음해 권한/장치/입력 레벨을 확인하고, 결과를 대시보드 카드에 표시
+  - RMS 대신 평균 dBFS·SNR을 계산해 조용한 환경에서도 정상/주의 판정을 세분화
   - `SharedPreferences`에 마지막 검사 결과와 안내 문구를 저장해 재시작 후에도 상태를 바로 보여줌
   - 대시보드에서 "다시 점검" 버튼으로 수동 진단 가능하며, 녹음 중에는 점검을 제한해 충돌을 방지
 - UI/설정 다이얼로그
   - 메인 화면은 `대시보드 / 설정` 탭 구조로 개편되어 상단 헤더, 실시간 볼륨 막대, 오늘/예정 녹음 요약을 한 화면에서 확인
   - “진료 시간표 설정” 다이얼로그 저장 → 스케줄 즉시 재적용
-  - “고급 설정” 다이얼로그(VAD 토글/임계값, 값 설명 문구, Windows 자동 시작 토글, 녹음 파일 보관 기간 선택)
+  - “고급 설정” 다이얼로그(녹음 품질·메이크업 게인, VAD 토글/임계값, Windows 자동 시작, 녹음 파일 보관 기간)
   - 대시보드 하단 카드에서 현재 저장 경로 및 자동 정리 정책 안내
 
 ### 2025-09-25 주요 업데이트
@@ -62,7 +64,7 @@
 
 ### 2025-09-26 주요 업데이트
 - 도움말 다이얼로그 추가: 대시보드/설정 튜토리얼 분리, 트레이 메뉴와 헤더에서 호출 가능(`feat: add in-app help dialog and tutorial`).
-- 설정 탭 튜토리얼: 시간표·저장 위치·보관 기간·VAD·자동 실행 항목을 쇼케이스로 안내(`feat: add settings tab tutorial walkthrough`).
+- 설정 탭 튜토리얼: 시간표·저장 위치·녹음 품질·보관 기간·VAD·자동 실행 항목을 쇼케이스로 안내(`feat: add settings tab tutorial walkthrough`).
 - 녹음 상태 카드의 헤더와 볼륨 미터를 컴팩트하게 조정해 화면 밀도를 개선(`ui: compact recording card and meter layout`).
 - 마이크 진단 임계값을 낮춰 조용한 진료실에서도 "정상" 판정이 쉽게 나오도록 조정(OK=0.04, Caution=0.018) (`tweak: lower mic diagnostic sensitivity thresholds`).
 - 기본 진료 시간표 오전/오후 구간을 09:00~13:00 / 14:00~18:00으로 수정(`chore: update default clinic schedule hours`).
@@ -70,7 +72,7 @@
 ### 2025-09-24 주요 업데이트
 - 메인 화면을 `대시보드 / 설정` 탭 구조로 재구성하고, 녹음 상태 카드·애니메이션 볼륨 미터·저장 경로 안내 카드를 새 디자인으로 통일(`feat: refresh dashboard layout and window sizing`).
 - 스케줄 설정 다이얼로그를 카드형 UI로 전면 수정하고 SegmentedButton·Switch 기반 컨트롤을 도입해 일관된 사용자 경험 제공(`feat: redesign schedule configuration dialog`).
-- 고급 설정을 VAD / 보관 기간 / 자동 실행 세 가지 개별 다이얼로그로 분리하고, 권장 프리셋과 설명을 추가해 사용성을 개선(`feat: split advanced settings into dedicated dialogs`, `feat: add VAD presets and guidance`).
+- 고급 설정을 녹음 품질·메이크업 게인 / VAD / 보관 기간 / 자동 실행 네 가지 다이얼로그로 분리하고, 권장 프리셋과 설명을 추가해 사용성을 개선(`feat: split advanced settings into dedicated dialogs`, `feat: add VAD presets and guidance`).
 - 창 초기 크기·최소 크기 로직을 개선해 DPI 환경에서도 650×840 레이아웃이 안정적으로 적용되도록 조정(`feat: refresh dashboard layout and window sizing`).
 - 날짜별 저장 디렉터리 및 자동 보관 정책을 강화하고, 문서에 최신 정책을 반영.
 

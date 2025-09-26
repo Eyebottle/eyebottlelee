@@ -5,10 +5,11 @@ import 'package:flutter/material.dart';
 
 import '../../services/auto_launch_service.dart';
 import '../../services/settings_service.dart';
+import '../../models/recording_profile.dart';
 
 enum RetentionOption { forever, week, month, threeMonths, sixMonths, year }
 
-enum AdvancedSettingSection { vad, retention, autoLaunch }
+enum AdvancedSettingSection { audioQuality, vad, retention, autoLaunch }
 
 class AdvancedSettingsDialog extends StatefulWidget {
   const AdvancedSettingsDialog({super.key, required this.section});
@@ -31,11 +32,14 @@ class AdvancedSettingsDialog extends StatefulWidget {
 
 class _AdvancedSettingsDialogState extends State<AdvancedSettingsDialog> {
   bool _vadEnabled = true;
-  double _vadThreshold = 0.01;
+  double _vadThreshold = 0.006;
   bool _launchAtStartup = true;
   bool _loading = true;
   RetentionOption _retentionOption = RetentionOption.forever;
   VadPreset? _vadPreset;
+  RecordingQualityProfile _recordingProfile =
+      RecordingQualityProfile.balanced;
+  double _makeupGainDb = 0.0;
 
   @override
   void initState() {
@@ -48,6 +52,8 @@ class _AdvancedSettingsDialogState extends State<AdvancedSettingsDialog> {
     final (vadEnabled, vadThreshold) = await settings.getVad();
     final launch = await settings.getLaunchAtStartup();
     final retention = await settings.getRetentionDuration();
+    final profile = await settings.getRecordingProfile();
+    final gainDb = await settings.getMakeupGainDb();
     if (!mounted) return;
     setState(() {
       _vadEnabled = vadEnabled;
@@ -55,6 +61,8 @@ class _AdvancedSettingsDialogState extends State<AdvancedSettingsDialog> {
       _launchAtStartup = launch;
       _retentionOption = _optionFromDuration(retention);
       _vadPreset = _presetFromThreshold(_vadThreshold);
+      _recordingProfile = profile;
+      _makeupGainDb = gainDb;
       _loading = false;
     });
   }
@@ -119,6 +127,10 @@ class _AdvancedSettingsDialogState extends State<AdvancedSettingsDialog> {
   Widget _buildHeader(BuildContext context) {
     final theme = Theme.of(context);
     final (title, description) = switch (widget.section) {
+      AdvancedSettingSection.audioQuality => (
+          '녹음 품질 · 마이크 보정',
+          '녹음 파일 용량과 조용한 환경에서의 입력 민감도를 동시에 조절합니다.'
+        ),
       AdvancedSettingSection.vad => (
           '무음 감지 설정',
           '말이 끊어졌을 때 자동으로 녹음을 멈추고, 다시 말하면 이어서 녹음되도록 민감도를 조절합니다.'
@@ -167,12 +179,85 @@ class _AdvancedSettingsDialogState extends State<AdvancedSettingsDialog> {
 
   Widget _buildSectionContent(BuildContext context) {
     switch (widget.section) {
+      case AdvancedSettingSection.audioQuality:
+        final selectedProfile = RecordingProfile.resolve(_recordingProfile);
+        return _SettingsCard(
+          icon: Icons.graphic_eq,
+          title: '녹음 품질과 민감도',
+          description:
+              '녹음 파일 용량을 줄이거나 조용한 진료실에서도 작은 목소리를 안정적으로 녹음할 수 있도록 민감도를 조정합니다. 변경 후에는 짧게 테스트 녹음을 진행해 주세요.',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '녹음 품질',
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+              ),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: RecordingQualityProfile.values.map((profile) {
+                  final preset = RecordingProfile.resolve(profile);
+                  final selected = _recordingProfile == profile;
+                  return ChoiceChip(
+                    label: Text(preset.label),
+                    selected: selected,
+                    onSelected: (value) {
+                      if (!value) return;
+                      setState(() => _recordingProfile = profile);
+                    },
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                selectedProfile.description,
+                style: Theme.of(context)
+                    .textTheme
+                    .bodySmall
+                    ?.copyWith(color: Colors.grey.shade600),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                '조용한 환경 보정 (+${_makeupGainDb.toStringAsFixed(1)} dB)',
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+              ),
+              const SizedBox(height: 12),
+              Slider(
+                value: _makeupGainDb,
+                max: 12,
+                divisions: 24,
+                label: '+${_makeupGainDb.toStringAsFixed(1)} dB',
+                onChanged: (value) {
+                  setState(
+                    () => _makeupGainDb =
+                        double.parse(value.toStringAsFixed(1)),
+                  );
+                },
+              ),
+              Text(
+                _makeupGainDb <= 0.05
+                    ? '게인 0 dB: 원본 입력을 그대로 사용합니다.'
+                    : '게인 +${_makeupGainDb.toStringAsFixed(1)} dB: 조용한 환경에서 입력 신호를 살짝 키웁니다.',
+                style: Theme.of(context)
+                    .textTheme
+                    .bodySmall
+                    ?.copyWith(color: Colors.grey.shade600),
+              ),
+            ],
+          ),
+        );
       case AdvancedSettingSection.vad:
         return _SettingsCard(
           icon: Icons.mic,
           title: '무음 감지(자동 일시정지)',
           description:
-              '값을 낮출수록 작은 소리에도 녹음이 이어지고, 값을 높이면 큰 소리에서만 녹음이 유지됩니다. 진료실이 조용한 경우 낮은 값(0.004), 복도나 대기실 소음이 들어오는 경우 높은 값(0.020)을 권장합니다. 설정 후 짧은 테스트 녹음을 꼭 진행해 보세요.',
+              '값을 낮출수록 작은 소리에도 녹음이 이어지고, 값을 높이면 큰 소리에서만 녹음이 유지됩니다. 진료실이 조용한 경우 0.004~0.006, 복도나 대기실 소음이 들어오는 경우 0.012 이상을 권장합니다. 설정 후 짧게 테스트 녹음을 진행해 주세요.',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -194,6 +279,17 @@ class _AdvancedSettingsDialogState extends State<AdvancedSettingsDialog> {
                       setState(() {
                         _vadPreset = VadPreset.quiet;
                         _vadThreshold = 0.004;
+                      });
+                    },
+                  ),
+                  ChoiceChip(
+                    label: const Text('표준 환경 (권장 0.006)'),
+                    selected: _vadPreset == VadPreset.standard,
+                    onSelected: (selected) {
+                      if (!selected) return;
+                      setState(() {
+                        _vadPreset = VadPreset.standard;
+                        _vadThreshold = 0.006;
                       });
                     },
                   ),
@@ -226,8 +322,9 @@ class _AdvancedSettingsDialogState extends State<AdvancedSettingsDialog> {
                 label: _vadThreshold.toStringAsFixed(3),
                 onChanged: _vadEnabled
                     ? (v) => setState(() {
-                          _vadThreshold = v;
-                          _vadPreset = null;
+                          _vadThreshold =
+                              double.parse(v.toStringAsFixed(3));
+                          _vadPreset = _presetFromThreshold(_vadThreshold);
                         })
                     : null,
               ),
@@ -308,10 +405,11 @@ class _AdvancedSettingsDialogState extends State<AdvancedSettingsDialog> {
   }
 }
 
-enum VadPreset { quiet, noisy }
+enum VadPreset { quiet, standard, noisy }
 
 VadPreset? _presetFromThreshold(double threshold) {
   if ((threshold - 0.004).abs() < 0.0005) return VadPreset.quiet;
+  if ((threshold - 0.006).abs() < 0.0005) return VadPreset.standard;
   if ((threshold - 0.020).abs() < 0.0005) return VadPreset.noisy;
   return null;
 }

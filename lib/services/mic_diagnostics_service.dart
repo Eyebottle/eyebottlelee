@@ -16,12 +16,14 @@ class MicDiagnosticsService {
 
   Future<MicDiagnosticResult> runDiagnostic({
     Duration sampleDuration = const Duration(seconds: 3),
+    Duration ambientWindow = const Duration(milliseconds: 500),
   }) async {
     final timestamp = DateTime.now();
     final recorder = AudioRecorder();
     StreamSubscription<Amplitude>? subscription;
     String? tempFilePath;
-    double peakLevel = 0.0;
+    final samples = <_AmplitudeSample>[];
+    double peakLinear = 0.0;
 
     try {
       final hasPermission = await recorder.hasPermission();
@@ -60,8 +62,10 @@ class MicDiagnosticsService {
           .onAmplitudeChanged(const Duration(milliseconds: 160))
           .listen((amp) {
         final normalized = _normalizeAmplitude(amp);
-        if (normalized > peakLevel) {
-          peakLevel = normalized;
+        final now = DateTime.now();
+        samples.add(_AmplitudeSample(now, normalized));
+        if (normalized > peakLinear) {
+          peakLinear = normalized;
         }
       });
 
@@ -86,42 +90,39 @@ class MicDiagnosticsService {
         }
       }
 
-      if (!peakLevel.isFinite || peakLevel.isNaN) {
-        peakLevel = 0.0;
+      if (!peakLinear.isFinite || peakLinear.isNaN) {
+        peakLinear = 0.0;
       }
 
-      if (peakLevel >= _okThreshold) {
+      final metrics = _calculateMetrics(
+        samples: samples,
+        sampleWindow: sampleDuration,
+        ambientWindow: ambientWindow,
+      );
+
+      final decision = _classify(metrics);
+
+      if (decision.status == MicDiagnosticStatus.ok) {
         return MicDiagnosticResult(
           timestamp: timestamp,
           status: MicDiagnosticStatus.ok,
-          peakRms: peakLevel,
-          message: '마이크 입력이 정상이에요.',
-        );
-      }
-
-      if (peakLevel >= _cautionThreshold) {
-        return MicDiagnosticResult(
-          timestamp: timestamp,
-          status: MicDiagnosticStatus.lowInput,
-          peakRms: peakLevel,
-          message: '입력 레벨이 조금 낮아요. 마이크 위치나 볼륨을 조정해 주세요.',
-          hints: const [
-            '마이크와 거리를 조금 더 가깝게 설정',
-            'Windows 입력 장치 볼륨을 높임',
-          ],
+          peakRms: metrics.signalRms,
+          peakDb: metrics.signalDb,
+          ambientDb: metrics.ambientDb,
+          snrDb: metrics.snrDb,
+          message: decision.message,
         );
       }
 
       return MicDiagnosticResult(
         timestamp: timestamp,
-        status: MicDiagnosticStatus.lowInput,
-        peakRms: peakLevel,
-        message: '소리가 거의 들어오지 않아요. 마이크 연결이나 음소거 스위치를 확인하세요.',
-        hints: const [
-          '마이크 케이블과 연결 상태 확인',
-          '헤드셋 음소거 스위치 해제',
-          'Windows 입력 장치 설정에서 기본 장치 확인',
-        ],
+        status: decision.status,
+        peakRms: metrics.signalRms,
+        peakDb: metrics.signalDb,
+        ambientDb: metrics.ambientDb,
+        snrDb: metrics.snrDb,
+        message: decision.message,
+        hints: decision.hints,
       );
     } catch (e, stackTrace) {
       _logging.error('마이크 진단 실패', error: e, stackTrace: stackTrace);
@@ -144,9 +145,10 @@ class MicDiagnosticsService {
     }
   }
 
-  // 진료실 환경의 상대적으로 작은 음성을 고려해 임계값을 낮춘다.
-  static const double _okThreshold = 0.04;
-  static const double _cautionThreshold = 0.018;
+  static const double _normalThresholdDb = -24.0;
+  static const double _quietOkThresholdDb = -33.0;
+  static const double _quietSnrAllowanceDb = 6.0;
+  static const double _minDb = -80.0;
 
   double _normalizeAmplitude(Amplitude amplitude) {
     double sample = amplitude.current;
@@ -168,4 +170,153 @@ class MicDiagnosticsService {
     }
     return normalized.clamp(0.0, 1.0);
   }
+
+  _DiagnosticMetrics _calculateMetrics({
+    required List<_AmplitudeSample> samples,
+    required Duration sampleWindow,
+    required Duration ambientWindow,
+  }) {
+    if (samples.isEmpty) {
+      return const _DiagnosticMetrics.zero();
+    }
+
+    final startTime = samples.first.timestamp;
+    final ambientDeadline = startTime.add(ambientWindow);
+
+    final ambientValues = <double>[];
+    final signalValues = <double>[];
+
+    for (final sample in samples) {
+      if (sample.timestamp.isBefore(ambientDeadline)) {
+        ambientValues.add(sample.value);
+      } else {
+        signalValues.add(sample.value);
+      }
+    }
+
+    if (signalValues.isEmpty) {
+      signalValues.addAll(ambientValues);
+    }
+
+    final ambientRms = _rms(ambientValues);
+    final signalRms = _rms(signalValues);
+
+    final ambientDb = _toDb(ambientRms);
+    final signalDb = _toDb(signalRms);
+    final snrDb = _snrDb(signalRms, ambientRms);
+
+    return _DiagnosticMetrics(
+      signalRms: signalRms,
+      ambientRms: ambientRms,
+      signalDb: signalDb,
+      ambientDb: ambientDb,
+      snrDb: snrDb,
+    );
+  }
+
+  _DiagnosticDecision _classify(_DiagnosticMetrics metrics) {
+    final signalDb = metrics.signalDb;
+    final snrDb = metrics.snrDb;
+
+    final quietButClear =
+        signalDb >= _quietOkThresholdDb && snrDb >= _quietSnrAllowanceDb;
+    final normalLevel = signalDb >= _normalThresholdDb;
+
+    if (normalLevel || quietButClear) {
+      final description = quietButClear
+          ? '조용한 환경이지만 음성이 또렷하게 감지되고 있어요.'
+          : '마이크 입력이 정상이에요.';
+      return _DiagnosticDecision(
+        status: MicDiagnosticStatus.ok,
+        message: description,
+      );
+    }
+
+    if (signalDb >= _quietOkThresholdDb) {
+      return _DiagnosticDecision(
+        status: MicDiagnosticStatus.lowInput,
+        message: '입력 레벨이 조금 낮아요. 마이크 위치나 볼륨을 조정해 주세요.',
+        hints: const [
+          '마이크를 입 가까이에 두고 말해보세요.',
+          'Windows 입력 장치 볼륨을 조금 높여주세요.',
+        ],
+      );
+    }
+
+    return _DiagnosticDecision(
+      status: MicDiagnosticStatus.lowInput,
+      message: '소리가 거의 들어오지 않아요. 마이크 연결이나 음소거 스위치를 확인하세요.',
+      hints: const [
+        '마이크 케이블과 연결 상태 확인',
+        '헤드셋 음소거 스위치 해제',
+        'Windows 입력 장치 설정에서 기본 장치 확인',
+      ],
+    );
+  }
+
+  double _rms(List<double> values) {
+    if (values.isEmpty) {
+      return 0.0;
+    }
+    var sumSquares = 0.0;
+    for (final value in values) {
+      sumSquares += value * value;
+    }
+    return math.sqrt(sumSquares / values.length);
+  }
+
+  double _toDb(double rms) {
+    if (rms <= 0) {
+      return _minDb;
+    }
+    return 20 * (math.log(rms) / math.ln10);
+  }
+
+  double _snrDb(double signalRms, double ambientRms) {
+    final epsilon = 1e-9;
+    return 20 * (math.log((signalRms + epsilon) / (ambientRms + epsilon)) /
+        math.ln10);
+  }
+}
+
+class _AmplitudeSample {
+  _AmplitudeSample(this.timestamp, this.value);
+
+  final DateTime timestamp;
+  final double value;
+}
+
+class _DiagnosticMetrics {
+  const _DiagnosticMetrics({
+    required this.signalRms,
+    required this.ambientRms,
+    required this.signalDb,
+    required this.ambientDb,
+    required this.snrDb,
+  });
+
+  const _DiagnosticMetrics.zero()
+      : signalRms = 0.0,
+        ambientRms = 0.0,
+        signalDb = MicDiagnosticsService._minDb,
+        ambientDb = MicDiagnosticsService._minDb,
+        snrDb = 0.0;
+
+  final double signalRms;
+  final double ambientRms;
+  final double signalDb;
+  final double ambientDb;
+  final double snrDb;
+}
+
+class _DiagnosticDecision {
+  const _DiagnosticDecision({
+    required this.status,
+    required this.message,
+    this.hints = const <String>[],
+  });
+
+  final MicDiagnosticStatus status;
+  final String message;
+  final List<String> hints;
 }

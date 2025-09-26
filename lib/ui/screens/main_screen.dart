@@ -18,6 +18,7 @@ import '../widgets/advanced_settings_dialog.dart';
 import '../widgets/animated_volume_meter.dart';
 import '../widgets/schedule_config_widget.dart';
 import '../widgets/help/help_center_dialog.dart';
+import '../../models/recording_profile.dart';
 
 const _backgroundColor = Color(0xFFF6F7F8);
 const _primaryColor = Color(0xFF1193D4);
@@ -50,6 +51,7 @@ class _MainScreenState extends State<MainScreen>
   final GlobalKey _settingsRetentionKey = GlobalKey();
   final GlobalKey _settingsVadKey = GlobalKey();
   final GlobalKey _settingsAutoLaunchKey = GlobalKey();
+  final GlobalKey _settingsAudioQualityKey = GlobalKey();
 
   late final TabController _tabController;
 
@@ -68,6 +70,9 @@ class _MainScreenState extends State<MainScreen>
   bool? _autoLaunchEnabled;
   bool _vadEnabled = true;
   Duration? _retentionDuration;
+  RecordingQualityProfile _recordingProfile =
+      RecordingQualityProfile.balanced;
+  double _makeupGainDb = 0.0;
   bool _hasShownTrayReminder = false;
   bool _isHiddenToTray = false;
   bool _shutdownRequested = false;
@@ -179,6 +184,17 @@ class _MainScreenState extends State<MainScreen>
       });
     }
 
+    final profile = await _settings.getRecordingProfile();
+    _audioService.configureRecordingProfile(profile);
+    final gainDb = await _settings.getMakeupGainDb();
+    _audioService.configureMakeupGain(gainDb);
+    if (mounted) {
+      setState(() {
+        _recordingProfile = profile;
+        _makeupGainDb = gainDb;
+      });
+    }
+
     final retention = await _settings.getRetentionDuration();
     _audioService.configureRetention(retention);
     if (mounted) {
@@ -287,15 +303,19 @@ class _MainScreenState extends State<MainScreen>
                         onOpenVad: () => _openVadSettings(),
                         onOpenRetention: () => _openRetentionSettings(),
                         onOpenAutoLaunch: () => _openAutoLaunchSettings(),
+                        onOpenAudioQuality: () => _openAudioQualitySettings(),
                         scheduleShowcaseKey: _settingsScheduleKey,
                         saveFolderShowcaseKey: _settingsSaveKey,
                         retentionShowcaseKey: _settingsRetentionKey,
                         vadShowcaseKey: _settingsVadKey,
                         autoLaunchShowcaseKey: _settingsAutoLaunchKey,
+                        audioQualityShowcaseKey: _settingsAudioQualityKey,
                         saveFolder: _currentSaveFolder,
                         vadEnabled: _vadEnabled,
                         autoLaunchEnabled: _autoLaunchEnabled ?? true,
                         retentionDuration: _retentionDuration,
+                        recordingProfile: _recordingProfile,
+                        makeupGainDb: _makeupGainDb,
                       ),
                     ],
                   ),
@@ -465,6 +485,25 @@ class _MainScreenState extends State<MainScreen>
       final value = await _settings.getLaunchAtStartup();
       if (mounted) {
         setState(() => _autoLaunchEnabled = value);
+      }
+    }
+  }
+
+  Future<void> _openAudioQualitySettings() async {
+    final result = await AdvancedSettingsDialog.show(
+      context,
+      AdvancedSettingSection.audioQuality,
+    );
+    if (result == 'saved') {
+      final profile = await _settings.getRecordingProfile();
+      final gainDb = await _settings.getMakeupGainDb();
+      _audioService.configureRecordingProfile(profile);
+      _audioService.configureMakeupGain(gainDb);
+      if (mounted) {
+        setState(() {
+          _recordingProfile = profile;
+          _makeupGainDb = gainDb;
+        });
       }
     }
   }
@@ -717,6 +756,7 @@ class _MainScreenState extends State<MainScreen>
         showCase.startShowCase([
           _settingsScheduleKey,
           _settingsSaveKey,
+          _settingsAudioQualityKey,
           _settingsRetentionKey,
           _settingsVadKey,
           _settingsAutoLaunchKey,
@@ -761,7 +801,7 @@ class _MainScreenState extends State<MainScreen>
 
     final result = await _micDiagnosticsService.runDiagnostic();
     _loggingService.info(
-      'Mic diagnostic result: ${result.status.name} (peak=${result.peakRms?.toStringAsFixed(3) ?? 'n/a'})',
+      'Mic diagnostic result: ${result.status.name} (signalDb=${result.peakDb?.toStringAsFixed(1) ?? 'n/a'}, snr=${result.snrDb?.toStringAsFixed(1) ?? 'n/a'})',
     );
     await _settings.saveMicDiagnosticResult(result);
     if (mounted) {
@@ -886,7 +926,18 @@ class _DashboardTab extends StatelessWidget {
     final primaryMessage = _diagnosticPrimaryMessage(status);
     final detailMessage = _diagnosticDetailMessage(status, diagnostic?.message);
     final hints = _diagnosticHints(status, diagnostic?.hints);
-    final peak = diagnostic?.peakRms;
+    final signalDb = diagnostic?.peakDb;
+    final ambientDb = diagnostic?.ambientDb;
+    final snrDb = diagnostic?.snrDb;
+    final levelPercent = signalDb == null
+        ? null
+        : ((signalDb + 60) / 60).clamp(0.0, 1.0);
+    final signalText = signalDb == null
+        ? null
+        : '${signalDb.toStringAsFixed(1)} dBFS';
+    final snrText = snrDb == null
+        ? null
+        : '${snrDb.toStringAsFixed(1)} dB';
     final lastTimeText = diagnostic == null
         ? '최근 점검 기록 없음'
         : _formatShortDateTime(diagnostic.timestamp);
@@ -931,7 +982,7 @@ class _DashboardTab extends StatelessWidget {
                   theme.textTheme.bodyMedium?.copyWith(color: _textMuted),
             ),
           ],
-          if (peak != null) ...[
+          if (levelPercent != null) ...[
             const SizedBox(height: 10),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -942,7 +993,7 @@ class _DashboardTab extends StatelessWidget {
               child: Row(
                 children: [
                   Text(
-                    '최대 입력',
+                    '평균 레벨',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: _textMuted,
                       fontWeight: FontWeight.w600,
@@ -953,7 +1004,7 @@ class _DashboardTab extends StatelessWidget {
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(4),
                       child: LinearProgressIndicator(
-                        value: peak.clamp(0.0, 1.0),
+                        value: levelPercent,
                         backgroundColor: const Color(0xFFE0E7EC),
                         color: visuals.color,
                         minHeight: 4,
@@ -962,7 +1013,7 @@ class _DashboardTab extends StatelessWidget {
                   ),
                   const SizedBox(width: 12),
                   Text(
-                    '${(peak * 100).clamp(0, 100).toStringAsFixed(0)}%',
+                    signalText ?? '- dBFS',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: visuals.color,
                       fontWeight: FontWeight.w600,
@@ -971,6 +1022,29 @@ class _DashboardTab extends StatelessWidget {
                 ],
               ),
             ),
+            if (ambientDb != null || snrText != null) ...[
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  if (ambientDb != null)
+                    Text(
+                      '실내 소음 ${ambientDb.toStringAsFixed(1)} dBFS',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: _textMuted,
+                      ),
+                    ),
+                  if (ambientDb != null && snrText != null)
+                    const SizedBox(width: 12),
+                  if (snrText != null)
+                    Text(
+                      'SNR $snrText',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: _textMuted,
+                      ),
+                    ),
+                ],
+              ),
+            ],
           ],
           if (hints.isNotEmpty) ...[
             const SizedBox(height: 10),
@@ -1351,15 +1425,19 @@ class _SettingsTab extends StatelessWidget {
     required this.onOpenVad,
     required this.onOpenRetention,
     required this.onOpenAutoLaunch,
+    required this.onOpenAudioQuality,
     required this.scheduleShowcaseKey,
     required this.saveFolderShowcaseKey,
     required this.retentionShowcaseKey,
     required this.vadShowcaseKey,
     required this.autoLaunchShowcaseKey,
+    required this.audioQualityShowcaseKey,
     required this.saveFolder,
     required this.vadEnabled,
     required this.autoLaunchEnabled,
     required this.retentionDuration,
+    required this.recordingProfile,
+    required this.makeupGainDb,
   });
 
   final Future<void> Function() onOpenSchedule;
@@ -1367,15 +1445,19 @@ class _SettingsTab extends StatelessWidget {
   final Future<void> Function() onOpenVad;
   final Future<void> Function() onOpenRetention;
   final Future<void> Function() onOpenAutoLaunch;
+  final Future<void> Function() onOpenAudioQuality;
   final GlobalKey scheduleShowcaseKey;
   final GlobalKey saveFolderShowcaseKey;
   final GlobalKey retentionShowcaseKey;
   final GlobalKey vadShowcaseKey;
   final GlobalKey autoLaunchShowcaseKey;
+  final GlobalKey audioQualityShowcaseKey;
   final String saveFolder;
   final bool vadEnabled;
   final bool autoLaunchEnabled;
   final Duration? retentionDuration;
+  final RecordingQualityProfile recordingProfile;
+  final double makeupGainDb;
 
   @override
   Widget build(BuildContext context) {
@@ -1431,6 +1513,19 @@ class _SettingsTab extends StatelessWidget {
             title: '고급 설정',
             items: [
               SettingsDestination(
+                icon: Icons.graphic_eq,
+                title: '녹음 품질 · 민감도',
+                description: '파일 용량과 조용한 환경에 맞는 입력 감도를 조절합니다.',
+                statusText: _formatAudioQualityStatus(
+                  recordingProfile,
+                  makeupGainDb,
+                ),
+                onTap: onOpenAudioQuality,
+                showcaseKey: audioQualityShowcaseKey,
+                showcaseDescription:
+                    '저장 공간이 부족하거나 조용한 환경이라면 녹음 품질과 마이크 민감도를 여기서 조정하세요.',
+              ),
+              SettingsDestination(
                 icon: Icons.mic,
                 title: '음성 활동 감지 (VAD)',
                 description: '음성이 감지될 때만 녹음하도록 설정합니다.',
@@ -1456,6 +1551,17 @@ class _SettingsTab extends StatelessWidget {
       ),
     );
   }
+}
+
+String _formatAudioQualityStatus(
+  RecordingQualityProfile profile,
+  double makeupGainDb,
+) {
+  final preset = RecordingProfile.resolve(profile);
+  final gainText = makeupGainDb <= 0.05
+      ? '게인 0 dB'
+      : '게인 +${makeupGainDb.toStringAsFixed(1)} dB';
+  return '${preset.label} · $gainText';
 }
 
 class SettingsDestination {
