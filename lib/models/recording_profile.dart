@@ -32,7 +32,7 @@ class RecordingProfile {
       label: '음성 강화 (48 kbps)',
       description: '조용한 환경에서 음성 위주로 저장 공간 절약',
       bitRate: 48000,
-      sampleRate: 24000,
+      sampleRate: 32000,
     ),
     RecordingQualityProfile.storageSaver: RecordingProfile(
       id: RecordingQualityProfile.storageSaver,

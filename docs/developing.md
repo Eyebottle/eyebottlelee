@@ -60,6 +60,8 @@
 - 현장 테스트에서 발견된 문제:
   - 녹음 품질·민감도 설정을 변경해도 UI와 실제 동작이 기본값으로 되돌아가는 현상. 저장 시 상태 업데이트 논리 점검 필요.
     - TODO: `AdvancedSettingsDialog._save`에서 `SettingsService.setRecordingProfile` / `setMakeupGainDb` 호출 및 대시보드 카드 상태 동기화 확인.
+
+    - 해결: Windows Media Foundation이 AAC 24kHz 입력을 지원하지 않아 음성 강화 프로필 샘플레이트를 32kHz로 재조정함 (48 kbps 유지). 릴리스 빌드 반영 후 재테스트 예정.
   - 마이크 점검 카드가 실제 정상 음성에도 "입력이 약함"으로 표시되어 진단 임계값/게인 설명이 과도하게 엄격함. dBFS/SNR 계산 및 안내 문구 조정 필요.
 - `docs/clinic-deployment-guide.md` 를 기준으로 MSIX·폴더 복사 두 가지 배포 경로를 정리했고, 실제 진료실 PC에서 Phase 1 테스트를 시작했습니다.
 - 현재 Phase 1 항목 중 앱 기동/SmartScreen 우회는 완료했으며, 마이크 연결 환경이 준비되는 즉시 진단·수동 녹음 항목을 검증할 예정입니다.
