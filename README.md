@@ -132,6 +132,8 @@ flutter build windows --release
 # MSIX 패키지 생성 (Microsoft Store 배포용)
 dart run msix:create
 ```
+> 장시간 안정성 점검용으로 PowerShell에서 `pwsh -File scripts\windows\run-soak-test.ps1`를 실행하면 8시간 Soak 테스트 로그(`C:\ws-workspace\eyebottlelee\soak-logs` 저장)를 수집할 수 있습니다.
+
 
 > 참고: `msix_config.logo_path`는 `assets/icons/icon.ico`를 바라봅니다. 공식 로고 기반 ICO는 `scripts/windows/generate-placeholder-icons.ps1`로 생성할 수 있으며, 배포 전에는 실제 아이콘을 생성하거나 교체하세요.
 

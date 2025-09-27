@@ -52,9 +52,7 @@ flutter:
 msix_config:
   display_name: 아이보틀 진료 녹음
   publisher_display_name: Eyebottle
-  identity_name: kr.eyebottle.medical_recorder
+  identity_name: eyebottle.medical.recorder
   msix_version: 1.1.0.0
   logo_path: assets/icons/icon.ico
-  capabilities:
-    - microphone
-    - internetClient
+  capabilities: "microphone, internetClient"

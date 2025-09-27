@@ -223,9 +223,8 @@ class MicDiagnosticsService {
     final normalLevel = signalDb >= _normalThresholdDb;
 
     if (normalLevel || quietButClear) {
-      final description = quietButClear
-          ? '조용한 환경이지만 음성이 또렷하게 감지되고 있어요.'
-          : '마이크 입력이 정상이에요.';
+      final description =
+          quietButClear ? '조용한 환경이지만 음성이 또렷하게 감지되고 있어요.' : '마이크 입력이 정상이에요.';
       return _DiagnosticDecision(
         status: MicDiagnosticStatus.ok,
         message: description,
@@ -274,8 +273,8 @@ class MicDiagnosticsService {
 
   double _snrDb(double signalRms, double ambientRms) {
     final epsilon = 1e-9;
-    return 20 * (math.log((signalRms + epsilon) / (ambientRms + epsilon)) /
-        math.ln10);
+    return 20 *
+        (math.log((signalRms + epsilon) / (ambientRms + epsilon)) / math.ln10);
   }
 }
 

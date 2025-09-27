@@ -56,6 +56,16 @@
   - 대시보드 하단 카드에서 현재 저장 경로 및 자동 정리 정책 안내
 
 ### 2025-09-25 주요 업데이트
+### 2025-09-27 진료실 배포 테스트 진행 중
+- 현장 테스트에서 발견된 문제:
+  - 녹음 품질·민감도 설정을 변경해도 UI와 실제 동작이 기본값으로 되돌아가는 현상. 저장 시 상태 업데이트 논리 점검 필요.
+    - TODO: `AdvancedSettingsDialog._save`에서 `SettingsService.setRecordingProfile` / `setMakeupGainDb` 호출 및 대시보드 카드 상태 동기화 확인.
+  - 마이크 점검 카드가 실제 정상 음성에도 "입력이 약함"으로 표시되어 진단 임계값/게인 설명이 과도하게 엄격함. dBFS/SNR 계산 및 안내 문구 조정 필요.
+- `docs/clinic-deployment-guide.md` 를 기준으로 MSIX·폴더 복사 두 가지 배포 경로를 정리했고, 실제 진료실 PC에서 Phase 1 테스트를 시작했습니다.
+- 현재 Phase 1 항목 중 앱 기동/SmartScreen 우회는 완료했으며, 마이크 연결 환경이 준비되는 즉시 진단·수동 녹음 항목을 검증할 예정입니다.
+- 테스트 도중 발견되는 수정점은 `docs/clinic-deployment-guide.md`에 즉시 반영하고 있으므로, 후속 개발자는 최신 절차를 참고해 추가 이슈를 기록해 주세요.
+- 8시간 Soak 테스트는 Claude 에이전트가 `scripts/windows/run-soak-test.ps1`로 완료했고, 로그는 `C\ws-workspace\eyebottlelee\soak-logs` 아래 공유되었습니다. 현재는 MSIX 릴리즈 빌드를 기준으로 실사용 테스트(Phase 1~2) 검증을 진행 중입니다.
+
 - 대시보드 마이크 진단 카드를 헤더·요약·힌트·버튼 구조로 컴팩트하게 재구성하고, 상태 아이콘/색상/기본 가이드를 통일된 헬퍼로 관리(`refactor: compact mic diagnostic card`).
 - 설정 탭의 "고급 설정" 항목 옆에 VAD, 자동 실행 상태를 즉시 확인할 수 있는 ON/OFF 배지를 추가(`feat: show toggle states in settings`).
 - 앱 초기/최소 창 크기를 660×980 / 640×900으로 확장해 기본 레이아웃을 여유 있게 확인할 수 있도록 조정(`chore: increase default window size`).
@@ -210,9 +220,19 @@ flutter run -d windows
 
 ---
 
+
 ## 10) 이어서 작업하기(가이드)
 - 작은 단위로 변경 → 실행/확인 → 문서/체크리스트 갱신
 - 새 기능 추가 시: UI(설정/토글) → 서비스(로직) → 저장(SharedPreferences) 순으로 연결
 - 파괴적 변경(파일 삭제 정책/경로 변경 등)은 반드시 문서에 근거 및 롤백 전략 기재
 
 참고: 루트의 `AGENTS.md`는 에이전트/자동화 도구 작업 지침을 정의합니다. 변경 시 함께 갱신하세요.
+
+## 11) 실사용 테스트 앱 준비 체크리스트
+- [ ] Windows에서 `pwsh -File scripts\windows\run-soak-test.ps1` 로 8시간 Soak 테스트를 수행하고, 필요하면 `-DurationHours` 옵션으로 시간을 조절합니다. 로그와 metrics는 `C:\ws-workspace\eyebottlelee\soak-logs\<timestamp>` 아래에 저장됩니다.
+- [ ] Soak 테스트 결과를 요약한 `session-notes.txt`와 `metrics.csv`를 확인해 메모리 사용량·CPU 누적 시간을 검토하고, 진료실 PC에서도 동일 스크립트를 재실행해 하드웨어 차이를 비교합니다.
+- [ ] `flutter build windows --release` 완료 후 `build\windows\x64\runner\Release` 폴더를 ZIP으로 묶어 테스트앱 패키지를 만든 뒤, 진료실 PC에 전달합니다.
+- [ ] 패키지에는 실행 파일 외에 최신 사용자 가이드(`docs/user-guide.md`)의 테스트 절차 요약본과 복구 안내, Soak 테스트 로그 묶음을 포함해 현장에서도 바로 검수할 수 있도록 합니다.
+- [ ] 테스트 중 발견한 이슈는 Phase 1~3 일정(알림, 오류 가시화, 동기화 안정화)과 연결해 티켓을 작성하고, 해결 여부를 회고 로그에 남깁니다.
+
+

@@ -37,8 +37,7 @@ class _AdvancedSettingsDialogState extends State<AdvancedSettingsDialog> {
   bool _loading = true;
   RetentionOption _retentionOption = RetentionOption.forever;
   VadPreset? _vadPreset;
-  RecordingQualityProfile _recordingProfile =
-      RecordingQualityProfile.balanced;
+  RecordingQualityProfile _recordingProfile = RecordingQualityProfile.balanced;
   double _makeupGainDb = 0.0;
 
   @override
@@ -235,8 +234,8 @@ class _AdvancedSettingsDialogState extends State<AdvancedSettingsDialog> {
                 label: '+${_makeupGainDb.toStringAsFixed(1)} dB',
                 onChanged: (value) {
                   setState(
-                    () => _makeupGainDb =
-                        double.parse(value.toStringAsFixed(1)),
+                    () =>
+                        _makeupGainDb = double.parse(value.toStringAsFixed(1)),
                   );
                 },
               ),
@@ -322,8 +321,7 @@ class _AdvancedSettingsDialogState extends State<AdvancedSettingsDialog> {
                 label: _vadThreshold.toStringAsFixed(3),
                 onChanged: _vadEnabled
                     ? (v) => setState(() {
-                          _vadThreshold =
-                              double.parse(v.toStringAsFixed(3));
+                          _vadThreshold = double.parse(v.toStringAsFixed(3));
                           _vadPreset = _presetFromThreshold(_vadThreshold);
                         })
                     : null,
@@ -380,6 +378,8 @@ class _AdvancedSettingsDialogState extends State<AdvancedSettingsDialog> {
 
   Future<void> _save() async {
     final settings = SettingsService();
+    await settings.setRecordingProfile(_recordingProfile);
+    await settings.setMakeupGainDb(_makeupGainDb);
     await settings.setVad(enabled: _vadEnabled, threshold: _vadThreshold);
     await settings.setLaunchAtStartup(_launchAtStartup);
     await settings.setRetentionDuration(_durationForOption(_retentionOption));
@@ -391,8 +391,7 @@ class _AdvancedSettingsDialogState extends State<AdvancedSettingsDialog> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content:
-                  Text('자동 실행 설정 적용 중 오류가 발생했습니다: $e'),
+              content: Text('자동 실행 설정 적용 중 오류가 발생했습니다: $e'),
             ),
           );
         }

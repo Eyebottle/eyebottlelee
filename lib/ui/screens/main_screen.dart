@@ -70,8 +70,7 @@ class _MainScreenState extends State<MainScreen>
   bool? _autoLaunchEnabled;
   bool _vadEnabled = true;
   Duration? _retentionDuration;
-  RecordingQualityProfile _recordingProfile =
-      RecordingQualityProfile.balanced;
+  RecordingQualityProfile _recordingProfile = RecordingQualityProfile.balanced;
   double _makeupGainDb = 0.0;
   bool _hasShownTrayReminder = false;
   bool _isHiddenToTray = false;
@@ -104,13 +103,15 @@ class _MainScreenState extends State<MainScreen>
       await windowManager.setPreventClose(true);
       await windowManager.setSkipTaskbar(false);
     } catch (e, stackTrace) {
-      _loggingService.warning('창 닫힘 방지 초기화 실패', error: e, stackTrace: stackTrace);
+      _loggingService.warning('창 닫힘 방지 초기화 실패',
+          error: e, stackTrace: stackTrace);
     }
 
     try {
       await AutoLaunchService().applySavedPreference();
     } catch (e, stackTrace) {
-      _loggingService.warning('자동 실행 설정 동기화 실패', error: e, stackTrace: stackTrace);
+      _loggingService.warning('자동 실행 설정 동기화 실패',
+          error: e, stackTrace: stackTrace);
       if (mounted) {
         Future.microtask(() {
           if (!mounted) return;
@@ -612,7 +613,8 @@ class _MainScreenState extends State<MainScreen>
           await _stopRecording(showFeedback: false);
         }
       } catch (e, stackTrace) {
-        _loggingService.error('종료 전 녹음 중지 실패', error: e, stackTrace: stackTrace);
+        _loggingService.error('종료 전 녹음 중지 실패',
+            error: e, stackTrace: stackTrace);
       }
 
       windowManager.removeListener(this);
@@ -909,7 +911,8 @@ class _DashboardTab extends StatelessWidget {
           const SizedBox(height: 16),
           Showcase(
             key: trayShowcaseKey,
-            description: '창을 닫으면 앱은 트레이에서 계속 실행됩니다. 좌/더블클릭으로 창을 복원하고 우클릭 메뉴로 기능을 제어하세요.',
+            description:
+                '창을 닫으면 앱은 트레이에서 계속 실행됩니다. 좌/더블클릭으로 창을 복원하고 우클릭 메뉴로 기능을 제어하세요.',
             child: _buildTrayInfoBanner(context),
           ),
         ],
@@ -929,15 +932,11 @@ class _DashboardTab extends StatelessWidget {
     final signalDb = diagnostic?.peakDb;
     final ambientDb = diagnostic?.ambientDb;
     final snrDb = diagnostic?.snrDb;
-    final levelPercent = signalDb == null
-        ? null
-        : ((signalDb + 60) / 60).clamp(0.0, 1.0);
-    final signalText = signalDb == null
-        ? null
-        : '${signalDb.toStringAsFixed(1)} dBFS';
-    final snrText = snrDb == null
-        ? null
-        : '${snrDb.toStringAsFixed(1)} dB';
+    final levelPercent =
+        signalDb == null ? null : ((signalDb + 60) / 60).clamp(0.0, 1.0);
+    final signalText =
+        signalDb == null ? null : '${signalDb.toStringAsFixed(1)} dBFS';
+    final snrText = snrDb == null ? null : '${snrDb.toStringAsFixed(1)} dB';
     final lastTimeText = diagnostic == null
         ? '최근 점검 기록 없음'
         : _formatShortDateTime(diagnostic.timestamp);
@@ -978,8 +977,7 @@ class _DashboardTab extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               detailMessage,
-              style:
-                  theme.textTheme.bodyMedium?.copyWith(color: _textMuted),
+              style: theme.textTheme.bodyMedium?.copyWith(color: _textMuted),
             ),
           ],
           if (levelPercent != null) ...[
@@ -1065,7 +1063,8 @@ class _DashboardTab extends StatelessWidget {
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.check_circle, size: 14, color: visuals.color),
+                        Icon(Icons.check_circle,
+                            size: 14, color: visuals.color),
                         const SizedBox(width: 6),
                         Expanded(
                           child: Text(
@@ -1131,7 +1130,8 @@ class _DashboardTab extends StatelessWidget {
                 const SizedBox(height: 6),
                 Text(
                   '창을 닫아도 녹음은 중단되지 않아요. 트레이 아이콘을 좌/더블클릭해서 창을 다시 열고, 우클릭 메뉴에서 녹음 제어·마이크 점검·설정·종료를 실행할 수 있습니다.',
-                  style: theme.textTheme.bodySmall?.copyWith(color: const Color(0xFF0F7ABF)),
+                  style: theme.textTheme.bodySmall
+                      ?.copyWith(color: const Color(0xFF0F7ABF)),
                 ),
               ],
             ),
@@ -1144,15 +1144,21 @@ class _DashboardTab extends StatelessWidget {
   _DiagnosticVisuals _diagnosticVisuals(MicDiagnosticStatus? status) {
     return switch (status) {
       MicDiagnosticStatus.ok => _DiagnosticVisuals(
-          label: '정상', color: const Color(0xFF2E7D32), icon: Icons.check_circle),
+          label: '정상',
+          color: const Color(0xFF2E7D32),
+          icon: Icons.check_circle),
       MicDiagnosticStatus.lowInput => _DiagnosticVisuals(
           label: '입력이 약함', color: const Color(0xFFFFA000), icon: Icons.hearing),
       MicDiagnosticStatus.permissionDenied => _DiagnosticVisuals(
           label: '권한 필요', color: const Color(0xFFD32F2F), icon: Icons.lock),
       MicDiagnosticStatus.noInputDevice => _DiagnosticVisuals(
-          label: '장치 없음', color: const Color(0xFFD32F2F), icon: Icons.headset_off),
+          label: '장치 없음',
+          color: const Color(0xFFD32F2F),
+          icon: Icons.headset_off),
       MicDiagnosticStatus.recorderBusy => _DiagnosticVisuals(
-          label: '녹음 중', color: const Color(0xFFFF7043), icon: Icons.pause_circle),
+          label: '녹음 중',
+          color: const Color(0xFFFF7043),
+          icon: Icons.pause_circle),
       MicDiagnosticStatus.failure => _DiagnosticVisuals(
           label: '점검 실패', color: const Color(0xFFD32F2F), icon: Icons.error),
       null => _DiagnosticVisuals(
@@ -1180,11 +1186,11 @@ class _DashboardTab extends StatelessWidget {
       MicDiagnosticStatus.ok => '필요 시 “다시 점검”으로 상태를 재확인할 수 있어요.',
       MicDiagnosticStatus.lowInput => '마이크 위치나 입력 볼륨을 조정한 뒤 다시 점검해 주세요.',
       MicDiagnosticStatus.permissionDenied =>
-          'Windows 설정 > 개인정보 보호 > 마이크에서 권한을 허용해주세요.',
+        'Windows 설정 > 개인정보 보호 > 마이크에서 권한을 허용해주세요.',
       MicDiagnosticStatus.noInputDevice =>
-          'USB/블루투스 연결을 확인하고 기본 입력 장치를 선택해 주세요.',
+        'USB/블루투스 연결을 확인하고 기본 입력 장치를 선택해 주세요.',
       MicDiagnosticStatus.recorderBusy =>
-          '녹음이 끝난 뒤 다시 점검을 실행하면 정확한 상태를 볼 수 있습니다.',
+        '녹음이 끝난 뒤 다시 점검을 실행하면 정확한 상태를 볼 수 있습니다.',
       MicDiagnosticStatus.failure => originalMessage,
       null => '창이 열리면 자동으로 마이크 상태를 점검합니다.',
     };
@@ -1199,26 +1205,36 @@ class _DashboardTab extends StatelessWidget {
     }
 
     return switch (status) {
-      MicDiagnosticStatus.lowInput =>
-          ['마이크와의 거리를 한 뼘 안쪽으로 조정하세요.', 'Windows 입력 볼륨을 70% 이상으로 맞춰 주세요.'],
-      MicDiagnosticStatus.permissionDenied =>
-          ['Windows 설정 > 개인정보 보호 > 마이크에서 권한을 허용하세요.', '앱 목록에서 “아이보틀 진료 녹음”을 켭니다.'],
-      MicDiagnosticStatus.noInputDevice =>
-          ['USB·블루투스 케이블 연결을 확인하세요.', 'Windows 소리 설정에서 기본 입력 장치를 선택하세요.'],
-      MicDiagnosticStatus.failure =>
-          ['앱을 재실행한 뒤 다시 점검을 시도해 보세요.', '그래도 실패하면 지원팀에 로그와 함께 문의해주세요.'],
-      MicDiagnosticStatus.recorderBusy =>
-          ['현재 녹음을 중지한 뒤 점검을 다시 실행하세요.'],
+      MicDiagnosticStatus.lowInput => [
+          '마이크와의 거리를 한 뼘 안쪽으로 조정하세요.',
+          'Windows 입력 볼륨을 70% 이상으로 맞춰 주세요.'
+        ],
+      MicDiagnosticStatus.permissionDenied => [
+          'Windows 설정 > 개인정보 보호 > 마이크에서 권한을 허용하세요.',
+          '앱 목록에서 “아이보틀 진료 녹음”을 켭니다.'
+        ],
+      MicDiagnosticStatus.noInputDevice => [
+          'USB·블루투스 케이블 연결을 확인하세요.',
+          'Windows 소리 설정에서 기본 입력 장치를 선택하세요.'
+        ],
+      MicDiagnosticStatus.failure => [
+          '앱을 재실행한 뒤 다시 점검을 시도해 보세요.',
+          '그래도 실패하면 지원팀에 로그와 함께 문의해주세요.'
+        ],
+      MicDiagnosticStatus.recorderBusy => ['현재 녹음을 중지한 뒤 점검을 다시 실행하세요.'],
       _ => const [],
     };
   }
 
   String _formatShortDateTime(DateTime dateTime) {
     final local = dateTime.toLocal();
-    final date = '${local.year.toString().padLeft(4, '0')}-${local.month.toString().padLeft(2, '0')}-${local.day.toString().padLeft(2, '0')}';
-    final time = '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
+    final date =
+        '${local.year.toString().padLeft(4, '0')}-${local.month.toString().padLeft(2, '0')}-${local.day.toString().padLeft(2, '0')}';
+    final time =
+        '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
     return '$date $time';
   }
+
   Widget _buildRecordingCard(BuildContext context) {
     final theme = Theme.of(context);
     final statusText = isRecording ? '녹음 중' : '대기 중';
@@ -1303,7 +1319,7 @@ class _DashboardTab extends StatelessWidget {
                 children: [
                   SizedBox(
                     width:
-                    isWide ? constraints.maxWidth / 2 - 8 : double.infinity,
+                        isWide ? constraints.maxWidth / 2 - 8 : double.infinity,
                     child: OutlinedButton.icon(
                       onPressed: () {
                         if (isRecording) {
@@ -1312,7 +1328,8 @@ class _DashboardTab extends StatelessWidget {
                           onStartRecording();
                         }
                       },
-                      icon: Icon(isRecording ? Icons.stop : Icons.fiber_manual_record),
+                      icon: Icon(
+                          isRecording ? Icons.stop : Icons.fiber_manual_record),
                       label: Text(isRecording ? '중지' : '녹음 시작'),
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 16),
@@ -1340,9 +1357,7 @@ class _DashboardTab extends StatelessWidget {
       ),
     );
   }
-
 }
-
 
 class _StatusBadge extends StatelessWidget {
   const _StatusBadge({
@@ -1475,8 +1490,7 @@ class _SettingsTab extends StatelessWidget {
                 description: '진료/녹음 시간을 관리합니다.',
                 onTap: onOpenSchedule,
                 showcaseKey: scheduleShowcaseKey,
-                showcaseDescription:
-                    '진료 시간표에서 오전/오후 구간을 조정해 자동 녹음 시간을 관리하세요.',
+                showcaseDescription: '진료 시간표에서 오전/오후 구간을 조정해 자동 녹음 시간을 관리하세요.',
               ),
             ],
           ),
@@ -1490,8 +1504,7 @@ class _SettingsTab extends StatelessWidget {
                 description: '녹음 파일 저장 폴더를 변경합니다.',
                 onTap: onOpenSaveFolder,
                 showcaseKey: saveFolderShowcaseKey,
-                showcaseDescription:
-                    '녹음 파일을 저장할 폴더(예: OneDrive)를 지정합니다.',
+                showcaseDescription: '녹음 파일을 저장할 폴더(예: OneDrive)를 지정합니다.',
               ),
               SettingsDestination(
                 icon: Icons.history,
@@ -1500,8 +1513,7 @@ class _SettingsTab extends StatelessWidget {
                 statusText: _formatRetentionLabel(retentionDuration),
                 onTap: onOpenRetention,
                 showcaseKey: retentionShowcaseKey,
-                showcaseDescription:
-                    '자동 보관 기간을 설정해 오래된 파일을 정리할 수 있습니다.',
+                showcaseDescription: '자동 보관 기간을 설정해 오래된 파일을 정리할 수 있습니다.',
               ),
             ],
             footer: _SaveFolderSummary(
@@ -1542,8 +1554,7 @@ class _SettingsTab extends StatelessWidget {
                 statusText: autoLaunchEnabled ? '켜짐' : '꺼짐',
                 onTap: onOpenAutoLaunch,
                 showcaseKey: autoLaunchShowcaseKey,
-                showcaseDescription:
-                    'Windows 로그인 시 앱을 자동 실행하도록 설정합니다.',
+                showcaseDescription: 'Windows 로그인 시 앱을 자동 실행하도록 설정합니다.',
               ),
             ],
           ),
@@ -1655,16 +1666,16 @@ class _SettingsSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
-          child: Text(
-            title,
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w600,
-              color: const Color(0xFF101C22),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
+            child: Text(
+              title,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: const Color(0xFF101C22),
+              ),
             ),
           ),
-        ),
           ...items.map((item) => _SettingsTile(item: item)).toList(),
           if (footer != null) const Divider(height: 1),
           if (footer != null)
@@ -1725,8 +1736,7 @@ class _SettingsTile extends StatelessWidget {
             ),
             if (item.statusText != null) ...[
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: item.statusText == '켜짐'
                       ? _primaryColor.withOpacity(0.12)
@@ -1736,8 +1746,7 @@ class _SettingsTile extends StatelessWidget {
                 child: Text(
                   item.statusText!,
                   style: theme.textTheme.labelSmall?.copyWith(
-                    color:
-                        item.statusText == '켜짐' ? _primaryColor : _textMuted,
+                    color: item.statusText == '켜짐' ? _primaryColor : _textMuted,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
