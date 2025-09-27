@@ -146,10 +146,10 @@ class MicDiagnosticsService {
   }
 
   static const double _normalThresholdDb = -24.0;
-  static const double _quietOkThresholdDb = -38.0;
-  static const double _quietSnrAllowanceDb = 4.0;
-  static const double _quietAcceptableDb = -45.0;
-  static const double _snrToleranceDb = -1.5;
+  static const double _quietOkThresholdDb = -40.0;
+  static const double _quietSnrAllowanceDb = 3.5;
+  static const double _quietAcceptableDb = -48.0;
+  static const double _snrToleranceDb = -0.5;
   static const double _minDb = -80.0;
 
   double _normalizeAmplitude(Amplitude amplitude) {
@@ -231,7 +231,7 @@ class MicDiagnosticsService {
           quietButClear
               ? '조용한 환경이지만 음성이 또렷하게 감지되고 있어요.'
               : quietButAcceptable
-                  ? '조용한 진료실에서도 충분한 수준으로 입력이 감지되고 있어요.'
+                  ? '녹음은 가능하지만 입력이 다소 낮아요. 필요하면 마이크 위치나 볼륨을 조금만 조정해 주세요.'
                   : '마이크 입력이 정상이에요.';
       return _DiagnosticDecision(
         status: MicDiagnosticStatus.ok,
