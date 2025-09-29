@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/mic_diagnostic_result.dart';
 import '../models/schedule_model.dart';
 import '../models/recording_profile.dart';
+import '../models/launch_manager_settings.dart';
 
 class SettingsService {
   static const _keyScheduleJson = 'weekly_schedule_json';
@@ -17,6 +18,7 @@ class SettingsService {
   static const _keyMicDiagnostic = 'last_mic_diagnostic';
   static const _keyRecordingProfile = 'recording_profile';
   static const _keyMakeupGainDb = 'makeup_gain_db';
+  static const _keyLaunchManagerSettings = 'launch_manager_settings';
 
   Future<void> saveSchedule(WeeklySchedule schedule) async {
     final prefs = await SharedPreferences.getInstance();
@@ -182,5 +184,34 @@ class SettingsService {
   String _dateKey(DateTime date) {
     final normalized = DateTime(date.year, date.month, date.day);
     return normalized.toIso8601String().split('T').first;
+  }
+
+  /// 자동 실행 매니저 설정 저장
+  Future<void> setLaunchManagerSettings(LaunchManagerSettings settings) async {
+    final prefs = await SharedPreferences.getInstance();
+    final jsonStr = jsonEncode(settings.toJson());
+    await prefs.setString(_keyLaunchManagerSettings, jsonStr);
+  }
+
+  /// 자동 실행 매니저 설정 로드
+  Future<LaunchManagerSettings> getLaunchManagerSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    final jsonStr = prefs.getString(_keyLaunchManagerSettings);
+
+    if (jsonStr == null) {
+      // 기본 설정 반환
+      return LaunchManagerSettings.defaultSettings();
+    }
+
+    try {
+      final map = jsonDecode(jsonStr) as Map<String, dynamic>;
+      final settings = LaunchManagerSettings.fromJson(map);
+
+      // 버전 마이그레이션 수행
+      return settings.migrate();
+    } catch (e) {
+      // JSON 파싱 실패 시 기본 설정 반환
+      return LaunchManagerSettings.defaultSettings();
+    }
   }
 }

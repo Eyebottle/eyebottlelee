@@ -383,58 +383,58 @@ UAC 프롬프트 최소화
 ### Phase 1: 데이터 모델 및 서비스 (1주)
 
 #### 백엔드 로직
-- [ ] **LaunchProgram 모델 생성** (`lib/models/launch_program.dart`)
-  - [ ] 기본 필드 정의 (id, name, path, arguments, workingDirectory, delaySeconds, windowState, enabled, order)
-  - [ ] JSON 직렬화/역직렬화 구현 (toJson, fromJson)
+- [x] **LaunchProgram 모델 생성** (`lib/models/launch_program.dart`)
+  - [x] 기본 필드 정의 (id, name, path, arguments, workingDirectory, delaySeconds, windowState, enabled, order)
+  - [x] JSON 직렬화/역직렬화 구현 (toJson, fromJson)
   - [ ] 아이콘 추출 로직 구현 (Windows PE 파일 분석)
-  - [ ] 실행 파일 유효성 검증 메서드
-  - [ ] copyWith, toString, equals/hashCode 구현
+  - [x] 실행 파일 유효성 검증 메서드
+  - [x] copyWith, toString, equals/hashCode 구현
 
-- [ ] **LaunchManagerSettings 모델 생성** (`lib/models/launch_manager_settings.dart`)
-  - [ ] 기본 필드 정의 (autoLaunchEnabled, showNotifications, retryOnFailure, programs)
-  - [ ] JSON 직렬화/역직렬화 구현
-  - [ ] 기본값 정의 및 팩토리 생성자
-  - [ ] 설정 마이그레이션 로직 (버전 호환성)
+- [x] **LaunchManagerSettings 모델 생성** (`lib/models/launch_manager_settings.dart`)
+  - [x] 기본 필드 정의 (autoLaunchEnabled, showNotifications, retryOnFailure, programs)
+  - [x] JSON 직렬화/역직렬화 구현
+  - [x] 기본값 정의 및 팩토리 생성자
+  - [x] 설정 마이그레이션 로직 (버전 호환성)
 
-- [ ] **AutoLaunchManagerService 서비스 생성** (`lib/services/auto_launch_manager_service.dart`)
-  - [ ] 싱글톤 패턴 구현 (기존 서비스와 일관성)
-  - [ ] Process.start 기반 실행 엔진 구현
-  - [ ] 순차 실행 로직 (for loop + Future.delayed)
-  - [ ] 오류 복구 및 재시도 메커니즘
-  - [ ] 실행 상태 추적 시스템 (Stream/StateNotifier)
-  - [ ] Windows 특화 옵션 (runInShell for .bat/.cmd)
+- [x] **AutoLaunchManagerService 서비스 생성** (`lib/services/auto_launch_manager_service.dart`)
+  - [x] 싱글톤 패턴 구현 (기존 서비스와 일관성)
+  - [x] Process.start 기반 실행 엔진 구현
+  - [x] 순차 실행 로직 (for loop + Future.delayed)
+  - [x] 오류 복구 및 재시도 메커니즘
+  - [x] 실행 상태 추적 시스템 (Stream/StateNotifier)
+  - [x] Windows 특화 옵션 (runInShell for .bat/.cmd)
 
-- [ ] **SettingsService 확장**
-  - [ ] LaunchManagerSettings 저장/로드 메서드 추가
-  - [ ] SharedPreferences 키 네이밍 ('launch_manager_settings')
-  - [ ] 기존 설정과 분리된 독립적 관리
+- [x] **SettingsService 확장**
+  - [x] LaunchManagerSettings 저장/로드 메서드 추가
+  - [x] SharedPreferences 키 네이밍 ('launch_manager_settings')
+  - [x] 기존 설정과 분리된 독립적 관리
 
 ### Phase 2: UI 컴포넌트 (1주)
 
 #### 기존 디자인 패턴 활용
-- [ ] **자동 실행 매니저 메인 위젯** (`lib/ui/widgets/launch_manager_widget.dart`)
-  - [ ] AppSectionCard 래퍼 사용 (기존 패턴 준수)
-  - [ ] AppSpacing 간격 체계 적용 (md, lg 단위)
-  - [ ] 기존 색상 체계 준수 (_primaryColor, _textMuted)
-  - [ ] 전역 ON/OFF 토글 스위치 구현
-  - [ ] "프로그램 추가" 버튼 구현
+- [x] **자동 실행 매니저 메인 위젯** (`lib/ui/widgets/launch_manager_widget.dart`)
+  - [x] AppSectionCard 래퍼 사용 (기존 패턴 준수)
+  - [x] AppSpacing 간격 체계 적용 (md, lg 단위)
+  - [x] 기존 색상 체계 준수 (_primaryColor, _textMuted)
+  - [x] 전역 ON/OFF 토글 스위치 구현
+  - [x] "프로그램 추가" 버튼 구현
 
-- [ ] **프로그램 목록 관리 위젯** (`lib/ui/widgets/launch_program_list.dart`)
-  - [ ] ReorderableListView 드래그앤드롭 구현
-  - [ ] 체크박스 활성화/비활성화 UI
-  - [ ] 아이콘 + 이름 + 지연시간 표시 카드
-  - [ ] 위/아래 순서 조정 버튼
-  - [ ] 삭제 및 편집 액션 버튼
-  - [ ] 빈 상태 일러스트레이션
+- [x] **프로그램 목록 관리 위젯** (LaunchManagerWidget에 통합)
+  - [x] ReorderableListView 드래그앤드롭 구현
+  - [x] 체크박스 활성화/비활성화 UI
+  - [x] 아이콘 + 이름 + 지연시간 표시 카드
+  - [x] 위/아래 순서 조정 버튼
+  - [x] 삭제 및 편집 액션 버튼
+  - [x] 빈 상태 일러스트레이션
 
-- [ ] **프로그램 추가/편집 다이얼로그** (`lib/ui/widgets/add_program_dialog.dart`)
-  - [ ] file_selector 파일 선택 구현
-  - [ ] 프로그램 이름 자동 추출 및 수정 폼
-  - [ ] 지연시간 슬라이더 (5-60초)
-  - [ ] 명령줄 인수 입력 필드 (고급 옵션)
-  - [ ] 작업 디렉터리 선택 (고급 옵션)
-  - [ ] 창 상태 드롭다운 (일반/최소화/최대화)
-  - [ ] 미리보기 및 테스트 실행 버튼
+- [x] **프로그램 추가/편집 다이얼로그** (`lib/ui/widgets/add_program_dialog.dart`)
+  - [x] file_selector 파일 선택 구현
+  - [x] 프로그램 이름 자동 추출 및 수정 폼
+  - [x] 지연시간 슬라이더 (5-60초)
+  - [x] 명령줄 인수 입력 필드 (고급 옵션)
+  - [x] 작업 디렉터리 선택 (고급 옵션)
+  - [x] 창 상태 드롭다운 (일반/최소화/최대화)
+  - [x] 미리보기 및 테스트 실행 버튼
 
 - [ ] **AdvancedSettingsDialog 섹션 추가**
   - [ ] AdvancedSettingSection.launchManager enum 추가
@@ -444,20 +444,20 @@ UAC 프롬프트 최소화
 ### Phase 3: 시스템 통합 (0.5주)
 
 #### 기존 서비스와 연계
-- [ ] **MainScreen 통합** (`lib/ui/screens/main_screen.dart`)
-  - [ ] 설정 탭에 "자동 실행 매니저" 버튼 추가
-  - [ ] 기존 레이아웃과 일관된 배치
-  - [ ] 네비게이션 로직 구현
+- [x] **MainScreen 통합** (`lib/ui/screens/main_screen.dart`)
+  - [x] 설정 탭에 "자동 실행 매니저" 버튼 추가
+  - [x] 기존 레이아웃과 일관된 배치
+  - [x] 네비게이션 로직 구현
 
 - [ ] **TrayService 확장** (`lib/services/tray_service.dart`)
   - [ ] "자동 실행 시작" 컨텍스트 메뉴 항목 추가
   - [ ] 실행 상태 표시용 아이콘 색상 변경
   - [ ] 진행 상황 툴팁 표시
 
-- [ ] **앱 시작시 초기화**
-  - [ ] main.dart에서 AutoLaunchManagerService 초기화
-  - [ ] AutoLaunchService.applySavedPreference() 후 실행
-  - [ ] 오류 발생시 사용자 알림
+- [x] **앱 시작시 초기화**
+  - [x] MainScreen._initializeServices()에서 AutoLaunchManagerService 초기화
+  - [x] 자동 실행 설정 확인 후 5초 지연 실행
+  - [x] 오류 발생시 로깅 및 안전 처리
 
 - [ ] **알림 시스템 구현**
   - [ ] 시작 알림: "자동 실행을 시작합니다"

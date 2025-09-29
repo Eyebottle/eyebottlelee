@@ -6,6 +6,7 @@ import 'package:showcaseview/showcaseview.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../../services/auto_launch_service.dart';
+import '../../services/auto_launch_manager_service.dart';
 import '../../models/mic_diagnostic_result.dart';
 import '../../models/schedule_model.dart';
 import '../../services/audio_service.dart';
@@ -18,6 +19,7 @@ import '../widgets/advanced_settings_dialog.dart';
 import '../widgets/animated_volume_meter.dart';
 import '../widgets/schedule_config_widget.dart';
 import '../widgets/help/help_center_dialog.dart';
+import '../widgets/launch_manager_widget.dart';
 import '../../models/recording_profile.dart';
 
 const _backgroundColor = Color(0xFFF6F7F8);
@@ -42,6 +44,7 @@ class _MainScreenState extends State<MainScreen>
   final TrayService _trayService = TrayService();
   final LoggingService _loggingService = LoggingService();
   final MicDiagnosticsService _micDiagnosticsService = MicDiagnosticsService();
+  final AutoLaunchManagerService _autoLaunchManagerService = AutoLaunchManagerService();
 
   final GlobalKey _tutorialRecordingKey = GlobalKey();
   final GlobalKey _tutorialScheduleKey = GlobalKey();
@@ -52,6 +55,7 @@ class _MainScreenState extends State<MainScreen>
   final GlobalKey _settingsVadKey = GlobalKey();
   final GlobalKey _settingsAutoLaunchKey = GlobalKey();
   final GlobalKey _settingsAudioQualityKey = GlobalKey();
+  final GlobalKey _settingsLaunchManagerKey = GlobalKey();
 
   late final TabController _tabController;
 
@@ -120,6 +124,26 @@ class _MainScreenState extends State<MainScreen>
           );
         });
       }
+    }
+
+    // 자동 실행 매니저 초기화 및 프로그램 실행
+    try {
+      final launchManagerSettings = await _autoLaunchManagerService.loadSettings();
+      if (launchManagerSettings.autoLaunchEnabled &&
+          launchManagerSettings.enabledPrograms.isNotEmpty) {
+        // 앱 시작 5초 후에 프로그램 자동 실행
+        Timer(const Duration(seconds: 5), () async {
+          try {
+            await _autoLaunchManagerService.executePrograms();
+          } catch (e, stackTrace) {
+            _loggingService.warning('자동 실행 매니저 실행 실패',
+                error: e, stackTrace: stackTrace);
+          }
+        });
+      }
+    } catch (e, stackTrace) {
+      _loggingService.warning('자동 실행 매니저 초기화 실패',
+          error: e, stackTrace: stackTrace);
     }
 
     _audioService.onAmplitudeChanged = (level) {
@@ -304,12 +328,14 @@ class _MainScreenState extends State<MainScreen>
                         onOpenVad: () => _openVadSettings(),
                         onOpenRetention: () => _openRetentionSettings(),
                         onOpenAutoLaunch: () => _openAutoLaunchSettings(),
+                        onOpenLaunchManager: () => _openLaunchManagerSettings(),
                         onOpenAudioQuality: () => _openAudioQualitySettings(),
                         scheduleShowcaseKey: _settingsScheduleKey,
                         saveFolderShowcaseKey: _settingsSaveKey,
                         retentionShowcaseKey: _settingsRetentionKey,
                         vadShowcaseKey: _settingsVadKey,
                         autoLaunchShowcaseKey: _settingsAutoLaunchKey,
+                        launchManagerShowcaseKey: _settingsLaunchManagerKey,
                         audioQualityShowcaseKey: _settingsAudioQualityKey,
                         saveFolder: _currentSaveFolder,
                         vadEnabled: _vadEnabled,
@@ -488,6 +514,46 @@ class _MainScreenState extends State<MainScreen>
         setState(() => _autoLaunchEnabled = value);
       }
     }
+  }
+
+  Future<void> _openLaunchManagerSettings() async {
+    await showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        child: Container(
+          width: 800,
+          height: 600,
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.rocket_launch, size: 24),
+                  const SizedBox(width: 8),
+                  const Text(
+                    '자동 실행 매니저',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              const Expanded(
+                child: LaunchManagerWidget(),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _openAudioQualitySettings() async {
@@ -1440,12 +1506,14 @@ class _SettingsTab extends StatelessWidget {
     required this.onOpenVad,
     required this.onOpenRetention,
     required this.onOpenAutoLaunch,
+    required this.onOpenLaunchManager,
     required this.onOpenAudioQuality,
     required this.scheduleShowcaseKey,
     required this.saveFolderShowcaseKey,
     required this.retentionShowcaseKey,
     required this.vadShowcaseKey,
     required this.autoLaunchShowcaseKey,
+    required this.launchManagerShowcaseKey,
     required this.audioQualityShowcaseKey,
     required this.saveFolder,
     required this.vadEnabled,
@@ -1460,12 +1528,14 @@ class _SettingsTab extends StatelessWidget {
   final Future<void> Function() onOpenVad;
   final Future<void> Function() onOpenRetention;
   final Future<void> Function() onOpenAutoLaunch;
+  final Future<void> Function() onOpenLaunchManager;
   final Future<void> Function() onOpenAudioQuality;
   final GlobalKey scheduleShowcaseKey;
   final GlobalKey saveFolderShowcaseKey;
   final GlobalKey retentionShowcaseKey;
   final GlobalKey vadShowcaseKey;
   final GlobalKey autoLaunchShowcaseKey;
+  final GlobalKey launchManagerShowcaseKey;
   final GlobalKey audioQualityShowcaseKey;
   final String saveFolder;
   final bool vadEnabled;
@@ -1555,6 +1625,15 @@ class _SettingsTab extends StatelessWidget {
                 onTap: onOpenAutoLaunch,
                 showcaseKey: autoLaunchShowcaseKey,
                 showcaseDescription: 'Windows 로그인 시 앱을 자동 실행하도록 설정합니다.',
+              ),
+              SettingsDestination(
+                icon: Icons.rocket_launch,
+                title: '자동 실행 매니저',
+                description: '진료실에서 자주 사용하는 프로그램들을 자동으로 실행합니다.',
+                statusText: '설정',
+                onTap: onOpenLaunchManager,
+                showcaseKey: launchManagerShowcaseKey,
+                showcaseDescription: '전자차트, 의료영상 뷰어 등 자주 사용하는 프로그램을 자동으로 실행하도록 설정할 수 있습니다.',
               ),
             ],
           ),
