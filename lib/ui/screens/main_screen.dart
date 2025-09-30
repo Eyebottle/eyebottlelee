@@ -1334,7 +1334,7 @@ class _DashboardTab extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: _cardBorder),
+        border: Border.all(color: AppColors.surfaceBorder),
         boxShadow: const [
           BoxShadow(
             color: Color(0x0C101C22),
@@ -1858,10 +1858,10 @@ class _SettingsTile extends StatelessWidget {
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: _primaryColor.withAlpha((0.12 * 255).round()),
+                color: AppColors.primaryContainer,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(item.icon, color: _primaryColor),
+              child: Icon(item.icon, color: AppColors.primary),
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -1890,14 +1890,14 @@ class _SettingsTile extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: item.statusText == '켜짐'
-                      ? _primaryColor.withOpacity(0.12)
-                      : _textMuted.withOpacity(0.12),
+                      ? AppColors.primaryContainer
+                      : AppColors.textSecondary.withOpacity(0.12),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
                   item.statusText!,
                   style: theme.textTheme.labelSmall?.copyWith(
-                    color: item.statusText == '켜짐' ? _primaryColor : _textMuted,
+                    color: item.statusText == '켜짐' ? AppColors.primary : AppColors.textSecondary,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
