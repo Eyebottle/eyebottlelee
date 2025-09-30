@@ -969,28 +969,212 @@ class _DashboardTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isWideScreen = constraints.maxWidth > 900;
+
+        return SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // 2단 그리드 레이아웃 (와이드 스크린) 또는 수직 레이아웃 (좁은 화면)
+              if (isWideScreen)
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // 좌측: 녹음 상태 카드 (60%)
+                    Expanded(
+                      flex: 60,
+                      child: Showcase(
+                        key: recordingShowcaseKey,
+                        description: '녹음 상태 카드에서 현재 녹음 여부를 확인하고 수동으로 시작/중지할 수 있습니다.',
+                        child: _buildRecordingCard(context),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    // 우측: 마이크 진단 간소화 카드 (40%)
+                    Expanded(
+                      flex: 40,
+                      child: Showcase(
+                        key: diagnosticShowcaseKey,
+                        description: '앱 시작 시 마이크 입력 레벨을 자동으로 점검합니다. 정상 기준은 RMS 0.04 이상이며, 문제 발생 시 힌트를 확인하세요.',
+                        child: _buildDiagnosticCardCompact(context),
+                      ),
+                    ),
+                  ],
+                )
+              else
+                // 좁은 화면: 기존 수직 레이아웃
+                Column(
+                  children: [
+                    Showcase(
+                      key: recordingShowcaseKey,
+                      description: '녹음 상태 카드에서 현재 녹음 여부를 확인하고 수동으로 시작/중지할 수 있습니다.',
+                      child: _buildRecordingCard(context),
+                    ),
+                    const SizedBox(height: 16),
+                    Showcase(
+                      key: diagnosticShowcaseKey,
+                      description: '앱 시작 시 마이크 입력 레벨을 자동으로 점검합니다. 정상 기준은 RMS 0.04 이상이며, 문제 발생 시 힌트를 확인하세요.',
+                      child: _buildDiagnosticCard(context),
+                    ),
+                  ],
+                ),
+              const SizedBox(height: 16),
+              Showcase(
+                key: trayShowcaseKey,
+                description:
+                    '창을 닫으면 앱은 트레이에서 계속 실행됩니다. 좌/더블클릭으로 창을 복원하고 우클릭 메뉴로 기능을 제어하세요.',
+                child: _buildTrayInfoBanner(context),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildDiagnosticCardCompact(BuildContext context) {
+    final theme = Theme.of(context);
+    final diagnostic = lastDiagnostic;
+    final status = diagnostic?.status;
+
+    final visuals = _diagnosticVisuals(status);
+    final primaryMessage = _diagnosticPrimaryMessage(status);
+    final signalDb = diagnostic?.peakDb;
+    final levelPercent =
+        signalDb == null ? null : ((signalDb + 60) / 60).clamp(0.0, 1.0);
+    final signalText =
+        signalDb == null ? null : '${signalDb.toStringAsFixed(1)} dBFS';
+    final lastTimeText = diagnostic == null
+        ? '미점검'
+        : _formatShortDateTime(diagnostic.timestamp);
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.surfaceBorder),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Showcase(
-            key: recordingShowcaseKey,
-            description: '녹음 상태 카드에서 현재 녹음 여부를 확인하고 수동으로 시작/중지할 수 있습니다.',
-            child: _buildRecordingCard(context),
+          // 헤더
+          Row(
+            children: [
+              Icon(
+                Icons.mic,
+                size: 20,
+                color: AppColors.primary,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '마이크 진단',
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: const Color(0xFF101C22),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 16),
-          Showcase(
-            key: diagnosticShowcaseKey,
-            description: '앱 시작 시 마이크 입력 레벨을 자동으로 점검합니다. 정상 기준은 RMS 0.04 이상이며, 문제 발생 시 힌트를 확인하세요.',
-            child: _buildDiagnosticCard(context),
+
+          // 상태 뱃지
+          _StatusBadge(
+            color: visuals.color,
+            icon: visuals.icon,
+            label: visuals.label,
+          ),
+          const SizedBox(height: 12),
+
+          // 상태 메시지
+          Text(
+            primaryMessage,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: visuals.color,
+            ),
           ),
           const SizedBox(height: 16),
-          Showcase(
-            key: trayShowcaseKey,
-            description:
-                '창을 닫으면 앱은 트레이에서 계속 실행됩니다. 좌/더블클릭으로 창을 복원하고 우클릭 메뉴로 기능을 제어하세요.',
-            child: _buildTrayInfoBanner(context),
+
+          // 레벨 바
+          if (levelPercent != null) ...[
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF3F6F8),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        '평균 레벨',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: AppColors.textSecondary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      Text(
+                        signalText ?? '- dBFS',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: visuals.color,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: levelPercent,
+                      backgroundColor: const Color(0xFFE0E7EC),
+                      color: visuals.color,
+                      minHeight: 6,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+
+          // 마지막 점검 시간
+          Text(
+            '최근 점검: $lastTimeText',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // 진단 버튼
+          SizedBox(
+            height: 40,
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: diagnosticInProgress ? null : onRunDiagnostic,
+              icon: diagnosticInProgress
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Icon(Icons.refresh, size: 18),
+              label: Text(
+                diagnosticInProgress ? '점검 중…' : '다시 점검',
+                style: const TextStyle(fontSize: 14),
+              ),
+            ),
           ),
         ],
       ),
@@ -1182,35 +1366,23 @@ class _DashboardTab extends StatelessWidget {
   Widget _buildTrayInfoBanner(BuildContext context) {
     final theme = Theme.of(context);
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         color: const Color(0xFF0F7ABF).withOpacity(0.08),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: const Color(0xFF0F7ABF).withOpacity(0.25)),
       ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.system_update_tv, color: Color(0xFF0F7ABF)),
-          const SizedBox(width: 12),
+          const Icon(Icons.system_update_tv, color: Color(0xFF0F7ABF), size: 20),
+          const SizedBox(width: 10),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '트레이에서 계속 실행됩니다',
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: const Color(0xFF0F7ABF),
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  '창을 닫아도 녹음은 중단되지 않아요. 트레이 아이콘을 좌/더블클릭해서 창을 다시 열고, 우클릭 메뉴에서 녹음 제어·마이크 점검·설정·종료를 실행할 수 있습니다.',
-                  style: theme.textTheme.bodySmall
-                      ?.copyWith(color: const Color(0xFF0F7ABF)),
-                ),
-              ],
+            child: Text(
+              '창을 닫으면 트레이에서 계속 실행됩니다. 트레이 아이콘으로 복원하거나 우클릭 메뉴로 기능을 제어할 수 있어요.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: const Color(0xFF0F7ABF),
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ),
         ],
@@ -1370,7 +1542,7 @@ class _DashboardTab extends StatelessWidget {
           const SizedBox(height: 16),
           AnimatedVolumeMeter(
             history: volumeHistory,
-            maxHeight: 80,
+            maxHeight: 60,
           ),
           const SizedBox(height: 16),
           Row(
