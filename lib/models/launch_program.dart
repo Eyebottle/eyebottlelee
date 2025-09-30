@@ -70,10 +70,16 @@ class LaunchProgram {
   /// 프로그램 파일이 존재하는지 확인
   bool get isValid {
     try {
-      return File(path).existsSync();
+      final file = File(path);
+      return file.existsSync();
     } catch (e) {
       return false;
     }
+  }
+
+  /// 바로가기(.lnk) 파일인지 확인
+  bool get isShortcut {
+    return path.toLowerCase().endsWith('.lnk');
   }
 
   /// 프로그램 이름을 경로에서 자동 추출
@@ -102,6 +108,15 @@ class LaunchProgram {
   bool get isBatchFile {
     final extension = path.toLowerCase();
     return extension.endsWith('.bat') || extension.endsWith('.cmd');
+  }
+
+  /// 실행 파일인지 확인 (.exe, .bat, .cmd, .lnk)
+  bool get isExecutable {
+    final extension = path.toLowerCase();
+    return extension.endsWith('.exe') ||
+        extension.endsWith('.bat') ||
+        extension.endsWith('.cmd') ||
+        extension.endsWith('.lnk');
   }
 
   /// 프로그램 정보 복사 (일부 속성 변경)

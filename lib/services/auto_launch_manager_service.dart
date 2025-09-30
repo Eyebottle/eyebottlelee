@@ -87,7 +87,7 @@ class AutoLaunchManagerService {
   /// 등록된 프로그램들을 순차적으로 실행
   Future<void> executePrograms() async {
     if (_isExecuting) {
-      _logging.warn('프로그램 실행이 이미 진행 중입니다.');
+      _logging.warning('프로그램 실행이 이미 진행 중입니다.');
       return;
     }
 
@@ -173,29 +173,66 @@ class AutoLaunchManagerService {
   Future<bool> _launchProgram(LaunchProgram program) async {
     try {
       // 파일 존재 여부 확인
+      _logging.debug('프로그램 실행 검증 시작: ${program.name}');
+      _logging.debug('  - 경로: ${program.path}');
+      _logging.debug('  - 인수: ${program.arguments}');
+      _logging.debug('  - 작업 디렉터리: ${program.workingDirectory ?? "(없음)"}');
+      _logging.debug('  - 배치 파일 여부: ${program.isBatchFile}');
+
       if (!program.isValid) {
         _logging.error('프로그램 파일을 찾을 수 없습니다: ${program.path}');
+        _logging.error('  - File.existsSync() = false');
         return false;
       }
 
-      _logging.debug('프로그램 실행 시도: ${program.name} (${program.path})');
+      _logging.info('프로그램 실행 시도: ${program.name} (${program.path})');
+
+      // 실행 파일 여부 확인
+      final isExecutable = program.isExecutable;
+      final isShortcut = program.isShortcut;
+
+      if (!isExecutable) {
+        _logging.debug('문서 파일 감지 - Windows 기본 프로그램으로 실행');
+      } else if (isShortcut) {
+        _logging.debug('바로가기 파일 감지 - cmd.exe로 실행');
+      }
 
       // Process.start로 프로그램 실행
-      await Process.start(
-        program.path,
-        program.arguments,
+      final String executable;
+      final List<String> args;
+
+      if (!isExecutable || isShortcut) {
+        // 문서 파일 또는 바로가기는 cmd /c start로 실행
+        // 빈 문자열("")은 창 제목을 지정하는 것으로, 경로에 공백이 있어도 올바르게 동작
+        executable = 'cmd.exe';
+        args = ['/c', 'start', '""', program.path, ...program.arguments];
+      } else {
+        // 실행 파일은 직접 실행
+        executable = program.path;
+        args = program.arguments;
+      }
+
+      _logging.debug('실행 명령: $executable ${args.join(" ")}');
+
+      final process = await Process.start(
+        executable,
+        args,
         workingDirectory: program.workingDirectory?.isNotEmpty == true
             ? program.workingDirectory
             : null,
         mode: ProcessStartMode.detached,
-        runInShell: program.isBatchFile, // .bat/.cmd 파일은 셸에서 실행
+        runInShell: true, // cmd.exe 사용 시 항상 true
       );
 
-      _logging.info('프로그램 실행 성공: ${program.name}');
+      _logging.info('프로그램 실행 성공: ${program.name} (PID: ${process.pid})');
       return true;
 
-    } catch (e) {
-      _logging.error('프로그램 실행 실패: ${program.name}', error: e);
+    } catch (e, stackTrace) {
+      _logging.error('프로그램 실행 실패: ${program.name}');
+      _logging.error('  - 에러 타입: ${e.runtimeType}');
+      _logging.error('  - 에러 메시지: $e');
+      _logging.error('  - 경로: ${program.path}');
+      _logging.error('  - 스택트레이스: $stackTrace');
       return false;
     }
   }

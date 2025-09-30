@@ -9,7 +9,7 @@ import '../../models/recording_profile.dart';
 
 enum RetentionOption { forever, week, month, threeMonths, sixMonths, year }
 
-enum AdvancedSettingSection { audioQuality, vad, retention, autoLaunch }
+enum AdvancedSettingSection { audioQuality, vad, retention }
 
 class AdvancedSettingsDialog extends StatefulWidget {
   const AdvancedSettingsDialog({super.key, required this.section});
@@ -137,10 +137,6 @@ class _AdvancedSettingsDialogState extends State<AdvancedSettingsDialog> {
       AdvancedSettingSection.retention => (
           '녹음 파일 보관 기간',
           '선택한 기간이 지나면 녹음 파일을 자동으로 정리합니다.'
-        ),
-      AdvancedSettingSection.autoLaunch => (
-          'Windows 자동 실행',
-          '로그인 시 앱을 자동으로 실행할지 여부를 설정합니다.'
         ),
     };
 
@@ -355,22 +351,6 @@ class _AdvancedSettingsDialogState extends State<AdvancedSettingsDialog> {
                 },
               );
             }).toList(),
-          ),
-        );
-      case AdvancedSettingSection.autoLaunch:
-        return _SettingsCard(
-          icon: Icons.play_circle,
-          title: 'Windows 로그인 시 자동 실행',
-          description:
-              'Windows 로그인 시 앱을 자동으로 실행합니다. 만약 자동 실행이 동작하지 않으면 Windows 설정 > 앱 > 시작 프로그램에서 “Eyebottle Medical Recorder” 항목을 켜고, 조직 정책으로 차단된 경우 IT 담당자에게 예외 설정을 요청하세요.',
-          child: SwitchListTile.adaptive(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('자동 실행 사용'),
-            subtitle: const Text(
-              '로그인 후 자동 실행이 되지 않으면 Windows 시작 프로그램 설정에서 항목을 활성화하거나 IT 담당자에게 예외 승인을 요청하세요.',
-            ),
-            value: _launchAtStartup,
-            onChanged: (v) => setState(() => _launchAtStartup = v),
           ),
         );
     }

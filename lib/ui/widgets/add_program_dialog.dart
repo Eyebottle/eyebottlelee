@@ -115,13 +115,14 @@ class _AddProgramDialogState extends State<AddProgramDialog> {
       final success = await _launchService.testLaunchProgram(program);
       if (mounted) {
         final message = success
-            ? '프로그램이 성공적으로 실행되었습니다.'
-            : '프로그램 실행에 실패했습니다. 경로와 권한을 확인해주세요.';
+            ? '✅ 프로그램이 성공적으로 실행되었습니다.\n경로: ${program.path}'
+            : '❌ 프로그램 실행에 실패했습니다.\n경로: ${program.path}\n\n로그 파일을 확인하세요:\nC:\\Users\\<사용자명>\\Documents\\EyebottleRecorder\\logs\\';
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(message),
             backgroundColor: success ? Colors.green : Colors.red,
+            duration: success ? const Duration(seconds: 3) : const Duration(seconds: 5),
           ),
         );
       }
@@ -129,8 +130,9 @@ class _AddProgramDialogState extends State<AddProgramDialog> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('테스트 실행 중 오류가 발생했습니다: $e'),
+            content: Text('테스트 실행 중 오류가 발생했습니다:\n${e.toString()}\n\n경로: ${program.path}'),
             backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
           ),
         );
       }
@@ -183,7 +185,7 @@ class _AddProgramDialogState extends State<AddProgramDialog> {
         width: 500,
         constraints: const BoxConstraints(maxHeight: 700),
         child: Padding(
-          padding: AppPadding.lg,
+          padding: const EdgeInsets.all(AppSpacing.lg),
           child: Form(
             key: _formKey,
             child: Column(
@@ -191,24 +193,24 @@ class _AddProgramDialogState extends State<AddProgramDialog> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildHeader(),
-                AppSpacing.md.vertical,
+                const SizedBox(height: AppSpacing.md),
                 Flexible(
                   child: SingleChildScrollView(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         _buildBasicSettings(),
-                        AppSpacing.lg.vertical,
+                        const SizedBox(height: AppSpacing.lg),
                         _buildAdvancedToggle(),
                         if (_showAdvanced) ...[
-                          AppSpacing.md.vertical,
+                          const SizedBox(height: AppSpacing.md),
                           _buildAdvancedSettings(),
                         ],
                       ],
                     ),
                   ),
                 ),
-                AppSpacing.lg.vertical,
+                const SizedBox(height: AppSpacing.lg),
                 _buildActions(),
               ],
             ),
@@ -226,7 +228,7 @@ class _AddProgramDialogState extends State<AddProgramDialog> {
           size: 24,
           color: Theme.of(context).primaryColor,
         ),
-        AppSpacing.sm.horizontal,
+        const SizedBox(width: AppSpacing.sm),
         Text(
           _isEditing ? '프로그램 편집' : '프로그램 추가',
           style: const TextStyle(
@@ -255,7 +257,7 @@ class _AddProgramDialogState extends State<AddProgramDialog> {
             fontWeight: FontWeight.w600,
           ),
         ),
-        AppSpacing.sm.vertical,
+        const SizedBox(height: AppSpacing.sm),
         Row(
           children: [
             Expanded(
@@ -273,7 +275,7 @@ class _AddProgramDialogState extends State<AddProgramDialog> {
                 },
               ),
             ),
-            AppSpacing.sm.horizontal,
+            const SizedBox(width: AppSpacing.sm),
             OutlinedButton(
               onPressed: _selectFile,
               child: const Text('찾기'),
@@ -281,7 +283,7 @@ class _AddProgramDialogState extends State<AddProgramDialog> {
           ],
         ),
 
-        AppSpacing.md.vertical,
+        const SizedBox(height: AppSpacing.md),
 
         // 프로그램 이름
         const Text(
@@ -291,7 +293,7 @@ class _AddProgramDialogState extends State<AddProgramDialog> {
             fontWeight: FontWeight.w600,
           ),
         ),
-        AppSpacing.sm.vertical,
+        const SizedBox(height: AppSpacing.sm),
         TextFormField(
           controller: _nameController,
           decoration: const InputDecoration(
@@ -306,7 +308,7 @@ class _AddProgramDialogState extends State<AddProgramDialog> {
           },
         ),
 
-        AppSpacing.md.vertical,
+        const SizedBox(height: AppSpacing.md),
 
         // 지연 시간
         const Text(
@@ -316,7 +318,7 @@ class _AddProgramDialogState extends State<AddProgramDialog> {
             fontWeight: FontWeight.w600,
           ),
         ),
-        AppSpacing.sm.vertical,
+        const SizedBox(height: AppSpacing.sm),
         Row(
           children: [
             Expanded(
@@ -351,7 +353,7 @@ class _AddProgramDialogState extends State<AddProgramDialog> {
           ),
         ),
 
-        AppSpacing.md.vertical,
+        const SizedBox(height: AppSpacing.md),
 
         // 활성화 상태
         SwitchListTile(
@@ -381,7 +383,7 @@ class _AddProgramDialogState extends State<AddProgramDialog> {
             _showAdvanced ? Icons.expand_less : Icons.expand_more,
             color: Theme.of(context).primaryColor,
           ),
-          AppSpacing.sm.horizontal,
+          const SizedBox(width: AppSpacing.sm),
           Text(
             '고급 설정',
             style: TextStyle(
@@ -407,7 +409,7 @@ class _AddProgramDialogState extends State<AddProgramDialog> {
             fontWeight: FontWeight.w600,
           ),
         ),
-        AppSpacing.sm.vertical,
+        const SizedBox(height: AppSpacing.sm),
         TextFormField(
           controller: _argumentsController,
           decoration: const InputDecoration(
@@ -415,7 +417,7 @@ class _AddProgramDialogState extends State<AddProgramDialog> {
             border: OutlineInputBorder(),
           ),
         ),
-        AppSpacing.xs.vertical,
+        const SizedBox(height: AppSpacing.xs),
         Text(
           '프로그램 실행 시 전달할 명령줄 인수를 입력하세요 (공백으로 구분)',
           style: TextStyle(
@@ -424,7 +426,7 @@ class _AddProgramDialogState extends State<AddProgramDialog> {
           ),
         ),
 
-        AppSpacing.md.vertical,
+        const SizedBox(height: AppSpacing.md),
 
         // 작업 디렉터리
         const Text(
@@ -434,7 +436,7 @@ class _AddProgramDialogState extends State<AddProgramDialog> {
             fontWeight: FontWeight.w600,
           ),
         ),
-        AppSpacing.sm.vertical,
+        const SizedBox(height: AppSpacing.sm),
         Row(
           children: [
             Expanded(
@@ -446,7 +448,7 @@ class _AddProgramDialogState extends State<AddProgramDialog> {
                 ),
               ),
             ),
-            AppSpacing.sm.horizontal,
+            const SizedBox(width: AppSpacing.sm),
             OutlinedButton(
               onPressed: _selectWorkingDirectory,
               child: const Text('찾기'),
@@ -454,7 +456,7 @@ class _AddProgramDialogState extends State<AddProgramDialog> {
           ],
         ),
 
-        AppSpacing.md.vertical,
+        const SizedBox(height: AppSpacing.md),
 
         // 창 상태
         const Text(
@@ -464,7 +466,7 @@ class _AddProgramDialogState extends State<AddProgramDialog> {
             fontWeight: FontWeight.w600,
           ),
         ),
-        AppSpacing.sm.vertical,
+        const SizedBox(height: AppSpacing.sm),
         DropdownButtonFormField<WindowState>(
           value: _windowState,
           decoration: const InputDecoration(
@@ -515,7 +517,7 @@ class _AddProgramDialogState extends State<AddProgramDialog> {
           onPressed: () => Navigator.of(context).pop(),
           child: const Text('취소'),
         ),
-        AppSpacing.sm.horizontal,
+        const SizedBox(width: AppSpacing.sm),
         ElevatedButton(
           onPressed: _save,
           child: Text(_isEditing ? '수정' : '추가'),

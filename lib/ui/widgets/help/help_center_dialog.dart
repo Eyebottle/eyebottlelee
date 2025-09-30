@@ -8,6 +8,7 @@ class HelpCenterDialog {
     BuildContext context, {
     VoidCallback? onStartDashboardTutorial,
     VoidCallback? onStartSettingsTutorial,
+    VoidCallback? onStartAutoLaunchTutorial,
   }) {
     return showDialog(
       context: context,
@@ -29,6 +30,7 @@ class HelpCenterDialog {
                     child: _HelpContent(
                       onStartDashboardTutorial: onStartDashboardTutorial,
                       onStartSettingsTutorial: onStartSettingsTutorial,
+                      onStartAutoLaunchTutorial: onStartAutoLaunchTutorial,
                     ),
                   ),
                 ),
@@ -89,10 +91,12 @@ class _HelpContent extends StatelessWidget {
   const _HelpContent({
     this.onStartDashboardTutorial,
     this.onStartSettingsTutorial,
+    this.onStartAutoLaunchTutorial,
   });
 
   final VoidCallback? onStartDashboardTutorial;
   final VoidCallback? onStartSettingsTutorial;
+  final VoidCallback? onStartAutoLaunchTutorial;
 
   @override
   Widget build(BuildContext context) {
@@ -145,8 +149,24 @@ class _HelpContent extends StatelessWidget {
           ],
         ),
         HelpSection(
+          icon: Icons.rocket_launch,
+          title: '4. 자동 실행 매니저',
+          description:
+              '자주 사용하는 프로그램들(EMR, 문서 등)을 앱 시작 시 자동으로 실행합니다. 프로그램 추가 후 순서와 대기 시간을 조정할 수 있습니다.',
+          actions: [
+            if (onStartAutoLaunchTutorial != null)
+              FilledButton.tonal(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  onStartAutoLaunchTutorial!();
+                },
+                child: const Text('자동 실행 튜토리얼'),
+              ),
+          ],
+        ),
+        HelpSection(
           icon: Icons.mic_external_on,
-          title: '4. 마이크 점검',
+          title: '5. 마이크 점검',
           description:
               '앱 시작 시 자동으로 3초 샘플을 녹음해 입력 레벨을 확인합니다. 정상 기준은 RMS 0.04 이상입니다.',
           actions: [
@@ -158,13 +178,13 @@ class _HelpContent extends StatelessWidget {
         ),
         HelpSection(
           icon: Icons.system_update_alt,
-          title: '5. 시스템 트레이',
+          title: '6. 시스템 트레이',
           description:
               '창을 닫아도 앱은 트레이에서 계속 실행됩니다. 좌/더블 클릭으로 창을 복원하고, 우클릭 메뉴로 녹음 토글·마이크 점검·설정·종료를 실행하세요.',
         ),
         HelpSection(
           icon: Icons.help_outline,
-          title: '6. 문제 해결 & FAQ',
+          title: '7. 문제 해결 & FAQ',
           description:
               '마이크 권한, 자동 시작, 스케줄 적용 문제는 사용자 가이드의 FAQ 섹션에서 확인할 수 있습니다.',
           actions: [

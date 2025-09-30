@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:showcaseview/showcaseview.dart';
 
 import '../../models/launch_program.dart';
 import '../../models/launch_manager_settings.dart';
@@ -8,7 +9,18 @@ import 'app_section_card.dart';
 import 'add_program_dialog.dart';
 
 class LaunchManagerWidget extends StatefulWidget {
-  const LaunchManagerWidget({super.key});
+  const LaunchManagerWidget({
+    super.key,
+    this.onAutoLaunchChanged,
+    this.switchShowcaseKey,
+    this.addButtonShowcaseKey,
+    this.testButtonShowcaseKey,
+  });
+
+  final void Function(bool enabled)? onAutoLaunchChanged;
+  final GlobalKey? switchShowcaseKey;
+  final GlobalKey? addButtonShowcaseKey;
+  final GlobalKey? testButtonShowcaseKey;
 
   @override
   State<LaunchManagerWidget> createState() => _LaunchManagerWidgetState();
@@ -76,6 +88,7 @@ class _LaunchManagerWidgetState extends State<LaunchManagerWidget> {
       _settings = _settings.copyWith(autoLaunchEnabled: enabled);
     });
     _saveSettings();
+    widget.onAutoLaunchChanged?.call(enabled);
   }
 
   void _toggleProgramEnabled(String programId, bool enabled) {
@@ -177,9 +190,9 @@ class _LaunchManagerWidgetState extends State<LaunchManagerWidget> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildHeader(),
-          AppSpacing.md.vertical,
+          const SizedBox(height: AppSpacing.md),
           _buildProgramList(),
-          AppSpacing.lg.vertical,
+          const SizedBox(height: AppSpacing.lg),
           _buildActionButtons(),
         ],
       ),
@@ -187,38 +200,72 @@ class _LaunchManagerWidgetState extends State<LaunchManagerWidget> {
   }
 
   Widget _buildHeader() {
+    Widget switchWidget = Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: _settings.autoLaunchEnabled
+            ? const Color(0xFF1193D4).withAlpha((0.08 * 255).round())
+            : Colors.grey.withAlpha((0.05 * 255).round()),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: _settings.autoLaunchEnabled
+              ? const Color(0xFF1193D4).withAlpha((0.2 * 255).round())
+              : Colors.grey.withAlpha((0.2 * 255).round()),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.power_settings_new,
+            size: 24,
+            color: _settings.autoLaunchEnabled
+                ? const Color(0xFF1193D4)
+                : Colors.grey[600],
+          ),
+          const SizedBox(width: AppSpacing.md),
+          const Text(
+            '자동 실행',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const Spacer(),
+          Text(
+            _settings.autoLaunchEnabled ? '켜짐' : '꺼짐',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: _settings.autoLaunchEnabled
+                  ? const Color(0xFF2E7D32)
+                  : Colors.grey[600],
+            ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Switch(
+            value: _settings.autoLaunchEnabled,
+            onChanged: _isExecuting ? null : _toggleAutoLaunch,
+          ),
+        ],
+      ),
+    );
+
+    if (widget.switchShowcaseKey != null) {
+      switchWidget = Showcase(
+        key: widget.switchShowcaseKey!,
+        description: '자동 실행을 켜면 앱 시작 시 등록된 프로그램들이 순차적으로 실행됩니다.',
+        child: switchWidget,
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            const Icon(Icons.rocket_launch, size: 24),
-            AppSpacing.sm.horizontal,
-            const Text(
-              '자동 실행 매니저',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const Spacer(),
-            Switch(
-              value: _settings.autoLaunchEnabled,
-              onChanged: _isExecuting ? null : _toggleAutoLaunch,
-            ),
-          ],
-        ),
-        AppSpacing.sm.vertical,
-        Text(
-          '진료실에서 자주 사용하는 프로그램들을 자동으로 실행합니다.',
-          style: TextStyle(
-            color: Colors.grey[600],
-            fontSize: 14,
-          ),
-        ),
+        switchWidget,
         if (_settings.autoLaunchEnabled && _settings.enabledPrograms.isNotEmpty)
           Padding(
-            padding: AppPadding.sm.copyWith(left: 0),
+            padding: const EdgeInsets.only(top: AppSpacing.md),
             child: Text(
               '총 ${_settings.enabledPrograms.length}개 프로그램이 자동 실행됩니다.',
               style: TextStyle(
@@ -247,7 +294,7 @@ class _LaunchManagerWidgetState extends State<LaunchManagerWidget> {
             fontWeight: FontWeight.w600,
           ),
         ),
-        AppSpacing.sm.vertical,
+        const SizedBox(height: AppSpacing.sm),
         Container(
           decoration: BoxDecoration(
             border: Border.all(color: Colors.grey[300]!),
@@ -287,7 +334,7 @@ class _LaunchManagerWidgetState extends State<LaunchManagerWidget> {
                 fontWeight: FontWeight.w500,
               ),
             ),
-            AppSpacing.sm.horizontal,
+            const SizedBox(width: AppSpacing.sm),
             Icon(
               isValid ? Icons.computer : Icons.error,
               color: isValid ? Colors.blue : Colors.red,
@@ -361,7 +408,7 @@ class _LaunchManagerWidgetState extends State<LaunchManagerWidget> {
 
   Widget _buildEmptyState() {
     return Container(
-      padding: AppPadding.lg,
+      padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
         border: Border.all(color: Colors.grey[300]!),
         borderRadius: BorderRadius.circular(8),
@@ -373,7 +420,7 @@ class _LaunchManagerWidgetState extends State<LaunchManagerWidget> {
             size: 48,
             color: Colors.grey[400],
           ),
-          AppSpacing.md.vertical,
+          const SizedBox(height: AppSpacing.md),
           Text(
             '등록된 프로그램이 없습니다',
             style: TextStyle(
@@ -382,7 +429,7 @@ class _LaunchManagerWidgetState extends State<LaunchManagerWidget> {
               color: Colors.grey[600],
             ),
           ),
-          AppSpacing.sm.vertical,
+          const SizedBox(height: AppSpacing.sm),
           Text(
             '자주 사용하는 프로그램을 추가해보세요',
             style: TextStyle(
@@ -396,27 +443,47 @@ class _LaunchManagerWidgetState extends State<LaunchManagerWidget> {
   }
 
   Widget _buildActionButtons() {
+    Widget addButton = ElevatedButton.icon(
+      onPressed: _isExecuting ? null : _addProgram,
+      icon: const Icon(Icons.add),
+      label: const Text('프로그램 추가'),
+    );
+
+    if (widget.addButtonShowcaseKey != null) {
+      addButton = Showcase(
+        key: widget.addButtonShowcaseKey!,
+        description: '프로그램 추가 버튼을 누르면 실행 파일을 선택하고 대기 시간을 설정할 수 있습니다. 추가 후 드래그로 실행 순서를 조정하세요.',
+        child: addButton,
+      );
+    }
+
+    Widget testButton = OutlinedButton.icon(
+      onPressed: _isExecuting || _settings.enabledPrograms.isEmpty
+          ? null
+          : _testExecution,
+      icon: _isExecuting
+          ? const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : const Icon(Icons.play_arrow),
+      label: Text(_isExecuting ? '실행 중...' : '테스트 실행'),
+    );
+
+    if (widget.testButtonShowcaseKey != null) {
+      testButton = Showcase(
+        key: widget.testButtonShowcaseKey!,
+        description: '등록한 프로그램들이 제대로 실행되는지 테스트해볼 수 있습니다.',
+        child: testButton,
+      );
+    }
+
     return Row(
       children: [
-        ElevatedButton.icon(
-          onPressed: _isExecuting ? null : _addProgram,
-          icon: const Icon(Icons.add),
-          label: const Text('프로그램 추가'),
-        ),
-        AppSpacing.md.horizontal,
-        OutlinedButton.icon(
-          onPressed: _isExecuting || _settings.enabledPrograms.isEmpty
-              ? null
-              : _testExecution,
-          icon: _isExecuting
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Icon(Icons.play_arrow),
-          label: Text(_isExecuting ? '실행 중...' : '테스트 실행'),
-        ),
+        addButton,
+        const SizedBox(width: AppSpacing.md),
+        testButton,
       ],
     );
   }
