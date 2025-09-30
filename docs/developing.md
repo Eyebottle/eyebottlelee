@@ -1,16 +1,16 @@
-# Developing Guide (아이보틀 진료 녹음)
+# Developing Guide (아이보틀 진료녹음 & 자동실행 매니저)
 
 문서 목적: 이 저장소를 처음 받는 개발자가 현재까지의 구현 상태를 빠르게 파악하고, 동일한 방향으로 다음 작업을 이어갈 수 있도록 돕습니다.
 
 - 대상: Windows 데스크톱용 Flutter 앱 개발(WSL 파일시스템 + Windows 툴체인)
-- 마지막 갱신: 2025-09-25
-- 참고: [제품 요구사항 PRD](medical-recording-prd.md)
+- 마지막 갱신: 2025-09-30
+- 참고: [제품 요구사항 PRD](medical-recording-prd.md), [자동 실행 매니저 PRD](auto-lancher-prd.md)
 
 ---
 
 ## 1) 개요
-- 제품: 아이보틀 진료 녹음(Eyebottle Medical Recorder)
-- 목표: 진료 시간표 기반 자동 녹음, 10분 분할 저장, OneDrive 폴더 동기화, 무음(VAD) 스킵으로 용량 절감
+- 제품: 아이보틀 진료녹음 & 자동실행 매니저 (Eyebottle Medical Recorder & Auto Launch Manager)
+- 목표: 진료 시간표 기반 자동 녹음, 10분 분할 저장, OneDrive 폴더 동기화, 무음(VAD) 스킵으로 용량 절감, 진료실 프로그램 자동 실행
 - 스택: Flutter 3.24+ / Dart 3+, Windows Desktop, 주요 패키지 `record`, `path_provider`, `shared_preferences`, `cron`, `system_tray`, `window_manager`, `launch_at_startup`, `file_selector`
 
 ---
@@ -50,10 +50,45 @@
   - `SharedPreferences`에 마지막 검사 결과와 안내 문구를 저장해 재시작 후에도 상태를 바로 보여줌
   - 대시보드에서 "다시 점검" 버튼으로 수동 진단 가능하며, 녹음 중에는 점검을 제한해 충돌을 방지
 - UI/설정 다이얼로그
-  - 메인 화면은 `대시보드 / 설정` 탭 구조로 개편되어 상단 헤더, 실시간 볼륨 막대, 오늘/예정 녹음 요약을 한 화면에서 확인
-  - “진료 시간표 설정” 다이얼로그 저장 → 스케줄 즉시 재적용
-  - “고급 설정” 다이얼로그(녹음 품질·메이크업 게인, VAD 토글/임계값, Windows 자동 시작, 녹음 파일 보관 기간)
+  - 메인 화면은 `녹음 대시보드 / 녹음 설정 / 자동 실행` 3탭 구조로 개편
+    - 녹음 대시보드: 상단 헤더, 실시간 볼륨 막대, 오늘/예정 녹음 요약, 마이크 진단 카드, 저장 경로 카드
+    - 녹음 설정: 진료 시간표, 저장 폴더, 보관 기간, 녹음 품질·민감도, VAD 설정 카드
+    - 자동 실행: 프로그램 자동 실행 매니저 (ON/OFF 상태가 탭 레이블에 표시됨)
+  - "진료 시간표 설정" 다이얼로그 저장 → 스케줄 즉시 재적용
+  - "고급 설정" 다이얼로그(녹음 품질·메이크업 게인, VAD 토글/임계값, 녹음 파일 보관 기간)
   - 대시보드 하단 카드에서 현재 저장 경로 및 자동 정리 정책 안내
+
+### 2025-09-30 주요 업데이트 - 자동 실행 매니저 구현
+- **신규 기능**: 프로그램 자동 실행 매니저를 독립 탭으로 추가
+  - **실행 시점**: 앱 시작 시 EMR, PACS 뷰어, 문서, URL 등을 순차적으로 자동 실행
+  - **프로그램 관리**:
+    - 파일 선택 다이얼로그를 통한 실행 파일(.exe), 문서, URL 등록
+    - 프로그램명, 실행 경로, 대기 시간(초) 설정
+    - 드래그 핸들(⋮⋮)로 실행 순서 변경
+    - 개별 프로그램 활성화/비활성화 스위치
+    - 편집(연필 아이콘) 및 삭제(휴지통 아이콘) 버튼
+  - **UI 기능**:
+    - 파일 유효성 검증 (경로 오류 시 빨간색 경고 아이콘 + 메시지 표시)
+    - 실행 중 UI 상태 변화 (버튼 비활성화, 로딩 표시, 진행 상태 스낵바)
+    - 테스트 실행 버튼으로 설정 즉시 검증
+    - 탭 레이블에 자동 실행 ON/OFF 상태 실시간 표시
+  - **독립 탭 구조**: 메인 화면 3번째 탭으로 분리, 설정이 아닌 핵심 기능으로 배치
+
+- **구현 파일**:
+  - `lib/models/launch_program.dart`: 프로그램 설정 모델 (id, name, path, delaySeconds, enabled)
+  - `lib/models/launch_manager_settings.dart`: 자동 실행 매니저 설정 모델 (autoLaunchEnabled, programs)
+  - `lib/services/auto_launch_manager_service.dart`: 프로그램 순차 실행 엔진, Stream 기반 진행 상황 추적
+  - `lib/ui/widgets/launch_manager_widget.dart`: 메인 관리 UI, 드래그 앤 드롭, 상태 표시
+  - `lib/ui/widgets/add_program_dialog.dart`: 프로그램 추가/편집 다이얼로그 (파일 선택, 이름/대기시간 입력)
+  - `lib/services/settings_service.dart`: SharedPreferences 기반 설정 영속화 확장
+
+- **주요 기술적 구현**:
+  - `Process.start` 기반 프로그램 실행 (detached mode로 부모 프로세스와 독립)
+  - `cmd /c start` 사용한 Windows 기본 프로그램 연결 (문서는 연결된 앱으로 자동 열림)
+  - Stream 기반 실행 진행 상황 추적 (LaunchProgress 모델)
+  - JSON 직렬화/역직렬화를 통한 설정 영속화
+  - 파일 존재 여부 검증 (`File(path).existsSync()`) 및 UI 경고 표시
+  - ReorderableListView로 드래그 앤 드롭 순서 변경 구현
 
 ### 2025-09-25 주요 업데이트
 ### 2025-09-27 진료실 배포 테스트 진행 중
@@ -136,16 +171,21 @@ lib/
 │  ├─ schedule_service.dart                  # 주간 스케줄 → cron 작업 등록
 │  ├─ settings_service.dart                  # SharedPreferences 저장/로드
 │  ├─ tray_service.dart                      # 시스템 트레이 연동(가드)
-│  └─ logging_service.dart                   # logger 기반 파일 로깅/에러 알림
+│  ├─ logging_service.dart                   # logger 기반 파일 로깅/에러 알림
+│  └─ auto_launch_manager_service.dart       # 프로그램 자동 실행 매니저
 ├─ models/
-│  └─ schedule_model.dart                    # WeeklySchedule/DaySchedule
+│  ├─ schedule_model.dart                    # WeeklySchedule/DaySchedule
+│  ├─ launch_program.dart                    # 실행 프로그램 설정 모델
+│  └─ launch_manager_settings.dart           # 자동 실행 매니저 설정
 └─ ui/
    ├─ screens/main_screen.dart               # 메인 화면: 상태/버튼/설정 진입
    └─ widgets/
       ├─ recording_status_widget.dart
       ├─ volume_meter_widget.dart
       ├─ schedule_config_widget.dart         # 시간표 편집/저장
-      └─ advanced_settings_dialog.dart       # VAD/자동 시작 설정
+      ├─ advanced_settings_dialog.dart       # VAD/자동 시작 설정
+      ├─ launch_manager_widget.dart          # 자동 실행 매니저 메인 UI
+      └─ add_program_dialog.dart             # 프로그램 추가/편집 다이얼로그
 ```
 
 주요 동작 파라미터

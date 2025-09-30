@@ -1,23 +1,37 @@
-# 아이보틀 진료 녹음 (Eyebottle Medical Recorder)
+# 아이보틀 진료녹음 & 자동실행 매니저 (Eyebottle Medical Recorder)
 
-진료 중 환자와의 대화를 자동으로 녹음하고 체계적으로 관리하는 Windows 데스크톱 애플리케이션입니다.
+진료 중 환자와의 대화를 자동으로 녹음하고, 진료실 프로그램을 자동으로 실행하여 체계적으로 관리하는 Windows 데스크톱 애플리케이션입니다.
 
 ## 🚀 주요 기능
 
+### 녹음 기능
 - **자동 녹음**: 진료 시간표 기반 완전 자동화 녹음 및 시작/종료 동기화
 - **스마트 분할**: 10분 단위 자동 파일 분할, 날짜별 폴더 정리
 - **VAD 지원**: 무음 구간 자동 감지 및 스킵, 민감도 조절 가능
 - **녹음 품질 프리셋**: 64/48/32kbps AAC-LC 프로필과 조용한 환경용 메이크업 게인(+0~12dB) 제공
 - **OneDrive 동기화**: 개인 OneDrive 폴더 자동 백업 + 보관 기간 관리
-- **시스템 트레이**: 닫아도 백그라운드 유지, 아이콘 좌/우클릭 메뉴로 녹음 토글·마이크 점검·설정·종료 제어
-- **자동 마이크 점검**: 앱 시작 시 3초 샘플로 장치/권한/입력 레벨 검사
-- **도움말 & 튜토리얼**: 앱 내 도움말 다이얼로그와 쇼케이스 가이드로 바로 사용법 익히기
+- **자동 마이크 점검**: 앱 시작 시 3초 샘플로 장치/권한/입력 레벨 검사 (RMS 0.04 기준)
+
+### 자동 실행 매니저 (신규 ✨)
+- **앱 시작 시 프로그램 자동 실행**: EMR, PACS 뷰어, 진단 장비, 문서 등을 순차적으로 자동 실행
+- **다양한 파일 지원**: 실행 파일(.exe), 문서(Office, PDF 등), URL 등록 가능
+- **실행 순서 조정**: 드래그 핸들(⋮⋮)로 쉬운 순서 변경
+- **개별 제어**: 프로그램별 활성화/비활성화, 편집, 삭제 기능
+- **대기 시간 설정**: 프로그램 간 로딩 시간 확보용 대기 시간(초) 개별 설정
+- **파일 유효성 검증**: 경로 오류 시 즉시 알림 (빨간색 경고 아이콘)
+- **테스트 실행**: 설정 완료 후 바로 동작 확인 가능
+
+### 사용자 경험
+- **3탭 구조**: 녹음 대시보드 / 녹음 설정 / 자동 실행 (ON/OFF 상태 실시간 표시)
+- **시스템 트레이**: 닫아도 백그라운드 유지, 우클릭 메뉴로 녹음 토글·마이크 점검·설정·종료 제어
+- **도움말 & 튜토리얼**: 앱 내 도움말 다이얼로그와 3개 쇼케이스 튜토리얼 (대시보드/설정/자동실행)
 
 ## 📚 문서
 
 - 개발 가이드: [docs/developing.md](docs/developing.md)
 - 사용자 가이드: [docs/user-guide.md](docs/user-guide.md)
 - 제품 요구사항(PRD): [docs/medical-recording-prd.md](docs/medical-recording-prd.md)
+- 자동 실행 매니저 PRD: [docs/auto-lancher-prd.md](docs/auto-lancher-prd.md)
 - WSL ↔ Windows 동기화 가이드: [docs/sync-workflow.md](docs/sync-workflow.md)
 
 ## 🛠 개발 환경 설정
@@ -147,41 +161,66 @@ dart run msix:create
 - OneDrive 동기화 폴더 선택 권장
 - 기본 경로: `%USERPROFILE%\OneDrive\진료녹음`
 
-### 3. 시스템 트레이 설정
-- 창을 닫아도 앱은 트레이로 숨겨져 녹음을 지속합니다.
+### 3. 자동 실행 매니저 설정 (신규 ✨)
+- 메인 화면 → **자동 실행 탭** 선택
+- **자동 실행 스위치**: 상단 스위치를 켜면 앱 시작 시 등록된 프로그램들이 자동 실행됩니다
+- **프로그램 추가**:
+  1. "프로그램 추가" 버튼 클릭
+  2. "찾아보기"로 실행 파일(.exe), 문서, URL 선택
+  3. 프로그램명과 대기 시간(초) 입력
+  4. "추가" 버튼으로 등록
+- **프로그램 관리**:
+  - 드래그 핸들(⋮⋮)을 잡고 드래그하여 실행 순서 변경
+  - 각 프로그램 우측 스위치로 개별 활성화/비활성화
+  - 연필 아이콘으로 편집, 휴지통 아이콘으로 삭제
+  - 파일 경로 오류 시 빨간색 경고 아이콘 표시
+- **테스트 실행**: "테스트 실행" 버튼으로 설정 즉시 검증 가능
+
+### 4. 시스템 트레이 사용
+- 창을 닫아도 앱은 트레이로 숨겨져 녹음을 지속합니다
 - 아이콘 좌/더블클릭: 메인 창 복원, 우클릭: 컨텍스트 메뉴 표시
-- 메뉴 항목
+- 메뉴 항목:
   - **녹음 시작/중지**: 현재 상태에 따라 토글
   - **마이크 점검**: 3초 샘플로 장치/입력 레벨 재검사
+  - **도움말**: 도움말 다이얼로그 열기 (튜토리얼 포함)
   - **설정 열기**: 메인 창의 설정 탭으로 이동
   - **종료**: 녹음을 안전하게 중지하고 앱 종료
-- Windows 시작 시 자동 실행 토글은 고급 설정에서 제어하며, 앱 부팅 시 저장된 설정과 동기화됩니다.
 
 ## 📂 프로젝트 구조
 
 ```
 lib/
-├── main.dart                    # 앱 진입점
+├── main.dart                    # 앱 진입점, 윈도우 초기화
 ├── services/                    # 비즈니스 로직
-│   ├── audio_service.dart       # 오디오 녹음 서비스
-│   ├── schedule_service.dart    # 스케줄링 서비스
-│   ├── tray_service.dart        # 시스템 트레이/메뉴 제어
-│   ├── mic_diagnostics_service.dart # 마이크 상태 진단
-│   ├── settings_service.dart    # SharedPreferences 관리
-│   └── auto_launch_service.dart # Windows 자동 실행 동기화
+│   ├── audio_service.dart       # 녹음/분할/VAD/보관정리
+│   ├── schedule_service.dart    # 주간 스케줄 → cron 작업 등록
+│   ├── tray_service.dart        # 시스템 트레이 연동 (가드)
+│   ├── mic_diagnostics_service.dart # 마이크 입력 레벨 진단 (RMS 기준)
+│   ├── settings_service.dart    # SharedPreferences 저장/로드
+│   ├── logging_service.dart     # logger 기반 파일 로깅/에러 알림
+│   ├── auto_launch_service.dart # Windows 시작프로그램 등록/해제
+│   └── auto_launch_manager_service.dart # 앱 시작 시 프로그램 자동 실행 엔진 (신규)
 ├── models/                      # 데이터 모델
-│   └── schedule_model.dart      # 스케줄 모델
+│   ├── schedule_model.dart      # WeeklySchedule/DaySchedule
+│   ├── launch_program.dart      # 실행 프로그램 설정 모델 (신규)
+│   └── launch_manager_settings.dart # 자동 실행 매니저 설정 (신규)
 ├── ui/                          # 사용자 인터페이스
 │   ├── screens/
-│   │   └── main_screen.dart    # 대시보드/설정 탭
+│   │   └── main_screen.dart    # 3탭 구조 (녹음 대시보드/녹음 설정/자동 실행), 튜토리얼
 │   └── widgets/
-│       ├── animated_volume_meter.dart
-│       ├── advanced_settings_dialog.dart
-│       └── schedule_config_widget.dart
+│       ├── recording_status_widget.dart     # 녹음 상태 카드
+│       ├── animated_volume_meter.dart       # 실시간 볼륨 미터
+│       ├── schedule_config_widget.dart      # 진료 시간표 편집
+│       ├── advanced_settings_dialog.dart    # 품질/VAD/보관 기간 설정
+│       ├── launch_manager_widget.dart       # 자동 실행 매니저 메인 UI (신규)
+│       ├── add_program_dialog.dart          # 프로그램 추가/편집 다이얼로그 (신규)
+│       └── help/
+│           ├── help_center_dialog.dart      # 도움말 & 빠른 시작
+│           └── help_section.dart            # 도움말 섹션 위젯
 └── utils/                       # 유틸리티
 
 windows/                        # Windows 플랫폼 코드
-assets/                         # 리소스 파일
+assets/                         # 리소스 파일 (icons, logos)
 ```
 
 ## 🎯 주요 의존성
