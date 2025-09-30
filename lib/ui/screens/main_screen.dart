@@ -1215,6 +1215,10 @@ class _DashboardTab extends StatelessWidget {
           icon: Icons.check_circle),
       MicDiagnosticStatus.lowInput => _DiagnosticVisuals(
           label: '입력이 약함', color: const Color(0xFFFFA000), icon: Icons.hearing),
+      MicDiagnosticStatus.noSignal => _DiagnosticVisuals(
+          label: '신호 없음',
+          color: const Color(0xFFD32F2F),
+          icon: Icons.mic_off),
       MicDiagnosticStatus.permissionDenied => _DiagnosticVisuals(
           label: '권한 필요', color: const Color(0xFFD32F2F), icon: Icons.lock),
       MicDiagnosticStatus.noInputDevice => _DiagnosticVisuals(
@@ -1236,6 +1240,7 @@ class _DashboardTab extends StatelessWidget {
     return switch (status) {
       MicDiagnosticStatus.ok => '마이크가 정상으로 동작 중입니다.',
       MicDiagnosticStatus.lowInput => '마이크 입력이 거의 감지되지 않습니다.',
+      MicDiagnosticStatus.noSignal => '마이크 신호가 전혀 감지되지 않습니다.',
       MicDiagnosticStatus.permissionDenied => '마이크 권한이 꺼져 있어요.',
       MicDiagnosticStatus.noInputDevice => '사용 가능한 마이크가 연결되지 않았어요.',
       MicDiagnosticStatus.recorderBusy => '녹음이 진행 중이라 점검을 잠시 중단했어요.',
@@ -1249,8 +1254,10 @@ class _DashboardTab extends StatelessWidget {
     String? originalMessage,
   ) {
     return switch (status) {
-      MicDiagnosticStatus.ok => '필요 시 “다시 점검”으로 상태를 재확인할 수 있어요.',
+      MicDiagnosticStatus.ok => '필요 시 "다시 점검"으로 상태를 재확인할 수 있어요.',
       MicDiagnosticStatus.lowInput => '마이크 위치나 입력 볼륨을 조정한 뒤 다시 점검해 주세요.',
+      MicDiagnosticStatus.noSignal =>
+        '마이크가 PC에 제대로 연결되어 있는지 확인해 주세요.',
       MicDiagnosticStatus.permissionDenied =>
         'Windows 설정 > 개인정보 보호 > 마이크에서 권한을 허용해주세요.',
       MicDiagnosticStatus.noInputDevice =>
@@ -1275,9 +1282,13 @@ class _DashboardTab extends StatelessWidget {
           '마이크와의 거리를 한 뼘 안쪽으로 조정하세요.',
           'Windows 입력 볼륨을 70% 이상으로 맞춰 주세요.'
         ],
+      MicDiagnosticStatus.noSignal => [
+          '마이크 케이블이 PC에 제대로 꽂혀 있는지 확인하세요.',
+          'USB 마이크라면 다른 포트에 연결해보세요.'
+        ],
       MicDiagnosticStatus.permissionDenied => [
           'Windows 설정 > 개인정보 보호 > 마이크에서 권한을 허용하세요.',
-          '앱 목록에서 “아이보틀 진료 녹음”을 켭니다.'
+          '앱 목록에서 "아이보틀 진료 녹음"을 켭니다.'
         ],
       MicDiagnosticStatus.noInputDevice => [
           'USB·블루투스 케이블 연결을 확인하세요.',

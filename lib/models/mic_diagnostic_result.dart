@@ -3,6 +3,7 @@ import 'dart:convert';
 enum MicDiagnosticStatus {
   ok,
   lowInput,
+  noSignal,
   permissionDenied,
   noInputDevice,
   recorderBusy,

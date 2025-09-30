@@ -152,6 +152,9 @@ class MicDiagnosticsService {
   static const double _snrToleranceDb = -0.5;
   static const double _minDb = -80.0;
 
+  static const double _noSignalThresholdDb = -70.0;
+  static const double _extremeLowThresholdDb = -60.0;
+
   double _normalizeAmplitude(Amplitude amplitude) {
     double sample = amplitude.current;
     if (sample == 0 && amplitude.max != 0) {
@@ -220,6 +223,30 @@ class MicDiagnosticsService {
     final signalDb = metrics.signalDb;
     final snrDb = metrics.snrDb;
 
+    if (signalDb < _noSignalThresholdDb) {
+      return _DiagnosticDecision(
+        status: MicDiagnosticStatus.noSignal,
+        message: '마이크 신호가 전혀 감지되지 않아요. 마이크가 연결되어 있는지 확인해주세요.',
+        hints: const [
+          '마이크 케이블이 PC에 제대로 꽂혀 있는지 확인',
+          'USB 마이크라면 다른 포트에 연결해보세요',
+          '블루투스 마이크라면 페어링 상태 확인',
+        ],
+      );
+    }
+
+    if (signalDb < _extremeLowThresholdDb) {
+      return _DiagnosticDecision(
+        status: MicDiagnosticStatus.lowInput,
+        message: '소리가 거의 들어오지 않아요. 마이크 음소거 스위치나 볼륨을 확인하세요.',
+        hints: const [
+          '헤드셋 음소거 스위치 해제',
+          'Windows 입력 장치 볼륨을 높여주세요',
+          '마이크를 입 가까이에 두고 말해보세요',
+        ],
+      );
+    }
+
     final quietButClear =
         signalDb >= _quietOkThresholdDb && snrDb >= _quietSnrAllowanceDb;
     final quietButAcceptable =
@@ -252,7 +279,7 @@ class MicDiagnosticsService {
 
     return _DiagnosticDecision(
       status: MicDiagnosticStatus.lowInput,
-      message: '소리가 거의 들어오지 않아요. 마이크 연결이나 음소거 스위치를 확인하세요.',
+      message: '마이크 연결이나 음소거 스위치를 확인하세요.',
       hints: const [
         '마이크 케이블과 연결 상태 확인',
         '헤드셋 음소거 스위치 해제',
