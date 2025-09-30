@@ -1,6 +1,8 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import '../style/app_colors.dart';
+import '../style/app_elevation.dart';
 
 class AnimatedVolumeMeter extends StatelessWidget {
   const AnimatedVolumeMeter({
@@ -16,26 +18,78 @@ class AnimatedVolumeMeter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final bars = _buildBars();
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-            color: theme.colorScheme.outlineVariant
-                .withAlpha((0.4 * 255).round())),
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.surfaceBorder),
+        boxShadow: AppElevation.shadow1,
       ),
-      child: SizedBox(
-        height: maxHeight,
-        child: Align(
-          alignment: Alignment.bottomCenter,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: bars,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // 레벨 표시
+          Row(
+            children: [
+              Icon(
+                Icons.graphic_eq,
+                size: 18,
+                color: AppColors.primary,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '볼륨 레벨',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const Spacer(),
+              _buildLevelIndicator(),
+            ],
           ),
+          const SizedBox(height: 12),
+          // 파형
+          SizedBox(
+            height: maxHeight,
+            child: Align(
+              alignment: Alignment.bottomCenter,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: bars,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLevelIndicator() {
+    final currentLevel = history.isNotEmpty ? history.last : 0.0;
+    final levelText = currentLevel < 0.35
+        ? '낮음'
+        : currentLevel < 0.7
+            ? '적정'
+            : '높음';
+    final levelColor = AppColors.getVolumeColor(currentLevel);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: levelColor.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        levelText,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: levelColor,
         ),
       ),
     );
@@ -75,11 +129,11 @@ class AnimatedVolumeMeter extends StatelessWidget {
 
   Color _colorForValue(double value) {
     if (value < 0.35) {
-      return const Color(0xFF34C759); // green
+      return AppColors.volumeLow;
     } else if (value < 0.7) {
-      return const Color(0xFFFFC107); // amber
+      return AppColors.volumeMedium;
     } else {
-      return const Color(0xFFE53935); // red
+      return AppColors.volumeHigh;
     }
   }
 }

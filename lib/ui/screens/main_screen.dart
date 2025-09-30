@@ -17,15 +17,11 @@ import '../../services/tray_service.dart';
 import '../../services/mic_diagnostics_service.dart';
 import '../widgets/advanced_settings_dialog.dart';
 import '../widgets/animated_volume_meter.dart';
-import '../widgets/schedule_config_widget.dart';
+import '../widgets/schedule/schedule_config_widget_v2.dart';
 import '../widgets/help/help_center_dialog.dart';
 import '../widgets/launch_manager_widget.dart';
 import '../../models/recording_profile.dart';
-
-const _backgroundColor = Color(0xFFF6F7F8);
-const _primaryColor = Color(0xFF1193D4);
-const _textMuted = Color(0xFF4A5860);
-const _cardBorder = Color(0xFFE7EFF3);
+import '../style/app_colors.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -47,15 +43,17 @@ class _MainScreenState extends State<MainScreen>
   final AutoLaunchManagerService _autoLaunchManagerService = AutoLaunchManagerService();
 
   final GlobalKey _tutorialRecordingKey = GlobalKey();
+  final GlobalKey _tutorialDiagnosticKey = GlobalKey();
   final GlobalKey _tutorialScheduleKey = GlobalKey();
   final GlobalKey _tutorialTrayKey = GlobalKey();
   final GlobalKey _settingsScheduleKey = GlobalKey();
   final GlobalKey _settingsSaveKey = GlobalKey();
   final GlobalKey _settingsRetentionKey = GlobalKey();
   final GlobalKey _settingsVadKey = GlobalKey();
-  final GlobalKey _settingsAutoLaunchKey = GlobalKey();
   final GlobalKey _settingsAudioQualityKey = GlobalKey();
-  final GlobalKey _settingsLaunchManagerKey = GlobalKey();
+  final GlobalKey _launchSwitchKey = GlobalKey();
+  final GlobalKey _launchAddButtonKey = GlobalKey();
+  final GlobalKey _launchTestButtonKey = GlobalKey();
 
   late final TabController _tabController;
 
@@ -71,8 +69,8 @@ class _MainScreenState extends State<MainScreen>
   WeeklySchedule? _currentSchedule;
   MicDiagnosticResult? _lastMicDiagnostic;
   bool _micDiagnosticRunning = false;
-  bool? _autoLaunchEnabled;
   bool _vadEnabled = true;
+  bool _autoLaunchEnabled = false;
   Duration? _retentionDuration;
   RecordingQualityProfile _recordingProfile = RecordingQualityProfile.balanced;
   double _makeupGainDb = 0.0;
@@ -84,7 +82,7 @@ class _MainScreenState extends State<MainScreen>
   void initState() {
     super.initState();
     windowManager.addListener(this);
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     _initializeServices();
   }
 
@@ -228,10 +226,10 @@ class _MainScreenState extends State<MainScreen>
       });
     }
 
-    final autoLaunch = await _settings.getLaunchAtStartup();
+    final launchSettings = await AutoLaunchManagerService().loadSettings();
     if (mounted) {
       setState(() {
-        _autoLaunchEnabled = autoLaunch;
+        _autoLaunchEnabled = launchSettings.autoLaunchEnabled;
       });
     }
 
@@ -253,6 +251,7 @@ class _MainScreenState extends State<MainScreen>
             context,
             onStartDashboardTutorial: _startDashboardTutorial,
             onStartSettingsTutorial: _startSettingsTutorial,
+            onStartAutoLaunchTutorial: _startAutoLaunchTutorial,
           );
       await _trayService.setRecordingState(_audioService.isRecording);
     } catch (_) {}
@@ -278,7 +277,7 @@ class _MainScreenState extends State<MainScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _backgroundColor,
+      backgroundColor: AppColors.background,
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
@@ -319,6 +318,7 @@ class _MainScreenState extends State<MainScreen>
                         onStopRecording: () => _stopRecording(),
                         onSyncSchedule: () => _syncRecordingWithSchedule(),
                         recordingShowcaseKey: _tutorialRecordingKey,
+                        diagnosticShowcaseKey: _tutorialDiagnosticKey,
                         scheduleShowcaseKey: _tutorialScheduleKey,
                         trayShowcaseKey: _tutorialTrayKey,
                       ),
@@ -327,22 +327,25 @@ class _MainScreenState extends State<MainScreen>
                         onOpenSaveFolder: () => _showFolderDialog(),
                         onOpenVad: () => _openVadSettings(),
                         onOpenRetention: () => _openRetentionSettings(),
-                        onOpenAutoLaunch: () => _openAutoLaunchSettings(),
-                        onOpenLaunchManager: () => _openLaunchManagerSettings(),
                         onOpenAudioQuality: () => _openAudioQualitySettings(),
                         scheduleShowcaseKey: _settingsScheduleKey,
                         saveFolderShowcaseKey: _settingsSaveKey,
                         retentionShowcaseKey: _settingsRetentionKey,
                         vadShowcaseKey: _settingsVadKey,
-                        autoLaunchShowcaseKey: _settingsAutoLaunchKey,
-                        launchManagerShowcaseKey: _settingsLaunchManagerKey,
                         audioQualityShowcaseKey: _settingsAudioQualityKey,
                         saveFolder: _currentSaveFolder,
                         vadEnabled: _vadEnabled,
-                        autoLaunchEnabled: _autoLaunchEnabled ?? true,
                         retentionDuration: _retentionDuration,
                         recordingProfile: _recordingProfile,
                         makeupGainDb: _makeupGainDb,
+                      ),
+                      _LaunchManagerTab(
+                        onAutoLaunchChanged: (enabled) {
+                          setState(() => _autoLaunchEnabled = enabled);
+                        },
+                        switchShowcaseKey: _launchSwitchKey,
+                        addButtonShowcaseKey: _launchAddButtonKey,
+                        testButtonShowcaseKey: _launchTestButtonKey,
                       ),
                     ],
                   ),
@@ -363,7 +366,7 @@ class _MainScreenState extends State<MainScreen>
           width: 44,
           height: 44,
           decoration: BoxDecoration(
-            color: _primaryColor,
+            color: AppColors.primary,
             borderRadius: BorderRadius.circular(14),
           ),
           child: const Icon(Icons.mic_none, color: Colors.white),
@@ -374,7 +377,7 @@ class _MainScreenState extends State<MainScreen>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                '아이보틀 진료 녹음기',
+                '아이보틀 진료녹음 & 자동실행 매니저',
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w700,
@@ -383,9 +386,9 @@ class _MainScreenState extends State<MainScreen>
               ),
               Text(
                 subtitle,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 13,
-                  color: _textMuted,
+                  color: AppColors.textSecondary,
                 ),
               ),
             ],
@@ -396,10 +399,11 @@ class _MainScreenState extends State<MainScreen>
             context,
             onStartDashboardTutorial: _startDashboardTutorial,
             onStartSettingsTutorial: _startSettingsTutorial,
+            onStartAutoLaunchTutorial: _startAutoLaunchTutorial,
           ),
           icon: const Icon(Icons.menu_book_outlined),
           label: const Text('도움말'),
-          style: TextButton.styleFrom(foregroundColor: _primaryColor),
+          style: TextButton.styleFrom(foregroundColor: AppColors.primary),
         ),
       ],
     );
@@ -410,7 +414,7 @@ class _MainScreenState extends State<MainScreen>
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _cardBorder),
+        border: Border.all(color: AppColors.surfaceBorder),
       ),
       child: TabBar(
         controller: _tabController,
@@ -419,18 +423,50 @@ class _MainScreenState extends State<MainScreen>
         dividerColor: Colors.transparent,
         indicator: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
-          color: _primaryColor.withAlpha((0.12 * 255).round()),
+          color: AppColors.primaryContainer,
         ),
         indicatorPadding: const EdgeInsets.all(4),
         indicatorSize: TabBarIndicatorSize.tab,
-        labelColor: _primaryColor,
-        unselectedLabelColor: _textMuted,
+        labelColor: AppColors.primary,
+        unselectedLabelColor: AppColors.textSecondary,
         labelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
         unselectedLabelStyle:
             const TextStyle(fontWeight: FontWeight.w500, fontSize: 16),
-        tabs: const [
-          Tab(child: Center(child: Text('대시보드'))),
-          Tab(child: Center(child: Text('설정'))),
+        tabs: [
+          const Tab(child: Center(child: Text('녹음 대시보드'))),
+          const Tab(child: Center(child: Text('녹음 설정'))),
+          Tab(
+            child: Center(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('자동 실행'),
+                  const SizedBox(width: 6),
+                  Container(
+                    width: 6,
+                    height: 6,
+                    decoration: BoxDecoration(
+                      color: _autoLaunchEnabled
+                          ? const Color(0xFF2E7D32)
+                          : Colors.grey,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    _autoLaunchEnabled ? 'ON' : 'OFF',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: _autoLaunchEnabled
+                          ? const Color(0xFF2E7D32)
+                          : Colors.grey,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -439,7 +475,7 @@ class _MainScreenState extends State<MainScreen>
   Future<void> _showScheduleDialog() async {
     await showDialog<Widget>(
       context: context,
-      builder: (context) => ScheduleConfigWidget(
+      builder: (context) => ScheduleConfigWidgetV2(
         onSaved: () async {
           final saved = await _settings.loadSchedule();
           if (saved != null) {
@@ -501,59 +537,6 @@ class _MainScreenState extends State<MainScreen>
         });
       }
     }
-  }
-
-  Future<void> _openAutoLaunchSettings() async {
-    final result = await AdvancedSettingsDialog.show(
-      context,
-      AdvancedSettingSection.autoLaunch,
-    );
-    if (result == 'saved') {
-      final value = await _settings.getLaunchAtStartup();
-      if (mounted) {
-        setState(() => _autoLaunchEnabled = value);
-      }
-    }
-  }
-
-  Future<void> _openLaunchManagerSettings() async {
-    await showDialog(
-      context: context,
-      builder: (context) => Dialog(
-        child: Container(
-          width: 800,
-          height: 600,
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  const Icon(Icons.rocket_launch, size: 24),
-                  const SizedBox(width: 8),
-                  const Text(
-                    '자동 실행 매니저',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const Spacer(),
-                  IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              const Expanded(
-                child: LaunchManagerWidget(),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 
   Future<void> _openAudioQualitySettings() async {
@@ -809,6 +792,7 @@ class _MainScreenState extends State<MainScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       showCase.startShowCase([
         _tutorialRecordingKey,
+        _tutorialDiagnosticKey,
         _tutorialScheduleKey,
         _tutorialTrayKey,
       ]);
@@ -824,16 +808,37 @@ class _MainScreenState extends State<MainScreen>
         showCase.startShowCase([
           _settingsScheduleKey,
           _settingsSaveKey,
-          _settingsAudioQualityKey,
           _settingsRetentionKey,
+          _settingsAudioQualityKey,
           _settingsVadKey,
-          _settingsAutoLaunchKey,
         ]);
       });
     }
 
     if (_tabController.index != 1) {
       _tabController.animateTo(1);
+      Future.delayed(const Duration(milliseconds: 300), startShowcase);
+    } else {
+      startShowcase();
+    }
+  }
+
+  void _startAutoLaunchTutorial() {
+    final showCase = ShowCaseWidget.of(context);
+    if (showCase == null) return;
+
+    void startShowcase() {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        showCase.startShowCase([
+          _launchSwitchKey,
+          _launchAddButtonKey,
+          _launchTestButtonKey,
+        ]);
+      });
+    }
+
+    if (_tabController.index != 2) {
+      _tabController.animateTo(2);
       Future.delayed(const Duration(milliseconds: 300), startShowcase);
     } else {
       startShowcase();
@@ -941,6 +946,7 @@ class _DashboardTab extends StatelessWidget {
     required this.onStopRecording,
     required this.onSyncSchedule,
     required this.recordingShowcaseKey,
+    required this.diagnosticShowcaseKey,
     required this.scheduleShowcaseKey,
     required this.trayShowcaseKey,
   });
@@ -957,6 +963,7 @@ class _DashboardTab extends StatelessWidget {
   final Future<void> Function() onStopRecording;
   final Future<void> Function() onSyncSchedule;
   final GlobalKey recordingShowcaseKey;
+  final GlobalKey diagnosticShowcaseKey;
   final GlobalKey scheduleShowcaseKey;
   final GlobalKey trayShowcaseKey;
 
@@ -973,7 +980,11 @@ class _DashboardTab extends StatelessWidget {
             child: _buildRecordingCard(context),
           ),
           const SizedBox(height: 16),
-          _buildDiagnosticCard(context),
+          Showcase(
+            key: diagnosticShowcaseKey,
+            description: '앱 시작 시 마이크 입력 레벨을 자동으로 점검합니다. 정상 기준은 RMS 0.04 이상이며, 문제 발생 시 힌트를 확인하세요.',
+            child: _buildDiagnosticCard(context),
+          ),
           const SizedBox(height: 16),
           Showcase(
             key: trayShowcaseKey,
@@ -1012,7 +1023,7 @@ class _DashboardTab extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: _cardBorder),
+        border: Border.all(color: AppColors.surfaceBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1027,7 +1038,7 @@ class _DashboardTab extends StatelessWidget {
               const Spacer(),
               Text(
                 lastTimeText,
-                style: theme.textTheme.labelMedium?.copyWith(color: _textMuted),
+                style: theme.textTheme.labelMedium?.copyWith(color: AppColors.textSecondary),
               ),
             ],
           ),
@@ -1043,7 +1054,7 @@ class _DashboardTab extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               detailMessage,
-              style: theme.textTheme.bodyMedium?.copyWith(color: _textMuted),
+              style: theme.textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
             ),
           ],
           if (levelPercent != null) ...[
@@ -1059,7 +1070,7 @@ class _DashboardTab extends StatelessWidget {
                   Text(
                     '평균 레벨',
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color: _textMuted,
+                      color: AppColors.textSecondary,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -1094,7 +1105,7 @@ class _DashboardTab extends StatelessWidget {
                     Text(
                       '실내 소음 ${ambientDb.toStringAsFixed(1)} dBFS',
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: _textMuted,
+                        color: AppColors.textSecondary,
                       ),
                     ),
                   if (ambientDb != null && snrText != null)
@@ -1103,7 +1114,7 @@ class _DashboardTab extends StatelessWidget {
                     Text(
                       'SNR $snrText',
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: _textMuted,
+                        color: AppColors.textSecondary,
                       ),
                     ),
                 ],
@@ -1118,7 +1129,7 @@ class _DashboardTab extends StatelessWidget {
                 Text(
                   '빠른 해결 방법',
                   style: theme.textTheme.labelSmall?.copyWith(
-                    color: _textMuted,
+                    color: AppColors.textSecondary,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -1136,7 +1147,7 @@ class _DashboardTab extends StatelessWidget {
                           child: Text(
                             hint,
                             style: theme.textTheme.bodySmall?.copyWith(
-                              color: _textMuted,
+                              color: AppColors.textSecondary,
                             ),
                           ),
                         ),
@@ -1315,8 +1326,8 @@ class _DashboardTab extends StatelessWidget {
   Widget _buildRecordingCard(BuildContext context) {
     final theme = Theme.of(context);
     final statusText = isRecording ? '녹음 중' : '대기 중';
-    final statusColor = isRecording ? _primaryColor : _textMuted;
-    final indicatorColor = isRecording ? _primaryColor : _textMuted;
+    final statusColor = isRecording ? AppColors.primary : AppColors.textSecondary;
+    final indicatorColor = isRecording ? AppColors.primary : AppColors.textSecondary;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
@@ -1411,7 +1422,7 @@ class _DashboardTab extends StatelessWidget {
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         foregroundColor:
-                            isRecording ? Colors.redAccent : _primaryColor,
+                            isRecording ? Colors.redAccent : AppColors.primary,
                       ),
                     ),
                   ),
@@ -1510,25 +1521,98 @@ class _DiagnosticVisuals {
   final IconData icon;
 }
 
+/// 자동 실행 매니저 탭
+class _LaunchManagerTab extends StatelessWidget {
+  const _LaunchManagerTab({
+    required this.onAutoLaunchChanged,
+    this.switchShowcaseKey,
+    this.addButtonShowcaseKey,
+    this.testButtonShowcaseKey,
+  });
+
+  final void Function(bool enabled) onAutoLaunchChanged;
+  final GlobalKey? switchShowcaseKey;
+  final GlobalKey? addButtonShowcaseKey;
+  final GlobalKey? testButtonShowcaseKey;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 간단한 헤더
+          Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: AppColors.primaryContainer,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.rocket_launch,
+                  color: AppColors.primary,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      '자동 실행 매니저',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1E2329),
+                      ),
+                    ),
+                    Text(
+                      '진료실에서 자주 사용하는 프로그램들을 앱 시작 시 자동으로 실행합니다',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          // LaunchManagerWidget
+          Expanded(
+            child: LaunchManagerWidget(
+              onAutoLaunchChanged: onAutoLaunchChanged,
+              switchShowcaseKey: switchShowcaseKey,
+              addButtonShowcaseKey: addButtonShowcaseKey,
+              testButtonShowcaseKey: testButtonShowcaseKey,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _SettingsTab extends StatelessWidget {
   const _SettingsTab({
     required this.onOpenSchedule,
     required this.onOpenSaveFolder,
     required this.onOpenVad,
     required this.onOpenRetention,
-    required this.onOpenAutoLaunch,
-    required this.onOpenLaunchManager,
     required this.onOpenAudioQuality,
     required this.scheduleShowcaseKey,
     required this.saveFolderShowcaseKey,
     required this.retentionShowcaseKey,
     required this.vadShowcaseKey,
-    required this.autoLaunchShowcaseKey,
-    required this.launchManagerShowcaseKey,
     required this.audioQualityShowcaseKey,
     required this.saveFolder,
     required this.vadEnabled,
-    required this.autoLaunchEnabled,
     required this.retentionDuration,
     required this.recordingProfile,
     required this.makeupGainDb,
@@ -1538,19 +1622,14 @@ class _SettingsTab extends StatelessWidget {
   final Future<void> Function() onOpenSaveFolder;
   final Future<void> Function() onOpenVad;
   final Future<void> Function() onOpenRetention;
-  final Future<void> Function() onOpenAutoLaunch;
-  final Future<void> Function() onOpenLaunchManager;
   final Future<void> Function() onOpenAudioQuality;
   final GlobalKey scheduleShowcaseKey;
   final GlobalKey saveFolderShowcaseKey;
   final GlobalKey retentionShowcaseKey;
   final GlobalKey vadShowcaseKey;
-  final GlobalKey autoLaunchShowcaseKey;
-  final GlobalKey launchManagerShowcaseKey;
   final GlobalKey audioQualityShowcaseKey;
   final String saveFolder;
   final bool vadEnabled;
-  final bool autoLaunchEnabled;
   final Duration? retentionDuration;
   final RecordingQualityProfile recordingProfile;
   final double makeupGainDb;
@@ -1628,24 +1707,6 @@ class _SettingsTab extends StatelessWidget {
                 showcaseDescription:
                     '무음 감지 민감도를 조정해 조용한 환경에서도 녹음이 잘 이어지도록 설정하세요.',
               ),
-              SettingsDestination(
-                icon: Icons.play_circle,
-                title: '윈도우 시작 시 자동 실행',
-                description: '컴퓨터 시작 시 앱을 자동으로 실행합니다.',
-                statusText: autoLaunchEnabled ? '켜짐' : '꺼짐',
-                onTap: onOpenAutoLaunch,
-                showcaseKey: autoLaunchShowcaseKey,
-                showcaseDescription: 'Windows 로그인 시 앱을 자동 실행하도록 설정합니다.',
-              ),
-              SettingsDestination(
-                icon: Icons.rocket_launch,
-                title: '자동 실행 매니저',
-                description: '진료실에서 자주 사용하는 프로그램들을 자동으로 실행합니다.',
-                statusText: '설정',
-                onTap: onOpenLaunchManager,
-                showcaseKey: launchManagerShowcaseKey,
-                showcaseDescription: '전자차트, 의료영상 뷰어 등 자주 사용하는 프로그램을 자동으로 실행하도록 설정할 수 있습니다.',
-              ),
             ],
           ),
         ],
@@ -1701,7 +1762,7 @@ class _SaveFolderSummary extends StatelessWidget {
         Text(
           '현재 저장 경로',
           style: theme.textTheme.bodySmall?.copyWith(
-            color: _textMuted,
+            color: AppColors.textSecondary,
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -1709,13 +1770,13 @@ class _SaveFolderSummary extends StatelessWidget {
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Icon(Icons.folder_open, size: 18, color: _textMuted),
+            const Icon(Icons.folder_open, size: 18, color: AppColors.textSecondary),
             const SizedBox(width: 6),
             Expanded(
               child: SelectableText(
                 saveFolder,
                 style: theme.textTheme.bodySmall?.copyWith(
-                  color: _textMuted,
+                  color: AppColors.textSecondary,
                 ),
               ),
             ),
@@ -1725,7 +1786,7 @@ class _SaveFolderSummary extends StatelessWidget {
         Text(
           '경로는 “저장 위치” 메뉴에서 언제든지 바꿀 수 있어요.',
           style: theme.textTheme.bodySmall?.copyWith(
-            color: _textMuted.withOpacity(0.8),
+            color: AppColors.textSecondary.withOpacity(0.8),
           ),
         ),
       ],
@@ -1751,7 +1812,7 @@ class _SettingsSection extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: _cardBorder),
+        border: Border.all(color: AppColors.surfaceBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1818,7 +1879,7 @@ class _SettingsTile extends StatelessWidget {
                   Text(
                     item.description,
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color: _textMuted,
+                      color: AppColors.textSecondary,
                     ),
                   ),
                 ],
@@ -1843,7 +1904,7 @@ class _SettingsTile extends StatelessWidget {
               ),
               const SizedBox(width: 8),
             ],
-            const Icon(Icons.chevron_right, color: _textMuted),
+            const Icon(Icons.chevron_right, color: AppColors.textSecondary),
           ],
         ),
       ),
@@ -1886,7 +1947,7 @@ class _SummaryTile extends StatelessWidget {
         Text(
           title,
           style: theme.textTheme.bodyMedium?.copyWith(
-            color: _textMuted,
+            color: AppColors.textSecondary,
             fontWeight: FontWeight.w600,
           ),
         ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:showcaseview/showcaseview.dart';
 import 'package:window_manager/window_manager.dart';
 import 'ui/screens/main_screen.dart';
+import 'ui/style/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -17,7 +18,7 @@ void main() async {
     backgroundColor: Colors.transparent,
     skipTaskbar: false,
     titleBarStyle: TitleBarStyle.normal,
-    title: '아이보틀 진료 녹음',
+    title: '아이보틀 진료녹음 & 자동실행 매니저',
   );
 
   windowManager.waitUntilReadyToShow(windowOptions, () async {
@@ -67,11 +68,8 @@ class MedicalRecorderApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: '아이보틀 진료 녹음',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
-        useMaterial3: true,
-      ),
+      title: '아이보틀 진료녹음 & 자동실행 매니저',
+      theme: AppTheme.lightTheme,
       home: const MainScreen(),
       debugShowCheckedModeBanner: false,
     );

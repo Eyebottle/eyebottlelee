@@ -3,10 +3,9 @@ import 'package:flutter/material.dart';
 import '../../models/schedule_model.dart';
 import '../../services/settings_service.dart';
 import '../style/app_spacing.dart';
+import '../style/app_colors.dart';
 
 enum DaySessionMode { fullDay, split }
-
-const _textMuted = Color(0xFF54606A);
 
 class ScheduleConfigWidget extends StatefulWidget {
   const ScheduleConfigWidget({super.key, this.onSaved});
@@ -174,7 +173,7 @@ class _ScheduleConfigWidgetState extends State<ScheduleConfigWidget> {
                     Text(
                       editor.working ? '근무를 설정하세요' : '휴무일로 설정되어 있습니다',
                       style: theme.textTheme.bodySmall
-                          ?.copyWith(color: _textMuted),
+                          ?.copyWith(color: AppColors.textSecondary),
                     ),
                   ],
                 ),
@@ -599,7 +598,7 @@ class _TimeButton extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: textTheme.labelSmall?.copyWith(color: _textMuted)),
+          Text(label, style: textTheme.labelSmall?.copyWith(color: AppColors.textSecondary)),
           const SizedBox(height: 4),
           Text(
             formatted,
