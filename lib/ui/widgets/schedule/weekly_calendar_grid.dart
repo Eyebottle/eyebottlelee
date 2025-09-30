@@ -233,73 +233,40 @@ class WeeklyCalendarGrid extends StatelessWidget {
       );
     } else {
       // 분할 근무 (오전·오후)
-      return Row(
+      return Column(
         mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Flexible(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  '오전',
-                  style: AppTypography.labelSmall.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  _formatTime(sessions[0].start),
-                  style: AppTypography.bodySmall.copyWith(
-                    color: AppColors.textPrimary,
-                    fontWeight: FontWeight.w600,
-                    fontFamily: AppTypography.latinFontFamily,
-                  ),
-                ),
-              ],
+          // 오전 진료
+          Text(
+            '${_formatTime(sessions[0].start)} - ${_formatTime(sessions[0].end)}',
+            style: AppTypography.bodySmall.copyWith(
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.w600,
+              fontSize: 12,
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Icon(
-              Icons.more_vert,
-              size: 16,
-              color: AppColors.textDisabled,
+          const SizedBox(height: 4),
+          // 오후 진료
+          if (sessions.length > 1)
+            Text(
+              '${_formatTime(sessions[1].start)} - ${_formatTime(sessions[1].end)}',
+              style: AppTypography.bodySmall.copyWith(
+                color: AppColors.textPrimary,
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+              ),
             ),
-          ),
-          Flexible(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  '오후',
-                  style: AppTypography.labelSmall.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  sessions.length > 1
-                      ? _formatTime(sessions[1].start)
-                      : '-',
-                  style: AppTypography.bodySmall.copyWith(
-                    color: AppColors.textPrimary,
-                    fontWeight: FontWeight.w600,
-                    fontFamily: AppTypography.latinFontFamily,
-                  ),
-                ),
-              ],
-            ),
-          ),
         ],
       );
     }
   }
 
   String _formatTime(TimeOfDay time) {
-    final hour = time.hour.toString().padLeft(2, '0');
+    final hour = time.hour == 0 ? 12 : (time.hour > 12 ? time.hour - 12 : time.hour);
     final minute = time.minute.toString().padLeft(2, '0');
-    return '$hour:$minute';
+    final period = time.hour < 12 ? '오전' : '오후';
+    return '$period $hour:$minute';
   }
 }
