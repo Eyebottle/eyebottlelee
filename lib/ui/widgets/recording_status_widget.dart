@@ -41,19 +41,20 @@ class RecordingStatusWidget extends StatelessWidget {
                   Text(
                     isRecording ? '🎤 [●] 녹음 중' : '🎤 [⏸] 대기 중',
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: isRecording
-                          ? Theme.of(context).colorScheme.error
-                          : Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
+                          fontWeight: FontWeight.bold,
+                          color: isRecording
+                              ? Theme.of(context).colorScheme.error
+                              : Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
                   ),
                   if (startTime != null) ...[
                     const SizedBox(height: 4),
                     Text(
                       '시작 시간: ${_formatTime(startTime!)}',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
                     ),
                   ],
                 ],
@@ -61,8 +62,7 @@ class RecordingStatusWidget extends StatelessWidget {
             ),
 
             // 녹음 상태 표시 점
-            if (isRecording)
-              _buildRecordingIndicator(context),
+            if (isRecording) _buildRecordingIndicator(context),
           ],
         ),
       ),

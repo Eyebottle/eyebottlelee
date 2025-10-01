@@ -10,10 +10,10 @@ import 'settings_service.dart';
 
 /// 프로그램 실행 상태를 나타내는 열거형
 enum LaunchExecutionStatus {
-  idle,       // 대기 상태
-  running,    // 실행 중
-  completed,  // 완료
-  failed,     // 실패
+  idle, // 대기 상태
+  running, // 실행 중
+  completed, // 완료
+  failed, // 실패
 }
 
 /// 프로그램 실행 진행 상황을 나타내는 모델
@@ -48,7 +48,8 @@ class LaunchExecutionProgress {
 class AutoLaunchManagerService {
   AutoLaunchManagerService._internal();
 
-  static final AutoLaunchManagerService _instance = AutoLaunchManagerService._internal();
+  static final AutoLaunchManagerService _instance =
+      AutoLaunchManagerService._internal();
 
   factory AutoLaunchManagerService() => _instance;
 
@@ -59,7 +60,8 @@ class AutoLaunchManagerService {
   final StreamController<LaunchExecutionProgress> _progressController =
       StreamController<LaunchExecutionProgress>.broadcast();
 
-  Stream<LaunchExecutionProgress> get progressStream => _progressController.stream;
+  Stream<LaunchExecutionProgress> get progressStream =>
+      _progressController.stream;
 
   LaunchExecutionProgress _currentProgress = const LaunchExecutionProgress(
     status: LaunchExecutionStatus.idle,
@@ -155,11 +157,11 @@ class AutoLaunchManagerService {
       final totalPrograms = programs.length;
       final completionMessage = '완료: $successCount개, 실패: $failureCount개';
 
-      _updateProgress(LaunchExecutionStatus.completed, totalPrograms, totalPrograms,
+      _updateProgress(
+          LaunchExecutionStatus.completed, totalPrograms, totalPrograms,
           message: completionMessage);
 
       _logging.info('프로그램 자동 실행 완료. $completionMessage');
-
     } catch (e, stackTrace) {
       _logging.error('프로그램 자동 실행 중 오류 발생', error: e, stackTrace: stackTrace);
       _updateProgress(LaunchExecutionStatus.failed, 0, 0,
@@ -226,7 +228,6 @@ class AutoLaunchManagerService {
 
       _logging.info('프로그램 실행 성공: ${program.name} (PID: ${process.pid})');
       return true;
-
     } catch (e, stackTrace) {
       _logging.error('프로그램 실행 실패: ${program.name}');
       _logging.error('  - 에러 타입: ${e.runtimeType}');

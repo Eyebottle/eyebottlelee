@@ -78,7 +78,8 @@ class _TimeRangeSliderState extends State<TimeRangeSlider> {
 
   void _updateTextFields() {
     _startHourController.text = widget.start.hour.toString().padLeft(2, '0');
-    _startMinuteController.text = widget.start.minute.toString().padLeft(2, '0');
+    _startMinuteController.text =
+        widget.start.minute.toString().padLeft(2, '0');
     _endHourController.text = widget.end.hour.toString().padLeft(2, '0');
     _endMinuteController.text = widget.end.minute.toString().padLeft(2, '0');
   }
@@ -89,8 +90,9 @@ class _TimeRangeSliderState extends State<TimeRangeSlider> {
           widget.maxTime.hour,
         ) ??
         widget.start.hour;
-    final startMinute = int.tryParse(_startMinuteController.text)?.clamp(0, 59) ??
-        widget.start.minute;
+    final startMinute =
+        int.tryParse(_startMinuteController.text)?.clamp(0, 59) ??
+            widget.start.minute;
     final endHour = int.tryParse(_endHourController.text)?.clamp(
           widget.minTime.hour,
           widget.maxTime.hour,
@@ -103,7 +105,8 @@ class _TimeRangeSliderState extends State<TimeRangeSlider> {
     final snappedStartMinute = (startMinute / 30).round() * 30;
     final snappedEndMinute = (endMinute / 30).round() * 30;
 
-    final newStart = TimeOfDay(hour: startHour, minute: snappedStartMinute % 60);
+    final newStart =
+        TimeOfDay(hour: startHour, minute: snappedStartMinute % 60);
     final newEnd = TimeOfDay(hour: endHour, minute: snappedEndMinute % 60);
 
     // 유효성 검증: 시작 < 종료

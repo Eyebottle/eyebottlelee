@@ -15,8 +15,10 @@ class HelpCenterDialog {
       builder: (context) {
         final theme = Theme.of(context);
         return Dialog(
-          insetPadding: const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          insetPadding:
+              const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 760, maxHeight: 620),
             child: Column(
@@ -26,7 +28,8 @@ class HelpCenterDialog {
                 const Divider(height: 1),
                 Expanded(
                   child: SingleChildScrollView(
-                    padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 28, vertical: 20),
                     child: _HelpContent(
                       onStartDashboardTutorial: onStartDashboardTutorial,
                       onStartSettingsTutorial: onStartSettingsTutorial,
@@ -40,7 +43,8 @@ class HelpCenterDialog {
                   child: TextButton(
                     onPressed: () => Navigator.of(context).pop(),
                     child: const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 20, vertical: 14),
                       child: Text('닫기'),
                     ),
                   ),
@@ -64,7 +68,8 @@ class HelpCenterDialog {
               children: [
                 Text(
                   '도움말 & 빠른 시작',
-                  style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+                  style: theme.textTheme.titleLarge
+                      ?.copyWith(fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 6),
                 Text(
@@ -171,7 +176,8 @@ class _HelpContent extends StatelessWidget {
               '앱 시작 시 자동으로 3초 샘플을 녹음해 입력 레벨을 확인합니다. 정상 기준은 RMS 0.04 이상입니다.',
           actions: [
             TextButton(
-              onPressed: () => _openDocsSection('docs/user-guide.md#7-자동-마이크-점검-해석'),
+              onPressed: () =>
+                  _openDocsSection('docs/user-guide.md#7-자동-마이크-점검-해석'),
               child: const Text('민감도 설명 보기'),
             ),
           ],
@@ -189,7 +195,8 @@ class _HelpContent extends StatelessWidget {
               '마이크 권한, 자동 시작, 스케줄 적용 문제는 사용자 가이드의 FAQ 섹션에서 확인할 수 있습니다.',
           actions: [
             FilledButton(
-              onPressed: () => _openDocsSection('docs/user-guide.md#9-문제-해결--faq'),
+              onPressed: () =>
+                  _openDocsSection('docs/user-guide.md#9-문제-해결--faq'),
               child: const Text('FAQ 확인'),
             ),
           ],
@@ -197,7 +204,8 @@ class _HelpContent extends StatelessWidget {
         const SizedBox(height: 12),
         Text(
           '더 궁금한 점이 있으면 개발 가이드 또는 팀 채널에 문의하세요.',
-          style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline),
+          style: theme.textTheme.bodySmall
+              ?.copyWith(color: theme.colorScheme.outline),
           textAlign: TextAlign.center,
         ),
       ],
@@ -206,7 +214,8 @@ class _HelpContent extends StatelessWidget {
 }
 
 Future<void> _openDocsSection(String relativePath) async {
-  final uri = Uri.parse('https://github.com/eyebottle/eyebottlelee/blob/main/$relativePath');
+  final uri = Uri.parse(
+      'https://github.com/eyebottle/eyebottlelee/blob/main/$relativePath');
   if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
     debugPrint('문서를 열 수 없습니다: $uri');
   }

@@ -230,7 +230,8 @@ class DayDetailEditor extends StatelessWidget {
     WorkingSession? afternoonSession;
 
     for (final session in schedule.sessions) {
-      if (session.end.hour < 14 || (session.end.hour == 14 && session.end.minute == 0)) {
+      if (session.end.hour < 14 ||
+          (session.end.hour == 14 && session.end.minute == 0)) {
         morningSession = session;
       } else if (session.start.hour >= 12) {
         afternoonSession = session;
@@ -266,14 +267,18 @@ class DayDetailEditor extends StatelessWidget {
                   Icon(
                     Icons.wb_sunny,
                     size: 20,
-                    color: hasMorning ? AppColors.primary : AppColors.textSecondary,
+                    color: hasMorning
+                        ? AppColors.primary
+                        : AppColors.textSecondary,
                   ),
                   const SizedBox(width: 8),
                   Text(
                     '오전 진료',
                     style: AppTypography.titleSmall.copyWith(
                       fontWeight: FontWeight.w600,
-                      color: hasMorning ? AppColors.textPrimary : AppColors.textSecondary,
+                      color: hasMorning
+                          ? AppColors.textPrimary
+                          : AppColors.textSecondary,
                     ),
                   ),
                   const Spacer(),
@@ -314,7 +319,8 @@ class DayDetailEditor extends StatelessWidget {
                   maxTime: const TimeOfDay(hour: 14, minute: 0),
                   onChanged: (range) {
                     onScheduleChanged(DaySchedule.split(
-                      morning: WorkingSession(start: range.start, end: range.end),
+                      morning:
+                          WorkingSession(start: range.start, end: range.end),
                       afternoon: hasAfternoon ? afternoon : null,
                     ));
                   },
@@ -338,14 +344,18 @@ class DayDetailEditor extends StatelessWidget {
                   Icon(
                     Icons.nightlight,
                     size: 20,
-                    color: hasAfternoon ? AppColors.primary : AppColors.textSecondary,
+                    color: hasAfternoon
+                        ? AppColors.primary
+                        : AppColors.textSecondary,
                   ),
                   const SizedBox(width: 8),
                   Text(
                     '오후 진료',
                     style: AppTypography.titleSmall.copyWith(
                       fontWeight: FontWeight.w600,
-                      color: hasAfternoon ? AppColors.textPrimary : AppColors.textSecondary,
+                      color: hasAfternoon
+                          ? AppColors.textPrimary
+                          : AppColors.textSecondary,
                     ),
                   ),
                   const Spacer(),
@@ -387,7 +397,8 @@ class DayDetailEditor extends StatelessWidget {
                   onChanged: (range) {
                     onScheduleChanged(DaySchedule.split(
                       morning: hasMorning ? morning : null,
-                      afternoon: WorkingSession(start: range.start, end: range.end),
+                      afternoon:
+                          WorkingSession(start: range.start, end: range.end),
                     ));
                   },
                 ),

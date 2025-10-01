@@ -598,7 +598,9 @@ class _TimeButton extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: textTheme.labelSmall?.copyWith(color: AppColors.textSecondary)),
+          Text(label,
+              style: textTheme.labelSmall
+                  ?.copyWith(color: AppColors.textSecondary)),
           const SizedBox(height: 4),
           Text(
             formatted,

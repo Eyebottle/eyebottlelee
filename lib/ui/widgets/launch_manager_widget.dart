@@ -321,7 +321,9 @@ class _LaunchManagerWidgetState extends State<LaunchManagerWidget> {
     return Container(
       key: ValueKey(program.id),
       decoration: BoxDecoration(
-        border: index > 0 ? Border(top: BorderSide(color: Colors.grey[200]!)) : null,
+        border: index > 0
+            ? Border(top: BorderSide(color: Colors.grey[200]!))
+            : null,
       ),
       child: ListTile(
         leading: Row(
@@ -389,15 +391,11 @@ class _LaunchManagerWidgetState extends State<LaunchManagerWidget> {
             ),
             IconButton(
               icon: const Icon(Icons.edit, color: Colors.blue),
-              onPressed: _isExecuting
-                  ? null
-                  : () => _editProgram(program),
+              onPressed: _isExecuting ? null : () => _editProgram(program),
             ),
             IconButton(
               icon: const Icon(Icons.delete, color: Colors.red),
-              onPressed: _isExecuting
-                  ? null
-                  : () => _removeProgram(program.id),
+              onPressed: _isExecuting ? null : () => _removeProgram(program.id),
             ),
             const Icon(Icons.drag_handle, color: Colors.grey),
           ],
@@ -452,7 +450,8 @@ class _LaunchManagerWidgetState extends State<LaunchManagerWidget> {
     if (widget.addButtonShowcaseKey != null) {
       addButton = Showcase(
         key: widget.addButtonShowcaseKey!,
-        description: '프로그램 추가 버튼을 누르면 실행 파일을 선택하고 대기 시간을 설정할 수 있습니다. 추가 후 드래그로 실행 순서를 조정하세요.',
+        description:
+            '프로그램 추가 버튼을 누르면 실행 파일을 선택하고 대기 시간을 설정할 수 있습니다. 추가 후 드래그로 실행 순서를 조정하세요.',
         child: addButton,
       );
     }

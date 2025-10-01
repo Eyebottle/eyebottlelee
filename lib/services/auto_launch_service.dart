@@ -24,7 +24,8 @@ class AutoLaunchService {
   /// Applies the persisted auto-launch preference on startup.
   Future<void> applySavedPreference() async {
     if (!Platform.isWindows) {
-      _logging.debug('AutoLaunchService: Non-Windows platform, skipping setup.');
+      _logging
+          .debug('AutoLaunchService: Non-Windows platform, skipping setup.');
       return;
     }
 
@@ -35,7 +36,8 @@ class AutoLaunchService {
   /// Updates the auto-launch registration to match the provided state.
   Future<void> apply(bool enabled) async {
     if (!Platform.isWindows) {
-      _logging.debug('AutoLaunchService: Non-Windows platform, apply() ignored.');
+      _logging
+          .debug('AutoLaunchService: Non-Windows platform, apply() ignored.');
       return;
     }
     await _apply(enabled, source: 'user-setting');

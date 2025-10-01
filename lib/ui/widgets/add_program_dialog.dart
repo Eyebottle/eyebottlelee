@@ -122,7 +122,9 @@ class _AddProgramDialogState extends State<AddProgramDialog> {
           SnackBar(
             content: Text(message),
             backgroundColor: success ? Colors.green : Colors.red,
-            duration: success ? const Duration(seconds: 3) : const Duration(seconds: 5),
+            duration: success
+                ? const Duration(seconds: 3)
+                : const Duration(seconds: 5),
           ),
         );
       }
@@ -130,7 +132,8 @@ class _AddProgramDialogState extends State<AddProgramDialog> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('테스트 실행 중 오류가 발생했습니다:\n${e.toString()}\n\n경로: ${program.path}'),
+            content: Text(
+                '테스트 실행 중 오류가 발생했습니다:\n${e.toString()}\n\n경로: ${program.path}'),
             backgroundColor: Colors.red,
             duration: const Duration(seconds: 5),
           ),

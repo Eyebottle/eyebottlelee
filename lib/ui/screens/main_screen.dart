@@ -40,7 +40,8 @@ class _MainScreenState extends State<MainScreen>
   final TrayService _trayService = TrayService();
   final LoggingService _loggingService = LoggingService();
   final MicDiagnosticsService _micDiagnosticsService = MicDiagnosticsService();
-  final AutoLaunchManagerService _autoLaunchManagerService = AutoLaunchManagerService();
+  final AutoLaunchManagerService _autoLaunchManagerService =
+      AutoLaunchManagerService();
 
   final GlobalKey _tutorialRecordingKey = GlobalKey();
   final GlobalKey _tutorialDiagnosticKey = GlobalKey();
@@ -126,7 +127,8 @@ class _MainScreenState extends State<MainScreen>
 
     // 자동 실행 매니저 초기화 및 프로그램 실행
     try {
-      final launchManagerSettings = await _autoLaunchManagerService.loadSettings();
+      final launchManagerSettings =
+          await _autoLaunchManagerService.loadSettings();
       if (launchManagerSettings.autoLaunchEnabled &&
           launchManagerSettings.enabledPrograms.isNotEmpty) {
         // 앱 시작 5초 후에 프로그램 자동 실행
@@ -988,7 +990,8 @@ class _DashboardTab extends StatelessWidget {
                       flex: 60,
                       child: Showcase(
                         key: recordingShowcaseKey,
-                        description: '녹음 상태 카드에서 현재 녹음 여부를 확인하고 수동으로 시작/중지할 수 있습니다.',
+                        description:
+                            '녹음 상태 카드에서 현재 녹음 여부를 확인하고 수동으로 시작/중지할 수 있습니다.',
                         child: _buildRecordingCard(context),
                       ),
                     ),
@@ -998,7 +1001,8 @@ class _DashboardTab extends StatelessWidget {
                       flex: 40,
                       child: Showcase(
                         key: diagnosticShowcaseKey,
-                        description: '앱 시작 시 마이크 입력 레벨을 자동으로 점검합니다. 정상 기준은 RMS 0.04 이상이며, 문제 발생 시 힌트를 확인하세요.',
+                        description:
+                            '앱 시작 시 마이크 입력 레벨을 자동으로 점검합니다. 정상 기준은 RMS 0.04 이상이며, 문제 발생 시 힌트를 확인하세요.',
                         child: _buildDiagnosticCardCompact(context),
                       ),
                     ),
@@ -1010,13 +1014,15 @@ class _DashboardTab extends StatelessWidget {
                   children: [
                     Showcase(
                       key: recordingShowcaseKey,
-                      description: '녹음 상태 카드에서 현재 녹음 여부를 확인하고 수동으로 시작/중지할 수 있습니다.',
+                      description:
+                          '녹음 상태 카드에서 현재 녹음 여부를 확인하고 수동으로 시작/중지할 수 있습니다.',
                       child: _buildRecordingCard(context),
                     ),
                     const SizedBox(height: 16),
                     Showcase(
                       key: diagnosticShowcaseKey,
-                      description: '앱 시작 시 마이크 입력 레벨을 자동으로 점검합니다. 정상 기준은 RMS 0.04 이상이며, 문제 발생 시 힌트를 확인하세요.',
+                      description:
+                          '앱 시작 시 마이크 입력 레벨을 자동으로 점검합니다. 정상 기준은 RMS 0.04 이상이며, 문제 발생 시 힌트를 확인하세요.',
                       child: _buildDiagnosticCard(context),
                     ),
                   ],
@@ -1047,9 +1053,8 @@ class _DashboardTab extends StatelessWidget {
         signalDb == null ? null : ((signalDb + 60) / 60).clamp(0.0, 1.0);
     final signalText =
         signalDb == null ? null : '${signalDb.toStringAsFixed(1)} dBFS';
-    final lastTimeText = diagnostic == null
-        ? '미점검'
-        : _formatShortDateTime(diagnostic.timestamp);
+    final lastTimeText =
+        diagnostic == null ? '미점검' : _formatShortDateTime(diagnostic.timestamp);
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -1222,7 +1227,8 @@ class _DashboardTab extends StatelessWidget {
               const Spacer(),
               Text(
                 lastTimeText,
-                style: theme.textTheme.labelMedium?.copyWith(color: AppColors.textSecondary),
+                style: theme.textTheme.labelMedium
+                    ?.copyWith(color: AppColors.textSecondary),
               ),
             ],
           ),
@@ -1238,7 +1244,8 @@ class _DashboardTab extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               detailMessage,
-              style: theme.textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
+              style: theme.textTheme.bodyMedium
+                  ?.copyWith(color: AppColors.textSecondary),
             ),
           ],
           if (levelPercent != null) ...[
@@ -1374,7 +1381,8 @@ class _DashboardTab extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(Icons.system_update_tv, color: Color(0xFF0F7ABF), size: 20),
+          const Icon(Icons.system_update_tv,
+              color: Color(0xFF0F7ABF), size: 20),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
@@ -1399,9 +1407,7 @@ class _DashboardTab extends StatelessWidget {
       MicDiagnosticStatus.lowInput => _DiagnosticVisuals(
           label: '입력이 약함', color: const Color(0xFFFFA000), icon: Icons.hearing),
       MicDiagnosticStatus.noSignal => _DiagnosticVisuals(
-          label: '신호 없음',
-          color: const Color(0xFFD32F2F),
-          icon: Icons.mic_off),
+          label: '신호 없음', color: const Color(0xFFD32F2F), icon: Icons.mic_off),
       MicDiagnosticStatus.permissionDenied => _DiagnosticVisuals(
           label: '권한 필요', color: const Color(0xFFD32F2F), icon: Icons.lock),
       MicDiagnosticStatus.noInputDevice => _DiagnosticVisuals(
@@ -1439,8 +1445,7 @@ class _DashboardTab extends StatelessWidget {
     return switch (status) {
       MicDiagnosticStatus.ok => '필요 시 "다시 점검"으로 상태를 재확인할 수 있어요.',
       MicDiagnosticStatus.lowInput => '마이크 위치나 입력 볼륨을 조정한 뒤 다시 점검해 주세요.',
-      MicDiagnosticStatus.noSignal =>
-        '마이크가 PC에 제대로 연결되어 있는지 확인해 주세요.',
+      MicDiagnosticStatus.noSignal => '마이크가 PC에 제대로 연결되어 있는지 확인해 주세요.',
       MicDiagnosticStatus.permissionDenied =>
         'Windows 설정 > 개인정보 보호 > 마이크에서 권한을 허용해주세요.',
       MicDiagnosticStatus.noInputDevice =>
@@ -1498,8 +1503,10 @@ class _DashboardTab extends StatelessWidget {
   Widget _buildRecordingCard(BuildContext context) {
     final theme = Theme.of(context);
     final statusText = isRecording ? '녹음 중' : '대기 중';
-    final statusColor = isRecording ? AppColors.primary : AppColors.textSecondary;
-    final indicatorColor = isRecording ? AppColors.primary : AppColors.textSecondary;
+    final statusColor =
+        isRecording ? AppColors.primary : AppColors.textSecondary;
+    final indicatorColor =
+        isRecording ? AppColors.primary : AppColors.textSecondary;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
@@ -1942,7 +1949,8 @@ class _SaveFolderSummary extends StatelessWidget {
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Icon(Icons.folder_open, size: 18, color: AppColors.textSecondary),
+            const Icon(Icons.folder_open,
+                size: 18, color: AppColors.textSecondary),
             const SizedBox(width: 6),
             Expanded(
               child: SelectableText(
@@ -2069,7 +2077,9 @@ class _SettingsTile extends StatelessWidget {
                 child: Text(
                   item.statusText!,
                   style: theme.textTheme.labelSmall?.copyWith(
-                    color: item.statusText == '켜짐' ? AppColors.primary : AppColors.textSecondary,
+                    color: item.statusText == '켜짐'
+                        ? AppColors.primary
+                        : AppColors.textSecondary,
                     fontWeight: FontWeight.w600,
                   ),
                 ),

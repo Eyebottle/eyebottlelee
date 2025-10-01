@@ -125,9 +125,7 @@ class WeeklyCalendarGrid extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
           decoration: BoxDecoration(
-            color: isSelected
-                ? AppColors.primaryContainer
-                : Colors.transparent,
+            color: isSelected ? AppColors.primaryContainer : Colors.transparent,
             border: Border(
               bottom: dayIndex < 6
                   ? BorderSide(color: AppColors.neutral100)
@@ -264,7 +262,8 @@ class WeeklyCalendarGrid extends StatelessWidget {
   }
 
   String _formatTime(TimeOfDay time) {
-    final hour = time.hour == 0 ? 12 : (time.hour > 12 ? time.hour - 12 : time.hour);
+    final hour =
+        time.hour == 0 ? 12 : (time.hour > 12 ? time.hour - 12 : time.hour);
     final minute = time.minute.toString().padLeft(2, '0');
     final period = time.hour < 12 ? '오전' : '오후';
     return '$period $hour:$minute';

@@ -43,7 +43,8 @@ class VolumeMeterWidget extends StatelessWidget {
                 borderRadius: BorderRadius.circular(9),
                 child: LinearProgressIndicator(
                   value: volumeLevel,
-                  backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                  backgroundColor:
+                      Theme.of(context).colorScheme.surfaceContainerHighest,
                   valueColor: AlwaysStoppedAnimation<Color>(
                     _getVolumeColor(context, volumeLevel),
                   ),
@@ -63,9 +64,9 @@ class VolumeMeterWidget extends StatelessWidget {
                 Text(
                   _getVolumeStatusText(volumeLevel),
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: _getVolumeColor(context, volumeLevel),
-                    fontWeight: FontWeight.w500,
-                  ),
+                        color: _getVolumeColor(context, volumeLevel),
+                        fontWeight: FontWeight.w500,
+                      ),
                 ),
               ],
             ),

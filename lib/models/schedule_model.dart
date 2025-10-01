@@ -144,7 +144,8 @@ class DaySchedule {
 
   /// 휴무일 생성
   factory DaySchedule.rest() {
-    return const DaySchedule(isWorkingDay: false, sessions: [], mode: ScheduleMode.fullDay);
+    return const DaySchedule(
+        isWorkingDay: false, sessions: [], mode: ScheduleMode.fullDay);
   }
 
   /// JSON에서 생성 (레거시 호환)
@@ -170,8 +171,10 @@ class DaySchedule {
 
     final start = _timeFromJson(json['startTime']);
     final end = _timeFromJson(json['endTime']);
-    final lunchStart = json['lunchStart'] != null ? _timeFromJson(json['lunchStart']) : null;
-    final lunchEnd = json['lunchEnd'] != null ? _timeFromJson(json['lunchEnd']) : null;
+    final lunchStart =
+        json['lunchStart'] != null ? _timeFromJson(json['lunchStart']) : null;
+    final lunchEnd =
+        json['lunchEnd'] != null ? _timeFromJson(json['lunchEnd']) : null;
 
     final slots = <WorkingSession>[];
     if (lunchStart != null && lunchEnd != null) {

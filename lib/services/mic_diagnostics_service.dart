@@ -254,12 +254,11 @@ class MicDiagnosticsService {
     final normalLevel = signalDb >= _normalThresholdDb;
 
     if (normalLevel || quietButClear || quietButAcceptable) {
-      final description =
-          quietButClear
-              ? '조용한 환경이지만 음성이 또렷하게 감지되고 있어요.'
-              : quietButAcceptable
-                  ? '녹음은 가능하지만 입력이 다소 낮아요. 필요하면 마이크 위치나 볼륨을 조금만 조정해 주세요.'
-                  : '마이크 입력이 정상이에요.';
+      final description = quietButClear
+          ? '조용한 환경이지만 음성이 또렷하게 감지되고 있어요.'
+          : quietButAcceptable
+              ? '녹음은 가능하지만 입력이 다소 낮아요. 필요하면 마이크 위치나 볼륨을 조금만 조정해 주세요.'
+              : '마이크 입력이 정상이에요.';
       return _DiagnosticDecision(
         status: MicDiagnosticStatus.ok,
         message: description,

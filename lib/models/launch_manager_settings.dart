@@ -30,8 +30,9 @@ class LaunchManagerSettings {
       requireConfirmationForNewPrograms:
           json['requireConfirmationForNewPrograms'] as bool? ?? true,
       programs: (json['programs'] as List<dynamic>?)
-          ?.map((p) => LaunchProgram.fromJson(p as Map<String, dynamic>))
-          .toList() ?? [],
+              ?.map((p) => LaunchProgram.fromJson(p as Map<String, dynamic>))
+              .toList() ??
+          [],
       version: json['version'] as int? ?? 1,
     );
   }
@@ -50,9 +51,7 @@ class LaunchManagerSettings {
 
   /// 활성화된 프로그램 목록 (순서대로 정렬)
   List<LaunchProgram> get enabledPrograms {
-    return programs
-        .where((p) => p.enabled)
-        .toList()
+    return programs.where((p) => p.enabled).toList()
       ..sort((a, b) => a.order.compareTo(b.order));
   }
 
@@ -125,8 +124,8 @@ class LaunchManagerSettings {
       autoLaunchEnabled: autoLaunchEnabled ?? this.autoLaunchEnabled,
       showNotifications: showNotifications ?? this.showNotifications,
       retryOnFailure: retryOnFailure ?? this.retryOnFailure,
-      requireConfirmationForNewPrograms:
-          requireConfirmationForNewPrograms ?? this.requireConfirmationForNewPrograms,
+      requireConfirmationForNewPrograms: requireConfirmationForNewPrograms ??
+          this.requireConfirmationForNewPrograms,
       programs: programs ?? this.programs,
       version: version ?? this.version,
     );
@@ -155,7 +154,8 @@ class LaunchManagerSettings {
         other.autoLaunchEnabled == autoLaunchEnabled &&
         other.showNotifications == showNotifications &&
         other.retryOnFailure == retryOnFailure &&
-        other.requireConfirmationForNewPrograms == requireConfirmationForNewPrograms &&
+        other.requireConfirmationForNewPrograms ==
+            requireConfirmationForNewPrograms &&
         _listEquals(other.programs, programs) &&
         other.version == version;
   }

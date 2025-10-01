@@ -141,7 +141,8 @@ class LoggingService {
 
   Future<Directory> _resolveLogDirectory() async {
     final appDocDir = await getApplicationDocumentsDirectory();
-    final logDir = Directory(path.join(appDocDir.path, 'EyebottleRecorder', 'logs'));
+    final logDir =
+        Directory(path.join(appDocDir.path, 'EyebottleRecorder', 'logs'));
     if (!await logDir.exists()) {
       await logDir.create(recursive: true);
     }
