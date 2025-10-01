@@ -223,14 +223,18 @@ class DayDetailEditor extends StatelessWidget {
   }
 
   Widget _buildSplitEditor(DaySchedule schedule) {
-    final morning = schedule.sessions.length > 0
+    // 오전 세션 존재 여부 및 값
+    final hasMorning = schedule.sessions.isNotEmpty;
+    final morning = hasMorning
         ? schedule.sessions[0]
         : WorkingSession(
             start: const TimeOfDay(hour: 9, minute: 0),
             end: const TimeOfDay(hour: 13, minute: 0),
           );
 
-    final afternoon = schedule.sessions.length > 1
+    // 오후 세션 존재 여부 및 값
+    final hasAfternoon = schedule.sessions.length > 1;
+    final afternoon = hasAfternoon
         ? schedule.sessions[1]
         : WorkingSession(
             start: const TimeOfDay(hour: 14, minute: 0),
@@ -239,38 +243,146 @@ class DayDetailEditor extends StatelessWidget {
 
     return Column(
       children: [
-        TimeRangeSlider(
-          label: '오전 진료',
-          start: morning.start,
-          end: morning.end,
-          maxTime: const TimeOfDay(hour: 14, minute: 0),
-          onChanged: (range) {
-            onScheduleChanged(DaySchedule(
-              isWorkingDay: true,
-              mode: ScheduleMode.split,
-              sessions: [
-                WorkingSession(start: range.start, end: range.end),
-                afternoon,
+        // 오전 진료 섹션
+        AppCard.level1(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // 오전 진료 토글
+              Row(
+                children: [
+                  Icon(
+                    Icons.wb_sunny,
+                    size: 20,
+                    color: hasMorning ? AppColors.primary : AppColors.textSecondary,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '오전 진료',
+                    style: AppTypography.titleSmall.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: hasMorning ? AppColors.textPrimary : AppColors.textSecondary,
+                    ),
+                  ),
+                  const Spacer(),
+                  Switch(
+                    value: hasMorning,
+                    onChanged: (enabled) {
+                      if (enabled) {
+                        // 오전 활성화
+                        onScheduleChanged(DaySchedule.split(
+                          morning: morning,
+                          afternoon: hasAfternoon ? afternoon : null,
+                        ));
+                      } else {
+                        // 오전 비활성화
+                        if (hasAfternoon) {
+                          // 오후만 남김
+                          onScheduleChanged(DaySchedule.split(
+                            morning: null,
+                            afternoon: afternoon,
+                          ));
+                        } else {
+                          // 둘 다 없으면 휴무
+                          onScheduleChanged(DaySchedule.rest());
+                        }
+                      }
+                    },
+                  ),
+                ],
+              ),
+
+              // 오전 시간 슬라이더 (활성화 시에만)
+              if (hasMorning) ...[
+                const SizedBox(height: 16),
+                TimeRangeSlider(
+                  label: '시간 설정',
+                  start: morning.start,
+                  end: morning.end,
+                  maxTime: const TimeOfDay(hour: 14, minute: 0),
+                  onChanged: (range) {
+                    onScheduleChanged(DaySchedule.split(
+                      morning: WorkingSession(start: range.start, end: range.end),
+                      afternoon: hasAfternoon ? afternoon : null,
+                    ));
+                  },
+                ),
               ],
-            ));
-          },
+            ],
+          ),
         ),
-        const SizedBox(height: 24),
-        TimeRangeSlider(
-          label: '오후 진료',
-          start: afternoon.start,
-          end: afternoon.end,
-          minTime: const TimeOfDay(hour: 12, minute: 0),
-          onChanged: (range) {
-            onScheduleChanged(DaySchedule(
-              isWorkingDay: true,
-              mode: ScheduleMode.split,
-              sessions: [
-                morning,
-                WorkingSession(start: range.start, end: range.end),
+
+        const SizedBox(height: 16),
+
+        // 오후 진료 섹션
+        AppCard.level1(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // 오후 진료 토글
+              Row(
+                children: [
+                  Icon(
+                    Icons.nightlight,
+                    size: 20,
+                    color: hasAfternoon ? AppColors.primary : AppColors.textSecondary,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '오후 진료',
+                    style: AppTypography.titleSmall.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: hasAfternoon ? AppColors.textPrimary : AppColors.textSecondary,
+                    ),
+                  ),
+                  const Spacer(),
+                  Switch(
+                    value: hasAfternoon,
+                    onChanged: (enabled) {
+                      if (enabled) {
+                        // 오후 활성화
+                        onScheduleChanged(DaySchedule.split(
+                          morning: hasMorning ? morning : null,
+                          afternoon: afternoon,
+                        ));
+                      } else {
+                        // 오후 비활성화
+                        if (hasMorning) {
+                          // 오전만 남김
+                          onScheduleChanged(DaySchedule.split(
+                            morning: morning,
+                            afternoon: null,
+                          ));
+                        } else {
+                          // 둘 다 없으면 휴무
+                          onScheduleChanged(DaySchedule.rest());
+                        }
+                      }
+                    },
+                  ),
+                ],
+              ),
+
+              // 오후 시간 슬라이더 (활성화 시에만)
+              if (hasAfternoon) ...[
+                const SizedBox(height: 16),
+                TimeRangeSlider(
+                  label: '시간 설정',
+                  start: afternoon.start,
+                  end: afternoon.end,
+                  minTime: const TimeOfDay(hour: 12, minute: 0),
+                  onChanged: (range) {
+                    onScheduleChanged(DaySchedule.split(
+                      morning: hasMorning ? morning : null,
+                      afternoon: WorkingSession(start: range.start, end: range.end),
+                    ));
+                  },
+                ),
               ],
-            ));
-          },
+            ],
+          ),
         ),
       ],
     );
