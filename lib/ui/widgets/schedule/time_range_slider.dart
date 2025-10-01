@@ -155,52 +155,48 @@ class _TimeRangeSliderState extends State<TimeRangeSlider> {
 
         // 시간 표시
         Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Expanded(
-              child: _buildTimeChip(
-                '시작',
-                _minutesToTime(_startValue.toInt()),
-                AppColors.primary,
-                _startHourController,
-                _startMinuteController,
-              ),
+            _buildTimeChip(
+              _minutesToTime(_startValue.toInt()),
+              AppColors.primary,
+              _startHourController,
+              _startMinuteController,
+              isStart: true,
             ),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 12),
               child: Icon(
                 Icons.arrow_forward,
                 size: 20,
                 color: AppColors.textSecondary,
               ),
             ),
-            Expanded(
-              child: _buildTimeChip(
-                '종료',
-                _minutesToTime(_endValue.toInt()),
-                AppColors.primary,
-                _endHourController,
-                _endMinuteController,
-              ),
+            _buildTimeChip(
+              _minutesToTime(_endValue.toInt()),
+              AppColors.primary,
+              _endHourController,
+              _endMinuteController,
+              isStart: false,
             ),
-            const SizedBox(width: 8),
-            // 편집 버튼
-            IconButton(
-              icon: Icon(
-                _isEditMode ? Icons.check_circle : Icons.edit,
-                color: _isEditMode ? AppColors.success : AppColors.primary,
-                size: 24,
-              ),
-              onPressed: () {
-                setState(() {
-                  if (_isEditMode) {
+            // 편집 모드일 때만 확인 버튼 표시
+            if (_isEditMode) ...[
+              const SizedBox(width: 12),
+              IconButton(
+                icon: Icon(
+                  Icons.check_circle,
+                  color: AppColors.success,
+                  size: 24,
+                ),
+                onPressed: () {
+                  setState(() {
                     _applyTextFieldChanges();
-                  }
-                  _isEditMode = !_isEditMode;
-                });
-              },
-              tooltip: _isEditMode ? '확인' : '직접 입력',
-            ),
+                    _isEditMode = false;
+                  });
+                },
+                tooltip: '확인',
+              ),
+            ],
           ],
         ),
 
@@ -289,42 +285,42 @@ class _TimeRangeSliderState extends State<TimeRangeSlider> {
   }
 
   Widget _buildTimeChip(
-    String label,
     TimeOfDay time,
     Color color,
     TextEditingController hourController,
-    TextEditingController minuteController,
-  ) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.3)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            label,
-            style: AppTypography.labelSmall.copyWith(
-              color: color,
-              fontWeight: FontWeight.w600,
-            ),
+    TextEditingController minuteController, {
+    required bool isStart,
+  }) {
+    return InkWell(
+      onTap: _isEditMode
+          ? null
+          : () {
+              setState(() {
+                _isEditMode = true;
+              });
+            },
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.12),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: _isEditMode ? color : color.withOpacity(0.3),
+            width: _isEditMode ? 2 : 1,
           ),
-          const SizedBox(height: 4),
-          // 편집 모드에 따라 표시 변경
-          _isEditMode
-              ? _buildTimeInput(hourController, minuteController, color)
-              : Text(
-                  _formatTime(time),
-                  style: AppTypography.titleMedium.copyWith(
-                    color: color,
-                    fontWeight: FontWeight.w700,
-                    fontFamily: AppTypography.latinFontFamily,
-                  ),
+        ),
+        child: _isEditMode
+            ? _buildTimeInput(hourController, minuteController, color)
+            : Text(
+                _formatTime(time),
+                style: AppTypography.headlineSmall.copyWith(
+                  fontSize: 28,
+                  color: color,
+                  fontWeight: FontWeight.w800,
+                  fontFamily: AppTypography.latinFontFamily,
                 ),
-        ],
+              ),
       ),
     );
   }
@@ -339,27 +335,28 @@ class _TimeRangeSliderState extends State<TimeRangeSlider> {
       children: [
         // 시간 입력
         SizedBox(
-          width: 32,
-          height: 32,
+          width: 42,
+          height: 40,
           child: TextField(
             controller: hourController,
             keyboardType: TextInputType.number,
             textAlign: TextAlign.center,
             maxLength: 2,
-            style: AppTypography.titleMedium.copyWith(
+            style: AppTypography.headlineSmall.copyWith(
+              fontSize: 24,
               color: color,
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w800,
               fontFamily: AppTypography.latinFontFamily,
             ),
             decoration: InputDecoration(
               counterText: '',
-              contentPadding: const EdgeInsets.symmetric(vertical: 4),
+              contentPadding: const EdgeInsets.symmetric(vertical: 8),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(6),
+                borderRadius: BorderRadius.circular(8),
                 borderSide: BorderSide(color: color),
               ),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(6),
+                borderRadius: BorderRadius.circular(8),
                 borderSide: BorderSide(color: color, width: 2),
               ),
             ),
@@ -376,35 +373,37 @@ class _TimeRangeSliderState extends State<TimeRangeSlider> {
           padding: const EdgeInsets.symmetric(horizontal: 4),
           child: Text(
             ':',
-            style: AppTypography.titleMedium.copyWith(
+            style: AppTypography.headlineSmall.copyWith(
+              fontSize: 24,
               color: color,
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w800,
             ),
           ),
         ),
         // 분 입력
         SizedBox(
-          width: 32,
-          height: 32,
+          width: 42,
+          height: 40,
           child: TextField(
             controller: minuteController,
             keyboardType: TextInputType.number,
             textAlign: TextAlign.center,
             maxLength: 2,
-            style: AppTypography.titleMedium.copyWith(
+            style: AppTypography.headlineSmall.copyWith(
+              fontSize: 24,
               color: color,
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w800,
               fontFamily: AppTypography.latinFontFamily,
             ),
             decoration: InputDecoration(
               counterText: '',
-              contentPadding: const EdgeInsets.symmetric(vertical: 4),
+              contentPadding: const EdgeInsets.symmetric(vertical: 8),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(6),
+                borderRadius: BorderRadius.circular(8),
                 borderSide: BorderSide(color: color),
               ),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(6),
+                borderRadius: BorderRadius.circular(8),
                 borderSide: BorderSide(color: color, width: 2),
               ),
             ),
