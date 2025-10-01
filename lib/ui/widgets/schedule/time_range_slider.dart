@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../style/app_colors.dart';
 import '../../style/app_typography.dart';
 
@@ -33,11 +34,23 @@ class TimeRangeSlider extends StatefulWidget {
 class _TimeRangeSliderState extends State<TimeRangeSlider> {
   late double _startValue;
   late double _endValue;
+  bool _isEditMode = false;
+
+  // TextField controllers
+  late TextEditingController _startHourController;
+  late TextEditingController _startMinuteController;
+  late TextEditingController _endHourController;
+  late TextEditingController _endMinuteController;
 
   @override
   void initState() {
     super.initState();
+    _startHourController = TextEditingController();
+    _startMinuteController = TextEditingController();
+    _endHourController = TextEditingController();
+    _endMinuteController = TextEditingController();
     _updateValues();
+    _updateTextFields();
   }
 
   @override
@@ -45,12 +58,64 @@ class _TimeRangeSliderState extends State<TimeRangeSlider> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.start != widget.start || oldWidget.end != widget.end) {
       _updateValues();
+      _updateTextFields();
     }
+  }
+
+  @override
+  void dispose() {
+    _startHourController.dispose();
+    _startMinuteController.dispose();
+    _endHourController.dispose();
+    _endMinuteController.dispose();
+    super.dispose();
   }
 
   void _updateValues() {
     _startValue = _timeToMinutes(widget.start).toDouble();
     _endValue = _timeToMinutes(widget.end).toDouble();
+  }
+
+  void _updateTextFields() {
+    _startHourController.text = widget.start.hour.toString().padLeft(2, '0');
+    _startMinuteController.text = widget.start.minute.toString().padLeft(2, '0');
+    _endHourController.text = widget.end.hour.toString().padLeft(2, '0');
+    _endMinuteController.text = widget.end.minute.toString().padLeft(2, '0');
+  }
+
+  void _applyTextFieldChanges() {
+    final startHour = int.tryParse(_startHourController.text)?.clamp(
+          widget.minTime.hour,
+          widget.maxTime.hour,
+        ) ??
+        widget.start.hour;
+    final startMinute = int.tryParse(_startMinuteController.text)?.clamp(0, 59) ??
+        widget.start.minute;
+    final endHour = int.tryParse(_endHourController.text)?.clamp(
+          widget.minTime.hour,
+          widget.maxTime.hour,
+        ) ??
+        widget.end.hour;
+    final endMinute = int.tryParse(_endMinuteController.text)?.clamp(0, 59) ??
+        widget.end.minute;
+
+    // 30분 단위로 스냅
+    final snappedStartMinute = (startMinute / 30).round() * 30;
+    final snappedEndMinute = (endMinute / 30).round() * 30;
+
+    final newStart = TimeOfDay(hour: startHour, minute: snappedStartMinute % 60);
+    final newEnd = TimeOfDay(hour: endHour, minute: snappedEndMinute % 60);
+
+    // 유효성 검증: 시작 < 종료
+    final startMinutes = _timeToMinutes(newStart);
+    final endMinutes = _timeToMinutes(newEnd);
+
+    if (startMinutes < endMinutes) {
+      widget.onChanged(TimeRange(start: newStart, end: newEnd));
+    } else {
+      // 잘못된 입력 시 원래대로 복원
+      _updateTextFields();
+    }
   }
 
   int _timeToMinutes(TimeOfDay time) {
@@ -92,20 +157,49 @@ class _TimeRangeSliderState extends State<TimeRangeSlider> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            _buildTimeChip(
-              '시작',
-              _formatTime(_minutesToTime(_startValue.toInt())),
-              AppColors.primary,
+            Expanded(
+              child: _buildTimeChip(
+                '시작',
+                _minutesToTime(_startValue.toInt()),
+                AppColors.primary,
+                _startHourController,
+                _startMinuteController,
+              ),
             ),
-            Icon(
-              Icons.arrow_forward,
-              size: 20,
-              color: AppColors.textSecondary,
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Icon(
+                Icons.arrow_forward,
+                size: 20,
+                color: AppColors.textSecondary,
+              ),
             ),
-            _buildTimeChip(
-              '종료',
-              _formatTime(_minutesToTime(_endValue.toInt())),
-              AppColors.primary,
+            Expanded(
+              child: _buildTimeChip(
+                '종료',
+                _minutesToTime(_endValue.toInt()),
+                AppColors.primary,
+                _endHourController,
+                _endMinuteController,
+              ),
+            ),
+            const SizedBox(width: 8),
+            // 편집 버튼
+            IconButton(
+              icon: Icon(
+                _isEditMode ? Icons.check_circle : Icons.edit,
+                color: _isEditMode ? AppColors.success : AppColors.primary,
+                size: 24,
+              ),
+              onPressed: () {
+                setState(() {
+                  if (_isEditMode) {
+                    _applyTextFieldChanges();
+                  }
+                  _isEditMode = !_isEditMode;
+                });
+              },
+              tooltip: _isEditMode ? '확인' : '직접 입력',
             ),
           ],
         ),
@@ -194,9 +288,15 @@ class _TimeRangeSliderState extends State<TimeRangeSlider> {
     );
   }
 
-  Widget _buildTimeChip(String label, String time, Color color) {
+  Widget _buildTimeChip(
+    String label,
+    TimeOfDay time,
+    Color color,
+    TextEditingController hourController,
+    TextEditingController minuteController,
+  ) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: color.withOpacity(0.12),
         borderRadius: BorderRadius.circular(12),
@@ -212,17 +312,109 @@ class _TimeRangeSliderState extends State<TimeRangeSlider> {
               fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(height: 2),
-          Text(
-            time,
+          const SizedBox(height: 4),
+          // 편집 모드에 따라 표시 변경
+          _isEditMode
+              ? _buildTimeInput(hourController, minuteController, color)
+              : Text(
+                  _formatTime(time),
+                  style: AppTypography.titleMedium.copyWith(
+                    color: color,
+                    fontWeight: FontWeight.w700,
+                    fontFamily: AppTypography.latinFontFamily,
+                  ),
+                ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTimeInput(
+    TextEditingController hourController,
+    TextEditingController minuteController,
+    Color color,
+  ) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // 시간 입력
+        SizedBox(
+          width: 32,
+          height: 32,
+          child: TextField(
+            controller: hourController,
+            keyboardType: TextInputType.number,
+            textAlign: TextAlign.center,
+            maxLength: 2,
             style: AppTypography.titleMedium.copyWith(
               color: color,
               fontWeight: FontWeight.w700,
               fontFamily: AppTypography.latinFontFamily,
             ),
+            decoration: InputDecoration(
+              counterText: '',
+              contentPadding: const EdgeInsets.symmetric(vertical: 4),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(6),
+                borderSide: BorderSide(color: color),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(6),
+                borderSide: BorderSide(color: color, width: 2),
+              ),
+            ),
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+              _HourInputFormatter(
+                widget.minTime.hour,
+                widget.maxTime.hour,
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: Text(
+            ':',
+            style: AppTypography.titleMedium.copyWith(
+              color: color,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        // 분 입력
+        SizedBox(
+          width: 32,
+          height: 32,
+          child: TextField(
+            controller: minuteController,
+            keyboardType: TextInputType.number,
+            textAlign: TextAlign.center,
+            maxLength: 2,
+            style: AppTypography.titleMedium.copyWith(
+              color: color,
+              fontWeight: FontWeight.w700,
+              fontFamily: AppTypography.latinFontFamily,
+            ),
+            decoration: InputDecoration(
+              counterText: '',
+              contentPadding: const EdgeInsets.symmetric(vertical: 4),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(6),
+                borderSide: BorderSide(color: color),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(6),
+                borderSide: BorderSide(color: color, width: 2),
+              ),
+            ),
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+              _MinuteInputFormatter(),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -258,4 +450,69 @@ class TimeRange {
 
   final TimeOfDay start;
   final TimeOfDay end;
+}
+
+/// 시간 입력 포맷터 (0-23 범위 제한)
+class _HourInputFormatter extends TextInputFormatter {
+  _HourInputFormatter(this.minHour, this.maxHour);
+
+  final int minHour;
+  final int maxHour;
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    if (newValue.text.isEmpty) {
+      return newValue;
+    }
+
+    final value = int.tryParse(newValue.text);
+    if (value == null) {
+      return oldValue;
+    }
+
+    // 첫 자리가 3 이상이면 차단 (최대 23)
+    if (newValue.text.length == 1 && value > 2) {
+      return oldValue;
+    }
+
+    // 두 자리 입력 시 범위 체크
+    if (newValue.text.length == 2 && (value < minHour || value > maxHour)) {
+      return oldValue;
+    }
+
+    return newValue;
+  }
+}
+
+/// 분 입력 포맷터 (0-59 범위 제한)
+class _MinuteInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    if (newValue.text.isEmpty) {
+      return newValue;
+    }
+
+    final value = int.tryParse(newValue.text);
+    if (value == null) {
+      return oldValue;
+    }
+
+    // 첫 자리가 6 이상이면 차단 (최대 59)
+    if (newValue.text.length == 1 && value > 5) {
+      return oldValue;
+    }
+
+    // 두 자리 입력 시 0-59 범위 체크
+    if (newValue.text.length == 2 && value > 59) {
+      return oldValue;
+    }
+
+    return newValue;
+  }
 }
