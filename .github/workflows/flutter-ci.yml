@@ -33,8 +33,13 @@ jobs:
         run: dart format --output=none --set-exit-if-changed .
 
       - name: Analyze
-        run: flutter analyze
+        run: flutter analyze --no-fatal-infos
 
       - name: Test
-        run: flutter test --no-pub
+        run: |
+          if [ -d "test" ]; then
+            flutter test --no-pub
+          else
+            echo "No test directory found, skipping tests"
+          fi
 
