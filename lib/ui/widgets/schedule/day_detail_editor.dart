@@ -223,23 +223,34 @@ class DayDetailEditor extends StatelessWidget {
   }
 
   Widget _buildSplitEditor(DaySchedule schedule) {
-    // 오전 세션 존재 여부 및 값
-    final hasMorning = schedule.sessions.isNotEmpty;
-    final morning = hasMorning
-        ? schedule.sessions[0]
-        : WorkingSession(
-            start: const TimeOfDay(hour: 9, minute: 0),
-            end: const TimeOfDay(hour: 13, minute: 0),
-          );
+    // 시간대 기반으로 오전/오후 세션 구분
+    // 오전: 종료 시간이 14시 이전인 세션
+    // 오후: 시작 시간이 12시 이후인 세션
+    WorkingSession? morningSession;
+    WorkingSession? afternoonSession;
 
-    // 오후 세션 존재 여부 및 값
-    final hasAfternoon = schedule.sessions.length > 1;
-    final afternoon = hasAfternoon
-        ? schedule.sessions[1]
-        : WorkingSession(
-            start: const TimeOfDay(hour: 14, minute: 0),
-            end: const TimeOfDay(hour: 18, minute: 0),
-          );
+    for (final session in schedule.sessions) {
+      if (session.end.hour < 14 || (session.end.hour == 14 && session.end.minute == 0)) {
+        morningSession = session;
+      } else if (session.start.hour >= 12) {
+        afternoonSession = session;
+      }
+    }
+
+    final hasMorning = morningSession != null;
+    final hasAfternoon = afternoonSession != null;
+
+    final morning = morningSession ??
+        WorkingSession(
+          start: const TimeOfDay(hour: 9, minute: 0),
+          end: const TimeOfDay(hour: 13, minute: 0),
+        );
+
+    final afternoon = afternoonSession ??
+        WorkingSession(
+          start: const TimeOfDay(hour: 14, minute: 0),
+          end: const TimeOfDay(hour: 18, minute: 0),
+        );
 
     return Column(
       children: [
