@@ -1,5 +1,7 @@
 # 아이보틀 진료녹음 & 자동실행 매니저 (Eyebottle Medical Recorder)
 
+**버전 1.3.0** | [Changelog](CHANGELOG.md) | [MS Store 출시 가이드](docs/MS-STORE-GUIDE.md)
+
 진료 중 환자와의 대화를 자동으로 녹음하고, 진료실 프로그램을 자동으로 실행하여 체계적으로 관리하는 Windows 데스크톱 애플리케이션입니다.
 
 ## 🚀 주요 기능
@@ -7,6 +9,10 @@
 ### 녹음 기능
 - **자동 녹음**: 진료 시간표 기반 완전 자동화 녹음 및 시작/종료 동기화
 - **스마트 분할**: 10분 단위 자동 파일 분할, 날짜별 폴더 정리
+- **WAV → AAC 자동 변환**: 녹음 파일을 자동으로 AAC로 변환하여 용량 83% 절감 ⭐ v1.3.0 개선
+  - 10분 세그먼트 분할 시 자동 변환
+  - 녹음 중지 시에도 마지막 파일 자동 변환 (신규)
+  - 짧은 녹음 및 빈번한 중단 시나리오 최적화
 - **VAD 지원**: 무음 구간 자동 감지 및 스킵, 민감도 조절 가능
 - **녹음 품질 프리셋**: 64/48/32kbps AAC-LC 프로필과 조용한 환경용 메이크업 게인(+0~12dB) 제공
 - **OneDrive 동기화**: 개인 OneDrive 폴더 자동 백업 + 보관 기간 관리
@@ -28,11 +34,21 @@
 
 ## 📚 문서
 
-- 개발 가이드: [docs/developing.md](docs/developing.md)
+### 사용자 가이드
+- **[MS Store 출시 가이드](docs/MS-STORE-GUIDE.md)** - MS Store 출시 준비 및 진행 상황
+- **[Changelog](CHANGELOG.md)** - 버전별 변경사항
 - 사용자 가이드: [docs/user-guide.md](docs/user-guide.md)
+
+### 개발 문서
+- 개발 가이드: [docs/developing.md](docs/developing.md)
 - 제품 요구사항(PRD): [docs/medical-recording-prd.md](docs/medical-recording-prd.md)
 - 자동 실행 매니저 PRD: [docs/auto-lancher-prd.md](docs/auto-lancher-prd.md)
 - WSL ↔ Windows 동기화 가이드: [docs/sync-workflow.md](docs/sync-workflow.md)
+
+### 테스트 문서
+- [Phase 2 자동화 테스트 결과](docs/test-results-phase2.md)
+- [수동 테스트 가이드](docs/manual-test-guide.md)
+- [전체 테스트 체크리스트](docs/test-checklist-phase2.md)
 
 ## 🛠 개발 환경 설정
 
