@@ -1,7 +1,7 @@
 name: medical_recorder
 description: "아이보틀 진료 녹음 - 진료 중 환자와의 대화를 자동으로 녹음하고 체계적으로 관리하는 데스크톱 애플리케이션"
 publish_to: 'none'
-version: 1.1.0+1
+version: 1.3.0+11
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -11,7 +11,7 @@ dependencies:
     sdk: flutter
 
   # 오디오 녹음/레벨
-  record: ^6.1.1
+  record: ^6.1.2
 
   # 파일/저장/설정
   path_provider: ^2.1.4
@@ -48,11 +48,12 @@ flutter:
   assets:
     - assets/images/
     - assets/icons/
+    - assets/bin/ffmpeg.exe
 
 msix_config:
   display_name: 아이보틀 진료 녹음
   publisher_display_name: Eyebottle
   identity_name: eyebottle.medical.recorder
-  msix_version: 1.1.0.0
+  msix_version: 1.2.10.0
   logo_path: assets/icons/icon.ico
   capabilities: "microphone, internetClient"

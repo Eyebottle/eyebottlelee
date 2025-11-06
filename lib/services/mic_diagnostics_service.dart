@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 
+import 'package:flutter/services.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
@@ -25,9 +26,16 @@ class MicDiagnosticsService {
     final samples = <_AmplitudeSample>[];
     double peakLinear = 0.0;
 
+    _logging.info('🎤 마이크 진단 시작: sampleDuration=${sampleDuration.inSeconds}초');
+
     try {
+      // 1. 권한 체크
+      _logging.info('📋 권한 체크 중...');
       final hasPermission = await recorder.hasPermission();
+      _logging.info('권한 상태: hasPermission=$hasPermission');
+
       if (hasPermission == false) {
+        _logging.warning('⚠️ 마이크 권한 거부됨');
         return MicDiagnosticResult(
           timestamp: timestamp,
           status: MicDiagnosticStatus.permissionDenied,
@@ -39,8 +47,20 @@ class MicDiagnosticsService {
         );
       }
 
+      // 2. 장치 목록 확인
+      _logging.info('🔍 입력 장치 검색 중...');
       final devices = await recorder.listInputDevices();
+      _logging.info('발견된 입력 장치: ${devices?.length ?? 0}개');
+
+      if (devices != null && devices.isNotEmpty) {
+        for (var i = 0; i < devices.length; i++) {
+          final device = devices[i];
+          _logging.info('  장치 #$i: id=${device.id}, label=${device.label}');
+        }
+      }
+
       if (devices == null || devices.isEmpty) {
+        _logging.warning('⚠️ 입력 장치를 찾을 수 없음');
         return MicDiagnosticResult(
           timestamp: timestamp,
           status: MicDiagnosticStatus.noInputDevice,
@@ -52,12 +72,13 @@ class MicDiagnosticsService {
         );
       }
 
+      // 3. 임시 파일 경로 설정
       final tempDir = await getTemporaryDirectory();
-      tempFilePath = path.join(
-        tempDir.path,
-        'mic_diag_${timestamp.millisecondsSinceEpoch}.m4a',
-      );
+      final tempFileBaseName =
+          'mic_diag_${timestamp.millisecondsSinceEpoch}';
 
+      // 4. 진폭 모니터링 시작
+      _logging.info('📊 진폭 모니터링 시작...');
       subscription = recorder
           .onAmplitudeChanged(const Duration(milliseconds: 160))
           .listen((amp) {
@@ -69,17 +90,145 @@ class MicDiagnosticsService {
         }
       });
 
-      await recorder.start(
-        const RecordConfig(
-          encoder: AudioEncoder.aacLc,
-          bitRate: 64000,
-          sampleRate: 44100,
-        ),
-        path: tempFilePath,
-      );
+      // 5. 코덱 선택
+      _logging.info('지원되는 코덱 확인 중...');
 
+      AudioEncoder? selectedEncoder;
+      final encodersToTry = <AudioEncoder>[
+        AudioEncoder.aacLc,
+        AudioEncoder.opus,
+        AudioEncoder.wav,
+      ];
+
+      for (final encoder in encodersToTry) {
+        try {
+          final isSupported = await recorder.isEncoderSupported(encoder);
+          if (isSupported) {
+            selectedEncoder = encoder;
+            _logging.info('선택된 코덱: ${encoder.name}');
+            break;
+          }
+        } catch (e) {
+          _logging.warning('코덱 ${encoder.name} 확인 중 에러: $e');
+        }
+      }
+
+      if (selectedEncoder == null) {
+        _logging.error('❌ 지원되는 코덱을 찾을 수 없습니다');
+        return MicDiagnosticResult(
+          timestamp: timestamp,
+          status: MicDiagnosticStatus.failure,
+          message: '지원되는 오디오 코덱을 찾을 수 없어요.',
+          hints: const [
+            'Windows Media Feature Pack 설치를 확인해주세요',
+            '시스템을 재시작해보세요',
+          ],
+        );
+      }
+
+      // 6. 녹음 시작 (폴백 로직 포함)
+      bool recordingStarted = false;
+      Exception? lastError;
+
+      // 최대 3번 재시도 (선택된 코덱이 실패하면 다음 코덱으로)
+      final fallbackEncoders = <AudioEncoder>[
+        selectedEncoder,
+        ...encodersToTry.where((e) => e != selectedEncoder),
+      ];
+
+      for (int attempt = 0;
+          attempt < fallbackEncoders.length && !recordingStarted;
+          attempt++) {
+        final encoder = fallbackEncoders[attempt];
+        try {
+          tempFilePath = path.join(
+            tempDir.path,
+            '${tempFileBaseName}${_extensionForEncoder(encoder)}',
+          );
+
+          await recorder.start(
+            RecordConfig(
+              encoder: encoder,
+              bitRate: 64000,
+              sampleRate: 44100,
+            ),
+            path: tempFilePath,
+          );
+
+          recordingStarted = true;
+          _logging.info('✅ 녹음 시작 성공 (코덱: ${encoder.name})');
+          break;
+        } catch (e, st) {
+          lastError = e is Exception ? e : Exception(e.toString());
+          _logging.error('[시도 ${attempt + 1}] 녹음 실패 (${encoder.name})', error: e, stackTrace: st);
+
+          // PlatformException은 대부분 코덱/설정 문제 → 다음 코덱으로 폴백
+          if (e is PlatformException && attempt < fallbackEncoders.length - 1) {
+            _logging.warning('코덱 에러 - 다음 코덱으로 폴백 (${fallbackEncoders[attempt + 1].name})');
+            if (tempFilePath != null) {
+              final file = File(tempFilePath!);
+              if (await file.exists()) {
+                unawaited(file.delete());
+              }
+            }
+            tempFilePath = null;
+          } else if (e is! PlatformException) {
+            // PlatformException이 아닌 에러는 심각한 문제 → 재시도 중단
+            _logging.error('❌ 코덱과 무관한 심각한 에러 발생 - 재시도 중단');
+            break;
+          }
+        }
+      }
+
+      // 모든 재시도 실패 시
+      if (!recordingStarted) {
+        _logging.error('❌ 모든 코덱으로 녹음 시작 실패');
+
+        // 에러 메시지 상세화
+        String detailedMessage = '마이크 녹음을 시작할 수 없어요.';
+        List<String> errorHints = [];
+
+        if (lastError != null) {
+          final errorMsg = lastError.toString().toLowerCase();
+          if (errorMsg.contains('codec') || errorMsg.contains('encoder') || errorMsg.contains('aac')) {
+            detailedMessage = '오디오 인코더 초기화에 실패했어요.';
+            errorHints = [
+              'Windows Media Feature Pack이 설치되어 있는지 확인해주세요',
+              'Windows 버전이 N 또는 KN 에디션인 경우 별도 설치가 필요합니다',
+              '시스템을 재시작한 후 다시 시도해보세요',
+            ];
+          } else if (errorMsg.contains('permission')) {
+            detailedMessage = '마이크 권한 문제가 발생했어요.';
+            errorHints = [
+              'Windows 설정에서 마이크 권한을 확인해주세요',
+              '다른 앱이 마이크를 사용 중인지 확인해주세요',
+            ];
+          } else {
+            errorHints = [
+              '마이크가 다른 프로그램에서 사용 중일 수 있습니다',
+              '마이크를 다시 연결해보세요',
+              '시스템을 재시작해보세요',
+            ];
+          }
+        }
+
+        return MicDiagnosticResult(
+          timestamp: timestamp,
+          status: MicDiagnosticStatus.failure,
+          message: detailedMessage,
+          hints: errorHints.isNotEmpty ? errorHints : const ['로그 파일을 확인해주세요'],
+        );
+      }
+
+      // 7. 샘플 수집
+      _logging.info('⏱️ ${sampleDuration.inSeconds}초 동안 샘플 수집 중...');
       await Future<void>.delayed(sampleDuration);
+
+      // 8. 녹음 중지
+      _logging.info('⏹️ 녹음 중지 중...');
       await recorder.stop();
+      _logging.info('✅ 녹음 중지 완료');
+
       await subscription.cancel();
       subscription = null;
 
@@ -90,17 +239,30 @@ class MicDiagnosticsService {
         }
       }
 
+      // 9. 데이터 검증
       if (!peakLinear.isFinite || peakLinear.isNaN) {
         peakLinear = 0.0;
       }
+      _logging.info('📈 수집된 샘플: ${samples.length}개, 피크 레벨: ${peakLinear.toStringAsFixed(4)}');
 
+      // 10. 메트릭 계산
+      _logging.info('🧮 메트릭 계산 중...');
       final metrics = _calculateMetrics(
         samples: samples,
         sampleWindow: sampleDuration,
         ambientWindow: ambientWindow,
       );
 
+      _logging.info('📊 계산된 메트릭:');
+      _logging.info('  - signalRms: ${metrics.signalRms.toStringAsFixed(4)}');
+      _logging.info('  - signalDb: ${metrics.signalDb.toStringAsFixed(2)} dB');
+      _logging.info('  - ambientDb: ${metrics.ambientDb.toStringAsFixed(2)} dB');
+      _logging.info('  - SNR: ${metrics.snrDb.toStringAsFixed(2)} dB');
+
+      // 11. 상태 판정
+      _logging.info('🔍 상태 판정 중...');
       final decision = _classify(metrics);
+      _logging.info('✅ 판정 결과: ${decision.status.name} - ${decision.message}');
 
       if (decision.status == MicDiagnosticStatus.ok) {
         return MicDiagnosticResult(
@@ -125,11 +287,45 @@ class MicDiagnosticsService {
         hints: decision.hints,
       );
     } catch (e, stackTrace) {
-      _logging.error('마이크 진단 실패', error: e, stackTrace: stackTrace);
+      _logging.error('❌ 마이크 진단 중 예외 발생', error: e, stackTrace: stackTrace);
+      _logging.error('에러 타입: ${e.runtimeType}');
+      _logging.error('에러 메시지: $e');
+
+      // 에러 타입별 힌트 제공
+      String detailedMessage = '예상치 못한 오류가 발생했어요.';
+      List<String> errorHints = [
+        '로그 파일을 확인해주세요',
+        '앱을 재시작한 후 다시 시도해보세요',
+      ];
+
+      if (e.toString().contains('permission') ||
+          e.toString().contains('Permission')) {
+        detailedMessage = '마이크 권한 문제가 발생했어요.';
+        errorHints = [
+          'Windows 설정에서 마이크 권한을 확인해주세요',
+          '앱을 재시작한 후 다시 시도해보세요',
+        ];
+      } else if (e.toString().contains('device') ||
+          e.toString().contains('Device')) {
+        detailedMessage = '마이크 장치를 초기화하는 중 문제가 발생했어요.';
+        errorHints = [
+          '마이크를 다시 연결해보세요',
+          'Windows 사운드 설정에서 기본 장치를 확인해주세요',
+        ];
+      } else if (e.toString().contains('codec') ||
+          e.toString().contains('encoder')) {
+        detailedMessage = '오디오 인코더 초기화에 실패했어요.';
+        errorHints = [
+          'Windows Media Feature Pack이 설치되어 있는지 확인해주세요',
+          '시스템을 재시작해보세요',
+        ];
+      }
+
       return MicDiagnosticResult(
         timestamp: timestamp,
         status: MicDiagnosticStatus.failure,
-        message: '예상치 못한 오류가 발생했어요. 다시 시도하거나 지원 팀에 문의해 주세요.',
+        message: detailedMessage,
+        hints: errorHints,
       );
     } finally {
       try {
@@ -309,6 +505,19 @@ class MicDiagnosticsService {
     final epsilon = 1e-9;
     return 20 *
         (math.log((signalRms + epsilon) / (ambientRms + epsilon)) / math.ln10);
+  }
+
+  String _extensionForEncoder(AudioEncoder encoder) {
+    switch (encoder) {
+      case AudioEncoder.aacLc:
+        return '.m4a';
+      case AudioEncoder.opus:
+        return '.opus';
+      case AudioEncoder.wav:
+        return '.wav';
+      default:
+        return '.m4a';
+    }
   }
 }
 

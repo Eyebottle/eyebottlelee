@@ -183,14 +183,27 @@ class _HelpContent extends StatelessWidget {
           ],
         ),
         HelpSection(
+          icon: Icons.transform,
+          title: '6. WAV 파일 자동 변환',
+          description:
+              'AAC/Opus 코덱이 불안정한 PC에서는 WAV로 녹음 후 자동으로 AAC/Opus로 변환하여 용량을 90% 이상 절감합니다. 기본적으로 활성화되어 있으며, 설정에서 변환 형식과 지연 시간을 조정할 수 있습니다.',
+          actions: [
+            TextButton(
+              onPressed: () =>
+                  _openDocsSection('docs/ffmpeg-setup-guide.md'),
+              child: const Text('변환 기능 상세 정보'),
+            ),
+          ],
+        ),
+        HelpSection(
           icon: Icons.system_update_alt,
-          title: '6. 시스템 트레이',
+          title: '7. 시스템 트레이',
           description:
               '창을 닫아도 앱은 트레이에서 계속 실행됩니다. 좌/더블 클릭으로 창을 복원하고, 우클릭 메뉴로 녹음 토글·마이크 점검·설정·종료를 실행하세요.',
         ),
         HelpSection(
           icon: Icons.help_outline,
-          title: '7. 문제 해결 & FAQ',
+          title: '8. 문제 해결 & FAQ',
           description:
               '마이크 권한, 자동 시작, 스케줄 적용 문제는 사용자 가이드의 FAQ 섹션에서 확인할 수 있습니다.',
           actions: [

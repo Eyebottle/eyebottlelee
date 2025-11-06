@@ -1,42 +1,60 @@
-# Repository Guidelines
+# Eyebottlelee Quick Guide (AI Sidekick Edition)
 
-WSL에서 작성한 Flutter 코드를 Windows 데스크톱 환경으로 빠르게 배포하기 위한 지침입니다. 변경 전에는 반드시 `docs/medical-recording-prd.md`와 `docs/developing.md`를 확인해 제품 방향과 개발 계획을 맞춰 주세요.
+## Before You Start: Read the Map
+- Treat `docs/medical-recording-prd.md` as the mission briefing and `docs/developing.md` as the daily checklist. Read or re-check them before you move code around so our direction and schedule stay aligned.
 
-## Project Structure & Module Organization
-- `lib/`는 앱 로직의 중심이며, `services/`(녹음·스케줄), `ui/`(화면·위젯), `models/`, `utils/`로 구성됩니다.
-- `docs/`에는 PRD와 개발 가이드가 있으니 기능 정의나 일정 변경 시 함께 갱신합니다.
-- `assets/icons/`는 트레이·앱 아이콘을 보관하며, `scripts/`에는 `sync_wsl_to_windows.sh`와 `windows/` 하위 PowerShell 스크립트가 있습니다.
-- Windows 데스크톱 빌드 리소스는 `windows/runner/`에 있으며, 플랫폼 수정 전 Flutter 업데이트 여부를 확인합니다.
+## Map of the House (Project Layout)
+- `lib/` is the main control room for the app.
+  - `lib/services/`: like recording and scheduling robots that manage audio tasks and calendars.
+  - `lib/ui/`: the stage where screens and widgets perform for users.
+  - `lib/models/`: blueprints that describe our data shapes.
+  - `lib/utils/`: handy tool drawer for shared helpers.
+- `docs/`: living knowledge base—update it when features or timelines change so future helpers stay in sync.
+- `assets/icons/`: icon wardrobe for tray/app images.
+- `scripts/`: buttons that keep WSL and Windows copies in step (`sync_wsl_to_windows.sh`) and PowerShell helpers under `scripts/windows/`.
+- `windows/runner/`: Windows desktop build bits—check Flutter version compatibility before tweaking platform code.
 
-## Build, Test, and Development Commands
-- `flutter pub get` — 의존성을 동기화합니다.
-- `flutter run -d windows` — Windows 데스크톱 디바이스로 실행해 UI/오디오 동작을 검증합니다.
-- `flutter analyze` 및 `flutter test` — 정적 분석과 단위 테스트를 수행하며, 테스트가 없다면 최소 스텁 추가를 권장합니다.
-- `pwsh -File scripts/windows/generate-placeholder-icons.ps1` — 개발용 아이콘 세트를 생성합니다.
-- `bash scripts/sync_wsl_to_windows.sh` — WSL→Windows 워킹카피를 수동 동기화합니다.
+## Everyday Buttons (Commands)
+- `flutter pub get` — refresh dependencies; like restocking the fridge before cooking.
+- `flutter run -d windows` — launch the Windows build to see UI and audio behavior in action.
+- `flutter analyze` and `flutter test` — lint and unit tests; run them together so bugs are caught early. If tests are missing, add at least a starter stub.
+- `pwsh -File scripts/windows/generate-placeholder-icons.ps1` — spin up dev icon placeholders.
+- `bash scripts/sync_wsl_to_windows.sh` — manually mirror WSL work into the Windows checkout when needed.
 
-## Coding Style & Naming Conventions
-- Dart 공식 스타일을 따르며 저장 전 `dart format` 또는 IDE 자동 포매터를 사용합니다.
-- 파일과 클래스 이름은 UpperCamelCase, 프라이빗 멤버는 선행 `_`, 상수는 UPPER_SNAKE_CASE를 사용합니다.
-- UI 위젯은 `lib/ui/widgets/`에서 `FeatureRoleWidget` 식으로 이름 붙이고, 서비스는 `FeatureService` 접미사를 일관되게 유지합니다.
+## How We Write Code
+- Follow the official Dart style; run `dart format` (or your IDE’s auto-format) before committing.
+- Naming: files/classes use UpperCamelCase, private members begin with `_`, constants shout in `UPPER_SNAKE_CASE`.
+- Widgets in `lib/ui/widgets/` follow the `FeatureRoleWidget` pattern. Services end with `FeatureService` for consistency.
 
-## Testing Guidelines
-- 테스트는 `test/` 루트에 배치하고, 파일은 `<target>_test.dart` 패턴을 따릅니다.
-- 오디오 세그먼트, 스케줄 계산, 보관 정리 로직은 모킹 가능한 서비스 단위 테스트를 우선 작성합니다.
-- 장시간 녹음 시나리오는 PowerShell soak 스크립트 추가 계획(Phase 0)을 참고해 수동 체크리스트라도 결과를 기록합니다.
+## Tests Are Safety Nets
+- Place tests under `test/` using `<target>_test.dart` names.
+- Prioritize unit tests for recording segments, schedule math, and cleanup logic—mock services where helpful.
+- For long recording scenarios, follow the Phase 0 soak plan notes and log manual outcomes even if automated tests are pending.
 
-## Commit & Pull Request Guidelines
-- 커밋 메시지는 `docs:`, `feat:`, `fix:` 등 범위 접두사를 사용하고, 필수 설명을 50자 내외로 유지합니다.
-- PR에는 변경 요약, 영향 모듈, 테스트 결과(`flutter analyze`, `flutter test`, 수동 시나리오)를 표 형식으로 포함합니다.
-- 이슈를 다룰 때는 `Fixes #123` 또는 `Refs #123` 라인을 추가해 추적성을 보장합니다.
-- UI 변경은 필요 시 Windows 실행 화면 캡처를 첨부하고, 동기화 스크립트 수정 시 `docs/sync-workflow.md`를 함께 갱신합니다.
+## Commit & PR Storytelling
+- Prefix commit messages (`docs:`, `feat:`, `fix:`…) and keep the summary within ~50 characters.
+- PRs should list changes, affected modules, and test results (`flutter analyze`, `flutter test`, manual checks) in a simple table.
+- When closing issues, include `Fixes #123` or `Refs #123` for traceability.
+- UI updates may need a Windows screenshot; sync script changes should update `docs/sync-workflow.md` too.
 
-## Sync Workflow Essentials
-- post-commit 훅이 `scripts/sync_wsl_to_windows.sh`를 호출하므로, 훅 비활성화 시 수동 실행을 잊지 마세요.
-- Windows 경로 `C:\\ws-workspace\\eyebottlelee`에서 빌드할 때 열린 편집기가 있다면 동기화 전 저장하고 닫습니다.
-- 새 스크립트를 추가할 경우 실행 권한(`chmod +x`)과 Windows 대응 PowerShell 버전을 동시에 제공합니다.
+## Keeping WSL & Windows in Sync
+- Post-commit hook triggers `scripts/sync_wsl_to_windows.sh`; if hooks are off, run it yourself.
+- Before syncing, close editors touching the Windows path `C:\\ws-workspace\\eyebottlelee` to avoid file conflicts.
+- New scripts need executable bits (`chmod +x`) and a matching PowerShell version under `scripts/windows/`.
 
-## Security & Configuration Tips
-- 비밀 값은 `.env`나 OS 비밀 저장소에 보관하고 레포지토리에 커밋하지 않습니다.
-- `pubspec.yaml` 의존성 변경은 `docs/developing.md`의 단계별 계획과 충돌하지 않는지 검토한 뒤 진행합니다.
-- Windows 자동 시작이나 OneDrive 경로는 사용자의 관리자 권한에 의존하므로, 실패 시 사용자 안내 문구를 UI와 문서에 동기화합니다.
+## Security & Settings
+- Keep secrets in `.env` or OS key stores—never commit them.
+- Review `pubspec.yaml` changes against the roadmap in `docs/developing.md` to avoid plan drift.
+- Windows auto-start or OneDrive flows rely on admin rights; if they fail, align UI hints and docs with that reality.
+
+## How to Explain Things to the User
+- Assume the user is brand-new to coding. Use plain, friendly sentences and short steps.
+- Prefer everyday analogies ("like restocking the fridge") to describe tricky ideas.
+- Highlight only the core actions first; add extras after confirming the user is ready.
+- Offer numbered options when suggesting next steps so the user can pick easily.
+- If you must mention advanced terms, define them right away in simple words.
+- Double-check the current date (today is October 4, 2025) and cite exact dates when plans depend on timing.
+
+## When in Doubt
+- Pause and re-read the docs, then ask the user gentle clarifying questions.
+- Keep responses concise but encouraging—think supportive coach rather than textbook.

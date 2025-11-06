@@ -23,7 +23,7 @@ class DayDetailEditor extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final weekdays = ['월요일', '화요일', '수요일', '목요일', '금요일', '토요일', '일요일'];
+    final weekdays = ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'];
 
     return SingleChildScrollView(
       child: Column(

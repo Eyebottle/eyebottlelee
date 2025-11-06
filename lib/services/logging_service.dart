@@ -108,6 +108,55 @@ class LoggingService {
     _initializationFuture = null;
   }
 
+  /// 로그 디렉터리 경로 반환
+  Future<String> getLogDirectoryPath() async {
+    final logDirectory = await _resolveLogDirectory();
+    return logDirectory.path;
+  }
+
+  /// 현재 로그 파일 경로 반환
+  Future<String?> getCurrentLogFilePath() async {
+    try {
+      final logDirectory = await _resolveLogDirectory();
+      final now = DateTime.now();
+      final dateKey = _dateKey(now);
+      final fileName = 'eyebottle_$dateKey.log';
+      final filePath = path.join(logDirectory.path, fileName);
+      final file = File(filePath);
+      if (await file.exists()) {
+        return filePath;
+      }
+      return null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /// 모든 로그 파일 목록 반환 (최신순)
+  Future<List<File>> getLogFiles() async {
+    try {
+      final logDirectory = await _resolveLogDirectory();
+      final entries = logDirectory
+          .listSync()
+          .whereType<File>()
+          .where((file) => file.path.toLowerCase().endsWith('.log'))
+          .toList();
+
+      // 수정 시간 기준 내림차순 정렬
+      entries.sort((a, b) => b.statSync().modified.compareTo(a.statSync().modified));
+      return entries;
+    } catch (e) {
+      return [];
+    }
+  }
+
+  String _dateKey(DateTime time) {
+    final y = time.year.toString().padLeft(4, '0');
+    final m = time.month.toString().padLeft(2, '0');
+    final d = time.day.toString().padLeft(2, '0');
+    return '$y$m$d';
+  }
+
   void _log(
     Level level,
     String message, {

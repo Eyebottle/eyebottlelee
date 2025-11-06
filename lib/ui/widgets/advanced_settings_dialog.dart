@@ -3,13 +3,15 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import 'package:record/record.dart';
+
 import '../../services/auto_launch_service.dart';
 import '../../services/settings_service.dart';
 import '../../models/recording_profile.dart';
 
 enum RetentionOption { forever, week, month, threeMonths, sixMonths, year }
 
-enum AdvancedSettingSection { audioQuality, vad, retention }
+enum AdvancedSettingSection { audioQuality, vad, retention, wavConversion }
 
 class AdvancedSettingsDialog extends StatefulWidget {
   const AdvancedSettingsDialog({super.key, required this.section});
@@ -39,6 +41,10 @@ class _AdvancedSettingsDialogState extends State<AdvancedSettingsDialog> {
   VadPreset? _vadPreset;
   RecordingQualityProfile _recordingProfile = RecordingQualityProfile.balanced;
   double _makeupGainDb = 0.0;
+  // WAV 자동 변환 관련
+  bool _wavAutoConvertEnabled = false;
+  AudioEncoder _wavTargetEncoder = AudioEncoder.aacLc;
+  int _conversionDelay = 5;
 
   @override
   void initState() {
@@ -53,6 +59,10 @@ class _AdvancedSettingsDialogState extends State<AdvancedSettingsDialog> {
     final retention = await settings.getRetentionDuration();
     final profile = await settings.getRecordingProfile();
     final gainDb = await settings.getMakeupGainDb();
+    // WAV 자동 변환 설정 로드
+    final wavAutoConvert = await settings.isWavAutoConvertEnabled();
+    final wavTarget = await settings.getWavTargetEncoder();
+    final conversionDelay = await settings.getConversionDelay();
     if (!mounted) return;
     setState(() {
       _vadEnabled = vadEnabled;
@@ -62,6 +72,9 @@ class _AdvancedSettingsDialogState extends State<AdvancedSettingsDialog> {
       _vadPreset = _presetFromThreshold(_vadThreshold);
       _recordingProfile = profile;
       _makeupGainDb = gainDb;
+      _wavAutoConvertEnabled = wavAutoConvert;
+      _wavTargetEncoder = wavTarget;
+      _conversionDelay = conversionDelay;
       _loading = false;
     });
   }
@@ -137,6 +150,10 @@ class _AdvancedSettingsDialogState extends State<AdvancedSettingsDialog> {
       AdvancedSettingSection.retention => (
           '녹음 파일 보관 기간',
           '선택한 기간이 지나면 녹음 파일을 자동으로 정리합니다.'
+        ),
+      AdvancedSettingSection.wavConversion => (
+          'WAV 파일 자동 변환',
+          'WAV 파일을 AAC/Opus로 자동 변환하여 용량을 75% 이상 절감합니다.'
         ),
     };
 
@@ -353,6 +370,121 @@ class _AdvancedSettingsDialogState extends State<AdvancedSettingsDialog> {
             }).toList(),
           ),
         );
+      case AdvancedSettingSection.wavConversion:
+        return _SettingsCard(
+          icon: Icons.transform,
+          title: 'WAV 파일 자동 변환',
+          description:
+              'AAC나 Opus로 직접 녹음할 수 없는 PC에서 WAV로 녹음된 파일을 자동으로 압축 포맷으로 변환합니다. '
+              'AAC/Opus로 직접 녹음 가능한 경우 이 기능은 자동으로 건너뜁니다.',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SwitchListTile.adaptive(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('WAV 자동 변환 활성화'),
+                subtitle: const Text('용량 큰 WAV 파일을 75% 이상 절감'),
+                value: _wavAutoConvertEnabled,
+                onChanged: (v) => setState(() => _wavAutoConvertEnabled = v),
+              ),
+              if (_wavAutoConvertEnabled) ...[
+                const SizedBox(height: 16),
+                const Divider(),
+                const SizedBox(height: 16),
+                Text(
+                  '변환 포맷',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    ChoiceChip(
+                      label: const Text('AAC (권장)'),
+                      selected: _wavTargetEncoder == AudioEncoder.aacLc,
+                      onSelected: (selected) {
+                        if (selected) {
+                          setState(() => _wavTargetEncoder = AudioEncoder.aacLc);
+                        }
+                      },
+                    ),
+                    ChoiceChip(
+                      label: const Text('Opus'),
+                      selected: _wavTargetEncoder == AudioEncoder.opus,
+                      onSelected: (selected) {
+                        if (selected) {
+                          setState(() => _wavTargetEncoder = AudioEncoder.opus);
+                        }
+                      },
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  _wavTargetEncoder == AudioEncoder.aacLc
+                      ? 'AAC: 대부분의 플레이어와 호환되며 안정적입니다 (.m4a)'
+                      : 'Opus: 더 나은 음질과 압축률을 제공합니다 (.opus)',
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodySmall
+                      ?.copyWith(color: Colors.grey.shade600),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  '변환 지연 시간 ($_conversionDelay초)',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '녹음 안정화를 위해 세그먼트 분할 후 변환 시작까지 대기합니다',
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodySmall
+                      ?.copyWith(color: Colors.grey.shade600),
+                ),
+                const SizedBox(height: 12),
+                Slider(
+                  value: _conversionDelay.toDouble(),
+                  min: 3,
+                  max: 15,
+                  divisions: 12,
+                  label: '$_conversionDelay초',
+                  onChanged: (value) {
+                    setState(() => _conversionDelay = value.toInt());
+                  },
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.blue.shade200),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.info_outline, color: Colors.blue.shade700, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '변환은 백그라운드에서 조용히 진행되며, 실패 시 원본 WAV 파일이 보존됩니다',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: Colors.blue.shade900,
+                              ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+        );
     }
   }
 
@@ -363,6 +495,10 @@ class _AdvancedSettingsDialogState extends State<AdvancedSettingsDialog> {
     await settings.setVad(enabled: _vadEnabled, threshold: _vadThreshold);
     await settings.setLaunchAtStartup(_launchAtStartup);
     await settings.setRetentionDuration(_durationForOption(_retentionOption));
+    // WAV 자동 변환 설정 저장
+    await settings.setWavAutoConvertEnabled(_wavAutoConvertEnabled);
+    await settings.setWavTargetEncoder(_wavTargetEncoder);
+    await settings.setConversionDelay(_conversionDelay);
 
     if (!kIsWeb) {
       try {

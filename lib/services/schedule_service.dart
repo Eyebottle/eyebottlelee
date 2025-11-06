@@ -19,17 +19,27 @@ class ScheduleService {
   Function()? onRecordingStop;
 
   /// 진료 시간표 적용
-  void applySchedule(WeeklySchedule schedule) {
-    _resetCron();
+  Future<void> applySchedule(WeeklySchedule schedule) async {
+    _logging.info('📅 새로운 진료 시간표 적용 시작');
+    await _resetCron();
     _currentSchedule = schedule;
+
+    // 스케줄 내용 로깅
+    for (var entry in schedule.weekDays.entries) {
+      final day = entry.key;
+      final daySchedule = entry.value;
+      _logging.info('  ${_dayName(day)}요일: $daySchedule');
+    }
 
     // 새 스케줄 등록
     _registerCronJobs(schedule);
-    _logging.info('새로운 진료 시간표 적용 완료');
+    _logging.info('✅ 새로운 진료 시간표 적용 완료');
   }
 
-  void _resetCron() {
+  Future<void> _resetCron() async {
     _cron.close();
+    // 기존 스케줄이 완전히 취소될 때까지 대기
+    await Future.delayed(const Duration(milliseconds: 200));
     _cron = Cron();
   }
 
@@ -83,16 +93,33 @@ class ScheduleService {
 
   /// 현재 진료 시간인지 확인
   bool isCurrentlyWorkingTime() {
-    if (_currentSchedule == null) return false;
+    if (_currentSchedule == null) {
+      _logging.debug('isCurrentlyWorkingTime: 스케줄이 없음');
+      return false;
+    }
 
     final now = DateTime.now();
     final currentDay = now.weekday % 7; // DateTime.weekday는 1=월요일, 7=일요일
     final currentTime = TimeOfDay(hour: now.hour, minute: now.minute);
 
-    final daySchedule = _currentSchedule!.weekDays[currentDay];
-    if (daySchedule == null) return false;
+    _logging.debug(
+        '진료 시간 확인: 요일=$currentDay(${_dayName(currentDay)}), 시각=${currentTime.hour}:${currentTime.minute}');
 
-    return daySchedule.isTimeInWorkingHours(currentTime);
+    final daySchedule = _currentSchedule!.weekDays[currentDay];
+    if (daySchedule == null) {
+      _logging.debug('  -> 해당 요일 스케줄 없음');
+      return false;
+    }
+
+    _logging.debug('  -> 요일 스케줄: $daySchedule');
+    final result = daySchedule.isTimeInWorkingHours(currentTime);
+    _logging.debug('  -> 진료 시간 여부: $result');
+    return result;
+  }
+
+  String _dayName(int dayIndex) {
+    const days = ['일', '월', '화', '수', '목', '금', '토'];
+    return days[dayIndex];
   }
 
   /// 다음 진료 시작 시간 가져오기

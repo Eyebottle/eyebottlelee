@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:record/record.dart';
 
 import '../models/mic_diagnostic_result.dart';
 import '../models/schedule_model.dart';
@@ -19,6 +20,10 @@ class SettingsService {
   static const _keyRecordingProfile = 'recording_profile';
   static const _keyMakeupGainDb = 'makeup_gain_db';
   static const _keyLaunchManagerSettings = 'launch_manager_settings';
+  // WAV 자동 변환 관련 설정
+  static const _keyWavAutoConvertEnabled = 'wav_auto_convert_enabled';
+  static const _keyWavTargetEncoder = 'wav_target_encoder';
+  static const _keyConversionDelay = 'conversion_delay_seconds';
 
   Future<void> saveSchedule(WeeklySchedule schedule) async {
     final prefs = await SharedPreferences.getInstance();
@@ -213,5 +218,70 @@ class SettingsService {
       // JSON 파싱 실패 시 기본 설정 반환
       return LaunchManagerSettings.defaultSettings();
     }
+  }
+
+  // ========== WAV 자동 변환 관련 설정 ==========
+
+  /// WAV 자동 변환 활성화 여부 설정
+  ///
+  /// **기본값:** true (Windows AAC/Opus 불안정성 대응)
+  Future<void> setWavAutoConvertEnabled(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_keyWavAutoConvertEnabled, value);
+  }
+
+  /// WAV 자동 변환 활성화 여부 가져오기
+  ///
+  /// **반환값:** true = 자동 변환 활성화 (기본값), false = 비활성화
+  Future<bool> isWavAutoConvertEnabled() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_keyWavAutoConvertEnabled) ?? true; // 기본값 true로 변경
+  }
+
+  /// WAV 변환 목표 인코더 설정
+  ///
+  /// **매개변수:**
+  /// - `encoder`: AudioEncoder.aacLc 또는 AudioEncoder.opus
+  ///
+  /// **기본값:** AudioEncoder.aacLc (더 널리 호환됨)
+  Future<void> setWavTargetEncoder(AudioEncoder encoder) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyWavTargetEncoder, encoder.name);
+  }
+
+  /// WAV 변환 목표 인코더 가져오기
+  ///
+  /// **반환값:**
+  /// - AudioEncoder.aacLc (기본값)
+  /// - AudioEncoder.opus
+  Future<AudioEncoder> getWavTargetEncoder() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getString(_keyWavTargetEncoder);
+
+    if (saved == 'opus') {
+      return AudioEncoder.opus;
+    }
+
+    // 기본값은 AAC (호환성이 더 좋음)
+    return AudioEncoder.aacLc;
+  }
+
+  /// 변환 지연 시간 설정 (초)
+  ///
+  /// **매개변수:**
+  /// - `seconds`: 세그먼트 분할 후 변환 시작까지 대기 시간 (초)
+  ///
+  /// **권장값:** 5초 (녹음 안정화 시간 확보)
+  Future<void> setConversionDelay(int seconds) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_keyConversionDelay, seconds);
+  }
+
+  /// 변환 지연 시간 가져오기 (초)
+  ///
+  /// **반환값:** 지연 시간 (초), 기본값 5초
+  Future<int> getConversionDelay() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getInt(_keyConversionDelay) ?? 5;
   }
 }

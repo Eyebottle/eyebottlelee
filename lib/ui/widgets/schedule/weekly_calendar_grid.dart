@@ -62,7 +62,7 @@ class WeeklyCalendarGrid extends StatelessWidget {
   }
 
   Widget _buildWeekdayHeader() {
-    final weekdays = ['월', '화', '수', '목', '금', '토', '일'];
+    final weekdays = ['일', '월', '화', '수', '목', '금', '토'];
 
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
@@ -113,7 +113,7 @@ class WeeklyCalendarGrid extends StatelessWidget {
   }
 
   Widget _buildDayCard(int dayIndex) {
-    final weekdays = ['월', '화', '수', '목', '금', '토', '일'];
+    final weekdays = ['일', '월', '화', '수', '목', '금', '토'];
     final daySchedule = schedule.weekDays[dayIndex] ?? DaySchedule.rest();
     final isSelected = selectedDayIndex == dayIndex;
     final isWorking = daySchedule.isWorkingDay;

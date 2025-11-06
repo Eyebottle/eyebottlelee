@@ -20,6 +20,7 @@ import '../widgets/animated_volume_meter.dart';
 import '../widgets/schedule/schedule_config_widget_v2.dart';
 import '../widgets/help/help_center_dialog.dart';
 import '../widgets/launch_manager_widget.dart';
+import '../widgets/diagnostic_info_dialog.dart';
 import '../../models/recording_profile.dart';
 import '../style/app_colors.dart';
 
@@ -196,7 +197,7 @@ class _MainScreenState extends State<MainScreen>
 
     final savedSchedule = await _settings.loadSchedule();
     final schedule = savedSchedule ?? WeeklySchedule.defaultSchedule();
-    _scheduleService.applySchedule(schedule);
+    await _scheduleService.applySchedule(schedule);
     if (mounted) {
       setState(() => _currentSchedule = schedule);
     }
@@ -316,6 +317,7 @@ class _MainScreenState extends State<MainScreen>
                         lastDiagnostic: _lastMicDiagnostic,
                         diagnosticInProgress: _micDiagnosticRunning,
                         onRunDiagnostic: () => _runMicDiagnostic(),
+                        onShowDiagnosticInfo: _showDiagnosticInfo,
                         onStartRecording: () => _startRecording(),
                         onStopRecording: () => _stopRecording(),
                         onSyncSchedule: () => _syncRecordingWithSchedule(),
@@ -330,6 +332,7 @@ class _MainScreenState extends State<MainScreen>
                         onOpenVad: () => _openVadSettings(),
                         onOpenRetention: () => _openRetentionSettings(),
                         onOpenAudioQuality: () => _openAudioQualitySettings(),
+                        onOpenWavConversion: () => _openWavConversionSettings(),
                         scheduleShowcaseKey: _settingsScheduleKey,
                         saveFolderShowcaseKey: _settingsSaveKey,
                         retentionShowcaseKey: _settingsRetentionKey,
@@ -481,7 +484,7 @@ class _MainScreenState extends State<MainScreen>
         onSaved: () async {
           final saved = await _settings.loadSchedule();
           if (saved != null) {
-            _scheduleService.applySchedule(saved);
+            await _scheduleService.applySchedule(saved);
             if (mounted) {
               setState(() => _currentSchedule = saved);
             }
@@ -556,6 +559,22 @@ class _MainScreenState extends State<MainScreen>
           _recordingProfile = profile;
           _makeupGainDb = gainDb;
         });
+      }
+    }
+  }
+
+  Future<void> _openWavConversionSettings() async {
+    final result = await AdvancedSettingsDialog.show(
+      context,
+      AdvancedSettingSection.wavConversion,
+    );
+    if (result == 'saved') {
+      // WAV 변환 설정은 AudioService에서 매번 확인하므로
+      // 여기서 별도로 설정할 것이 없습니다
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('WAV 자동 변환 설정이 저장되었습니다')),
+        );
       }
     }
   }
@@ -857,6 +876,13 @@ class _MainScreenState extends State<MainScreen>
     }
   }
 
+  void _showDiagnosticInfo() {
+    showDialog(
+      context: context,
+      builder: (context) => const DiagnosticInfoDialog(),
+    );
+  }
+
   Future<void> _runMicDiagnostic({bool initial = false}) async {
     if (_micDiagnosticRunning) return;
     if (!initial && _audioService.isRecording) {
@@ -887,9 +913,35 @@ class _MainScreenState extends State<MainScreen>
     }
 
     if (!initial && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(result.message ?? '마이크 점검이 완료되었습니다.')),
-      );
+      // 에러 상태 확인
+      final bool hasIssue = result.status == MicDiagnosticStatus.failure ||
+          result.status == MicDiagnosticStatus.noSignal ||
+          result.status == MicDiagnosticStatus.lowInput ||
+          result.status == MicDiagnosticStatus.permissionDenied ||
+          result.status == MicDiagnosticStatus.noInputDevice;
+
+      if (hasIssue) {
+        // 에러 발생: 로그 확인 안내
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text(
+              '마이크 문제가 감지되었습니다. 아래 "📋 에러 로그 확인" 버튼을 눌러 로그를 수집해주세요.',
+            ),
+            backgroundColor: const Color(0xFFFF6B6B),
+            duration: const Duration(seconds: 5),
+            action: SnackBarAction(
+              label: '확인',
+              textColor: Colors.white,
+              onPressed: () {},
+            ),
+          ),
+        );
+      } else {
+        // 정상: 일반 완료 메시지
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(result.message ?? '마이크 점검이 완료되었습니다.')),
+        );
+      }
     }
   }
 
@@ -944,6 +996,7 @@ class _DashboardTab extends StatelessWidget {
     required this.lastDiagnostic,
     required this.diagnosticInProgress,
     required this.onRunDiagnostic,
+    required this.onShowDiagnosticInfo,
     required this.onStartRecording,
     required this.onStopRecording,
     required this.onSyncSchedule,
@@ -961,6 +1014,7 @@ class _DashboardTab extends StatelessWidget {
   final MicDiagnosticResult? lastDiagnostic;
   final bool diagnosticInProgress;
   final Future<void> Function() onRunDiagnostic;
+  final void Function() onShowDiagnosticInfo;
   final Future<void> Function() onStartRecording;
   final Future<void> Function() onStopRecording;
   final Future<void> Function() onSyncSchedule;
@@ -1039,6 +1093,45 @@ class _DashboardTab extends StatelessWidget {
         );
       },
     );
+  }
+
+  Widget _buildDiagnosticInfoButton({
+    required BuildContext context,
+    required MicDiagnosticStatus? status,
+    required VoidCallback onPressed,
+  }) {
+    // 에러/경고 상태 확인
+    final bool hasIssue = status == MicDiagnosticStatus.failure ||
+        status == MicDiagnosticStatus.noSignal ||
+        status == MicDiagnosticStatus.lowInput ||
+        status == MicDiagnosticStatus.permissionDenied ||
+        status == MicDiagnosticStatus.noInputDevice;
+
+    if (hasIssue) {
+      // 에러 상태: 경고 스타일 버튼
+      return FilledButton.icon(
+        onPressed: onPressed,
+        style: FilledButton.styleFrom(
+          backgroundColor: const Color(0xFFFF6B6B), // 경고 빨간색
+          foregroundColor: Colors.white,
+        ),
+        icon: const Icon(Icons.error_outline, size: 18),
+        label: const Text(
+          '📋 에러 로그 확인',
+          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+        ),
+      );
+    } else {
+      // 정상 상태: 일반 OutlinedButton
+      return OutlinedButton.icon(
+        onPressed: onPressed,
+        icon: const Icon(Icons.bug_report, size: 18),
+        label: const Text(
+          '진단 정보',
+          style: TextStyle(fontSize: 14),
+        ),
+      );
+    }
   }
 
   Widget _buildDiagnosticCardCompact(BuildContext context) {
@@ -1160,26 +1253,39 @@ class _DashboardTab extends StatelessWidget {
           const SizedBox(height: 16),
 
           // 진단 버튼
-          SizedBox(
-            height: 40,
-            width: double.infinity,
-            child: FilledButton.icon(
-              onPressed: diagnosticInProgress ? null : onRunDiagnostic,
-              icon: diagnosticInProgress
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : const Icon(Icons.refresh, size: 18),
-              label: Text(
-                diagnosticInProgress ? '점검 중…' : '다시 점검',
-                style: const TextStyle(fontSize: 14),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SizedBox(
+                height: 40,
+                child: FilledButton.icon(
+                  onPressed: diagnosticInProgress ? null : onRunDiagnostic,
+                  icon: diagnosticInProgress
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(Icons.refresh, size: 18),
+                  label: Text(
+                    diagnosticInProgress ? '점검 중…' : '다시 점검',
+                    style: const TextStyle(fontSize: 14),
+                  ),
+                ),
               ),
-            ),
+              const SizedBox(height: 8),
+              SizedBox(
+                height: 40,
+                child: _buildDiagnosticInfoButton(
+                  context: context,
+                  status: status,
+                  onPressed: onShowDiagnosticInfo,
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -1785,6 +1891,7 @@ class _SettingsTab extends StatelessWidget {
     required this.onOpenVad,
     required this.onOpenRetention,
     required this.onOpenAudioQuality,
+    required this.onOpenWavConversion,
     required this.scheduleShowcaseKey,
     required this.saveFolderShowcaseKey,
     required this.retentionShowcaseKey,
@@ -1802,6 +1909,7 @@ class _SettingsTab extends StatelessWidget {
   final Future<void> Function() onOpenVad;
   final Future<void> Function() onOpenRetention;
   final Future<void> Function() onOpenAudioQuality;
+  final Future<void> Function() onOpenWavConversion;
   final GlobalKey scheduleShowcaseKey;
   final GlobalKey saveFolderShowcaseKey;
   final GlobalKey retentionShowcaseKey;
@@ -1885,6 +1993,12 @@ class _SettingsTab extends StatelessWidget {
                 showcaseKey: vadShowcaseKey,
                 showcaseDescription:
                     '무음 감지 민감도를 조정해 조용한 환경에서도 녹음이 잘 이어지도록 설정하세요.',
+              ),
+              SettingsDestination(
+                icon: Icons.transform,
+                title: 'WAV 파일 자동 변환',
+                description: 'WAV 파일을 AAC/Opus로 자동 변환하여 용량을 75% 이상 절감합니다.',
+                onTap: onOpenWavConversion,
               ),
             ],
           ),

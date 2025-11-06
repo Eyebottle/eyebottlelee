@@ -38,7 +38,7 @@ class _ScheduleConfigWidgetV2State extends State<ScheduleConfigWidgetV2> {
     final saved = await _settings.loadSchedule();
     setState(() {
       _schedule = saved ?? WeeklySchedule.defaultSchedule();
-      _selectedDayIndex = 0; // 월요일 기본 선택
+      _selectedDayIndex = 1; // 월요일 기본 선택 (0=일요일)
       _isLoading = false;
     });
   }

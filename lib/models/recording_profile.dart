@@ -25,14 +25,14 @@ class RecordingProfile {
       label: '표준 음성 (64 kbps)',
       description: '일반 진료실 환경에 맞춘 기본 음질/용량 균형',
       bitRate: 64000,
-      sampleRate: 32000,
+      sampleRate: 44100,  // 32000 → 44100 (AAC 호환성 개선)
     ),
     RecordingQualityProfile.speechOptimized: RecordingProfile(
       id: RecordingQualityProfile.speechOptimized,
-      label: '음성 강화 (48 kbps)',
+      label: '음성 강화 (64 kbps)',
       description: '조용한 환경에서 음성 위주로 저장 공간 절약',
-      bitRate: 48000,
-      sampleRate: 32000,
+      bitRate: 64000,  // 48000 → 64000 (AAC 표준 비트레이트)
+      sampleRate: 44100,  // 32000 → 44100 (AAC 호환성 개선)
     ),
     RecordingQualityProfile.storageSaver: RecordingProfile(
       id: RecordingQualityProfile.storageSaver,
