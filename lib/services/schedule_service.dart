@@ -102,19 +102,12 @@ class ScheduleService {
     final currentDay = now.weekday % 7; // DateTime.weekday는 1=월요일, 7=일요일
     final currentTime = TimeOfDay(hour: now.hour, minute: now.minute);
 
-    _logging.debug(
-        '진료 시간 확인: 요일=$currentDay(${_dayName(currentDay)}), 시각=${currentTime.hour}:${currentTime.minute}');
-
     final daySchedule = _currentSchedule!.weekDays[currentDay];
     if (daySchedule == null) {
-      _logging.debug('  -> 해당 요일 스케줄 없음');
       return false;
     }
 
-    _logging.debug('  -> 요일 스케줄: $daySchedule');
-    final result = daySchedule.isTimeInWorkingHours(currentTime);
-    _logging.debug('  -> 진료 시간 여부: $result');
-    return result;
+    return daySchedule.isTimeInWorkingHours(currentTime);
   }
 
   String _dayName(int dayIndex) {

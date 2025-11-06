@@ -634,23 +634,6 @@ Duration? _durationForOption(RetentionOption option) {
   }
 }
 
-String _labelForOption(RetentionOption option) {
-  switch (option) {
-    case RetentionOption.forever:
-      return '삭제 없음 (영구 보존)';
-    case RetentionOption.week:
-      return '1주';
-    case RetentionOption.month:
-      return '1개월';
-    case RetentionOption.threeMonths:
-      return '3개월';
-    case RetentionOption.sixMonths:
-      return '6개월';
-    case RetentionOption.year:
-      return '1년';
-  }
-}
-
 (String, String?) _retentionDetails(RetentionOption option) {
   switch (option) {
     case RetentionOption.forever:

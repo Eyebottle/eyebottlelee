@@ -717,11 +717,8 @@ class AudioService {
 
   Future<RecordConfig> _buildRecordConfig(
       {Set<AudioEncoder> excludeEncoders = const {}}) async {
-    _logging.info('🔧 _buildRecordConfig 시작');
     final encoder =
         await _selectSupportedEncoder(excludeEncoders: excludeEncoders);
-    _logging.info('🔧 _selectSupportedEncoder 반환됨: ${encoder.name}');
-    _logging.info('🔧 RecordConfig 생성 시작');
     final config = RecordConfig(
       encoder: encoder,
       bitRate: _profile.bitRate,
@@ -730,8 +727,6 @@ class AudioService {
       // autoGain 제거 - AAC 코덱 호환성 개선
       // mic_diagnostics_service와 동일한 설정 사용
     );
-    _logging.info('🔧 RecordConfig 생성 완료');
-    _logging.info('🔧 _buildRecordConfig 반환 직전');
     return config;
   }
 

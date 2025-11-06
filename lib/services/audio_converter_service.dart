@@ -165,7 +165,6 @@ class AudioConverterService {
 
       // ffmpeg 명령어 구성
       final codec = task.targetEncoder == AudioEncoder.aacLc ? 'aac' : 'libopus';
-      final extension = task.targetEncoder == AudioEncoder.aacLc ? 'm4a' : 'opus';
 
       final args = [
         '-i', task.inputPath, // 입력 파일
@@ -303,14 +302,11 @@ class AudioConverterService {
   /// 최소한 원본 파일 크기의 2배 이상 여유 공간이 필요합니다
   Future<bool> _hasEnoughDiskSpace(String filePath) async {
     try {
-      final file = File(filePath);
-      final fileSize = await file.length();
-      final requiredSpace = fileSize * 2; // 여유 공간 (원본 + 변환본)
-
       // Windows에서 디스크 여유 공간 확인
       // TODO: 실제로는 Win32 API (GetDiskFreeSpaceEx)를 사용해야 하지만,
       // 여기서는 간단히 true 반환 (향후 개선 가능)
       // FFI를 사용하여 구현 가능
+      // 필요 공간: filePath 크기의 약 2배 (원본 + 변환본)
 
       return true; // 임시로 항상 true 반환
     } catch (e) {
