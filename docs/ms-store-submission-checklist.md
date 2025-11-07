@@ -16,14 +16,14 @@ MS Store에 앱을 제출하기 전 확인해야 할 모든 항목을 정리한 
 - [x] 진료실 테스트 완료 (30분 녹음, 세그먼트 분할 검증)
 
 #### 스크린샷
-- [ ] screenshot-1-dashboard.png
-- [ ] screenshot-2-schedule.png
-- [ ] screenshot-3-advanced-settings.png
-- [ ] screenshot-4-auto-launch.png
-- [ ] screenshot-5-help.png
+- [x] screenshot-1-dashboard.png (66 KB)
+- [x] screenshot-2-schedule.png (74 KB)
+- [x] screenshot-3-advanced-settings.png (92 KB)
+- [x] screenshot-4-auto-launch.png (43 KB)
+- [x] screenshot-5-help.png (67 KB)
 
 **위치:** `screenshots/` 폴더
-**가이드:** `docs/screenshot-guide.md`
+**촬영 완료:** 2025-11-07
 
 ---
 
