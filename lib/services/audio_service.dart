@@ -364,8 +364,10 @@ class AudioService {
       _logging.debug('새 세그먼트 시작: $newFilePath');
 
       // WAV 자동 변환 로직 (조건부 실행)
+      // 세그먼트 분할 시에는 녹음이 계속 진행 중이지만,
+      // 녹음 중지 직전에 분할된 파일도 변환되어야 하므로 skipRecordingCheck: true 사용
       if (completedEncoder == AudioEncoder.wav && completedPath != null) {
-        unawaited(_scheduleWavConversion(completedPath));
+        unawaited(_scheduleWavConversion(completedPath, skipRecordingCheck: true));
       }
 
       // 보관 정책 적용 (백그라운드)
