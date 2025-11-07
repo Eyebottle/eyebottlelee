@@ -43,26 +43,36 @@
   - MSIX 패키징 체크리스트 작성
 
 ### 🔄 진행 중
-- [x] **Phase 4: MSIX 패키징 (자동화 부분 완료)** (2025-11-07)
+- [x] **Phase 4: MSIX 패키징 완료** (2025-11-07)
   - [x] pubspec.yaml 설정 확인 (msix_version: 1.3.0.0)
   - [x] 필수 파일 확인 (icon.ico 172KB, ffmpeg.exe 182MB)
-  - [x] Release 빌드 성공 (34.6초)
+  - [x] Release 빌드 성공
   - [x] **MSIX 패키지 생성 성공 (83MB)** ✨
-  - [ ] 로컬 설치 테스트 (수동)
-  - [ ] WACK 테스트 (수동)
+  - [x] **세그먼트 분할 WAV 변환 버그 수정** ⭐
+  - [x] 전체 재빌드 및 배포
+  - [ ] 개발 PC MSIX 설치 테스트 (수동)
+  - [ ] 진료실 .exe 실사용 테스트 (수동)
 
 ### ⏳ 대기 중 (수동 개입 필요)
-- [ ] **Phase 4 수동 테스트**
-  - [ ] MSIX 로컬 설치 (`C:\ws-workspace\eyebottlelee\build\windows\x64\runner\Release\medical_recorder.msix`)
-  - [ ] 설치 후 기능 확인 (녹음, 설정, 자동 실행)
-  - [ ] WACK (Windows App Certification Kit) 실행
-  - [ ] 제거 및 재설치 테스트
-- [ ] 수동 UI 테스트 (진료실 실사용 시 진행 가능)
-  - UI 테스트 (볼륨 미터, 버튼 반응)
-  - 음성 재생 확인
-  - 시간표 자동 녹음
-  - 자동 실행 매니저
-- [ ] Phase 5: MS Store 제출
+
+**진료실 컴퓨터 (.exe 실행):**
+- [ ] 10분 이상 장시간 녹음 테스트
+- [ ] 세그먼트 분할 시 WAV → AAC 변환 확인
+- [ ] 시간표 자동 녹음 동작 확인
+- [ ] 로고 표시 확인
+- 위치: `C:\Users\user\OneDrive\이안과\eyebottlelee-v1.3.0-wav-fix\medical_recorder.exe`
+- 제약: MSIX 설치 불가 (보안 정책)
+
+**개발 컴퓨터 (MSIX 설치):**
+- [ ] MSIX 로컬 설치 테스트
+- [ ] MSIX 환경에서 FFmpeg 실행 확인
+- [ ] 모든 기능 동작 확인
+- [ ] WACK 테스트 (선택적)
+- 위치: `C:\Users\user\OneDrive\이안과\eyebottlelee-v1.3.0-wav-fix\medical_recorder.msix`
+- 가이드: `docs/msix-dev-test-guide.md`
+
+**Phase 5 준비:**
+- [ ] MS Store 제출
 
 ---
 
