@@ -59,8 +59,9 @@
 
 **Phase 5: MS Store 제출 준비**
 - [x] 스크린샷 촬영 (5개 완료, 2025-11-07)
+- [x] 개인정보 처리방침 URL 준비 (GitHub Pages)
+  - URL: https://eyebottle.github.io/eyebottlelee/privacy-policy
 - [ ] MS 개발자 계정 등록 ($19) ← 다음 단계
-- [ ] 개인정보 처리방침 URL 준비
 - [ ] Partner Center에서 앱 리스팅 작성
 - [ ] MSIX 업로드 및 제출
 

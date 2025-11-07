@@ -38,8 +38,8 @@ MS Store에 앱을 제출하기 전 확인해야 할 모든 항목을 정리한 
 #### 개인정보 처리방침
 - [x] 개인정보 처리방침 작성 완료
 - [x] 위치: `docs/privacy-policy.md`
-- [ ] 웹사이트에 게시 (선택적)
-- [ ] URL 준비 (Partner Center 입력용)
+- [x] GitHub Pages에 게시 완료
+- [x] URL 준비: `https://eyebottle.github.io/eyebottlelee/privacy-policy`
 
 **옵션 1:** 웹사이트 게시
 ```
