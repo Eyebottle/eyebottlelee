@@ -1,0 +1,37 @@
+# Jekyll 설정 - GitHub Pages
+title: 아이보틀 진료 녹음
+description: 진료실을 위한 스마트 녹음 솔루션
+baseurl: "/eyebottlelee"
+url: "https://eyebottle.github.io"
+
+# 테마 설정
+theme: jekyll-theme-minimal
+markdown: kramdown
+
+# 레이아웃 설정
+defaults:
+  - scope:
+      path: ""
+    values:
+      layout: default
+
+# 플러그인
+plugins:
+  - jekyll-relative-links
+  - jekyll-optional-front-matter
+  - jekyll-titles-from-headings
+
+# 상대 링크 설정
+relative_links:
+  enabled: true
+  collections: true
+
+# 제목 자동 추출
+titles_from_headings:
+  enabled: true
+  strip_title: false
+  collections: false
+
+# Front Matter 선택적 사용
+optional_front_matter:
+  remove_originals: false
