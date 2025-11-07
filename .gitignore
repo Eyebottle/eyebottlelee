@@ -99,3 +99,12 @@ recordings/
 
 # User settings backup
 settings_backup.json.flutterw.env
+
+# Screenshots (MS Store submission - too large for git)
+screenshots/*.png
+screenshots/*.jpg
+screenshots/*.jpeg
+
+# Test releases
+eyebottlelee-test-release/
+eyebottlelee-test-release.zip

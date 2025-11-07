@@ -46,7 +46,7 @@ class LoggingService {
       );
 
       _logger = Logger(
-        level: Level.debug,
+        level: Level.info,  // debug → info로 변경하여 디버그 로그 제거
         printer: PrettyPrinter(
           methodCount: 0,
           errorMethodCount: 4,
