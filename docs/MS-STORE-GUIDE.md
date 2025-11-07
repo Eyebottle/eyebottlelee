@@ -42,7 +42,7 @@
   - 스크린샷 가이드 작성
   - MSIX 패키징 체크리스트 작성
 
-### 🔄 진행 중
+### ✅ 완료
 - [x] **Phase 4: MSIX 패키징 완료** (2025-11-07)
   - [x] pubspec.yaml 설정 확인 (msix_version: 1.3.0.0)
   - [x] 필수 파일 확인 (icon.ico 172KB, ffmpeg.exe 182MB)
@@ -50,29 +50,28 @@
   - [x] **MSIX 패키지 생성 성공 (83MB)** ✨
   - [x] **세그먼트 분할 WAV 변환 버그 수정** ⭐
   - [x] 전체 재빌드 및 배포
-  - [ ] 개발 PC MSIX 설치 테스트 (수동)
-  - [ ] 진료실 .exe 실사용 테스트 (수동)
+  - [x] **진료실 .exe 실사용 테스트 완료** 🎉
+    - 30분 녹음 (10분 × 3개 세그먼트)
+    - 모든 파일 AAC 변환 성공
+    - WAV 파일 0개 (완벽!)
 
-### ⏳ 대기 중 (수동 개입 필요)
+### 🔄 진행 중
 
-**진료실 컴퓨터 (.exe 실행):**
-- [ ] 10분 이상 장시간 녹음 테스트
-- [ ] 세그먼트 분할 시 WAV → AAC 변환 확인
-- [ ] 시간표 자동 녹음 동작 확인
-- [ ] 로고 표시 확인
-- 위치: `C:\Users\user\OneDrive\이안과\eyebottlelee-v1.3.0-wav-fix\medical_recorder.exe`
-- 제약: MSIX 설치 불가 (보안 정책)
+**Phase 5: MS Store 제출 준비**
+- [ ] 스크린샷 촬영 (5개 필수)
+- [ ] MS 개발자 계정 등록 ($19)
+- [ ] 앱 리스팅 작성
+- [ ] MSIX 업로드 및 제출
 
-**개발 컴퓨터 (MSIX 설치):**
+### ⏳ 선택적 작업
+
+**개발 컴퓨터 MSIX 테스트 (선택적):**
 - [ ] MSIX 로컬 설치 테스트
 - [ ] MSIX 환경에서 FFmpeg 실행 확인
-- [ ] 모든 기능 동작 확인
-- [ ] WACK 테스트 (선택적)
+- [ ] WACK 테스트
 - 위치: `C:\Users\user\OneDrive\이안과\eyebottlelee-v1.3.0-wav-fix\medical_recorder.msix`
 - 가이드: `docs/msix-dev-test-guide.md`
-
-**Phase 5 준비:**
-- [ ] MS Store 제출
+- **참고:** 진료실 테스트가 완료되어 선택적으로 진행 가능
 
 ---
 
