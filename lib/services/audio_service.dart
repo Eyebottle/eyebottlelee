@@ -238,20 +238,24 @@ class AudioService {
       final startTime = _sessionStartTime;
       final currentEncoder = _currentEncoder;
 
-      // 1. 녹음 중지
+      // 1. 타이머 먼저 취소 (새 세그먼트 생성 방지)
+      _logging.info('🧹 타이머 정리 중...');
+      _segmentTimer?.cancel();
+      _logging.info('✅ 타이머 취소 완료');
+
+      // 2. 녹음 중지
       _logging.info('🛑 녹음 중지 시도...');
       final filePath = await _recorder.stop();
       _logging.info('✅ 녹음 중지 완료');
       _isRecording = false;
       _currentEncoder = null;
 
-      // 2. 타이머 및 스트림 정리
-      _logging.info('🧹 리소스 정리 중...');
-      _segmentTimer?.cancel();
+      // 3. 스트림 정리
+      _logging.info('🧹 스트림 정리 중...');
       _amplitudeSubscription?.cancel();
       _logging.info('✅ 리소스 정리 완료');
 
-      // 3. 세션 통계
+      // 4. 세션 통계
       if (startTime != null) {
         final duration = stoppedAt.difference(startTime);
         _logging.info('📊 세션 통계:');
@@ -265,7 +269,7 @@ class AudioService {
       }
       _sessionStartTime = null;
 
-      // 4. 파일 정보
+      // 5. 파일 정보 및 WAV 변환
       if (filePath != null) {
         _logging.info('📁 마지막 세그먼트: $filePath');
         final file = File(filePath);
@@ -290,7 +294,7 @@ class AudioService {
       }
       _currentSegmentStartedAt = null;
 
-      // 5. 보관 정책 적용
+      // 6. 보관 정책 적용
       _logging.info('🧹 보관 정책 적용 중...');
       await _pruneOldFiles();
 
