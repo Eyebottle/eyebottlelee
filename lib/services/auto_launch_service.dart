@@ -18,6 +18,15 @@ class AutoLaunchService {
   final SettingsService _settings = SettingsService();
   final LoggingService _logging = LoggingService();
 
+  /// MSIX Package Family Name (must match msix_config in pubspec.yaml)
+  /// Format: [IdentityName]_[PublisherHash]
+  /// Note: PublisherHash depends on the certificate used for signing.
+  /// If the certificate changes, this hash will change.
+  static const String _msixPackageName =
+      'DCD952CB.367669DCDC1D3_tmhr7zc3de56j';
+
+  static const String _autostartArg = '--autostart';
+
   Future<void>? _setupFuture;
   bool _setupCompleted = false;
 
@@ -52,16 +61,28 @@ class AutoLaunchService {
         error: e,
         stackTrace: stackTrace,
       );
-      rethrow;
+      // 초기화 실패 시 더 진행하지 않음
+      return;
     }
 
     try {
+      // 현재 상태 확인 (불필요한 API 호출 방지)
+      final isEnabled = await _invokeLauncher(() => _launcher.isEnabled());
+
       if (enabled) {
-        await _invokeLauncher(() => _launcher.enable());
-        _logging.info('자동 실행이 활성화되었습니다. (source=$source)');
+        if (!isEnabled) {
+          await _invokeLauncher(() => _launcher.enable());
+          _logging.info('자동 실행이 활성화되었습니다. (source=$source)');
+        } else {
+          _logging.debug('자동 실행이 이미 활성화되어 있습니다. (source=$source)');
+        }
       } else {
-        await _invokeLauncher(() => _launcher.disable());
-        _logging.info('자동 실행이 비활성화되었습니다. (source=$source)');
+        if (isEnabled) {
+          await _invokeLauncher(() => _launcher.disable());
+          _logging.info('자동 실행이 비활성화되었습니다. (source=$source)');
+        } else {
+          _logging.debug('자동 실행이 이미 비활성화되어 있습니다. (source=$source)');
+        }
       }
     } catch (e, stackTrace) {
       _logging.error(
@@ -96,12 +117,12 @@ class AutoLaunchService {
         await _invokeLauncher(() => _launcher.setup(
               appName: 'Eyebottle Medical Recorder',
               appPath: exePath,
-              args: const <String>['--autostart'],
+              args: const <String>[_autostartArg],
               // Package Family Name from MS Store
-              packageName: 'DCD952CB.367669DCDC1D3_tmhr7zc3de56j',
+              packageName: _msixPackageName,
             ));
         _setupCompleted = true;
-        _logging.debug('자동 실행 등록 준비 완료 (path=$exePath)');
+        _logging.debug('자동 실행 등록 준비 완료 (path=$exePath, pkg=$_msixPackageName)');
       } catch (e, stackTrace) {
         _setupCompleted = false;
         _setupFuture = null;
@@ -117,10 +138,11 @@ class AutoLaunchService {
     return _setupFuture!;
   }
 
-  Future<void> _invokeLauncher(FutureOr<void> Function() action) async {
+  Future<T> _invokeLauncher<T>(FutureOr<T> Function() action) async {
     final result = action();
     if (result is Future) {
-      await result;
+      return await result;
     }
+    return result;
   }
 }
