@@ -1,10 +1,35 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:showcaseview/showcaseview.dart';
 import 'package:window_manager/window_manager.dart';
+import 'services/settings_service.dart';
 import 'ui/screens/main_screen.dart';
 import 'ui/style/app_theme.dart';
 
-void main() async {
+void main(List<String> args) async {
+  // 전역 에러 핸들러 설정
+  runZonedGuarded(() async {
+    WidgetsFlutterBinding.ensureInitialized();
+
+    // Flutter 프레임워크 에러 핸들러
+    FlutterError.onError = (FlutterErrorDetails details) {
+      FlutterError.presentError(details);
+      debugPrint('Flutter Error: ${details.exception}');
+      debugPrint('StackTrace: ${details.stack}');
+    };
+
+    // 부팅 시 자동 시작 여부 확인
+    final isAutostart = args.contains('--autostart');
+
+    await _initializeApp(isAutostart: isAutostart);
+  }, (error, stack) {
+    // Zone에서 캐치되지 않은 에러
+    debugPrint('Uncaught Error: $error');
+    debugPrint('StackTrace: $stack');
+  });
+}
+
+Future<void> _initializeApp({required bool isAutostart}) async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Windows Desktop 초기화
@@ -21,14 +46,31 @@ void main() async {
     title: '아이보틀 진료녹음 & 자동실행 매니저',
   );
 
+  // 부팅 시 자동 시작이고, 백그라운드 시작 설정이 활성화된 경우
+  bool shouldStartMinimized = false;
+  if (isAutostart) {
+    final settings = SettingsService();
+    shouldStartMinimized = await settings.getStartMinimizedOnBoot();
+    debugPrint('Autostart mode: shouldStartMinimized=$shouldStartMinimized');
+  }
+
   windowManager.waitUntilReadyToShow(windowOptions, () async {
-    await windowManager.show();
-    await windowManager.focus();
+    if (shouldStartMinimized) {
+      // 백그라운드로 시작 (트레이만 표시)
+      await windowManager.hide();
+      debugPrint('Started minimized to tray');
+    } else {
+      // 정상적으로 창 표시
+      await windowManager.show();
+      await windowManager.focus();
+    }
   });
 
   WidgetsBinding.instance.addPostFrameCallback((_) async {
-    await _applyWindowMetrics(
-        initialSize: initialSize, minimumSize: minimumSize);
+    if (!shouldStartMinimized) {
+      await _applyWindowMetrics(
+          initialSize: initialSize, minimumSize: minimumSize);
+    }
   });
 
   runApp(

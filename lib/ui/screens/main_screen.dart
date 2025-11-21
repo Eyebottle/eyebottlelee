@@ -257,12 +257,23 @@ class _MainScreenState extends State<MainScreen>
             onStartAutoLaunchTutorial: _startAutoLaunchTutorial,
           );
       await _trayService.setRecordingState(_audioService.isRecording);
-    } catch (_) {}
+    } catch (e, stackTrace) {
+      _loggingService.warning('시스템 트레이 초기화 실패 (앱은 계속 실행됨)',
+          error: e, stackTrace: stackTrace);
+      // 시스템 트레이 실패는 치명적이지 않으므로 앱 계속 실행
+    }
 
     await _loadTodayRecordingDuration();
     await _syncRecordingWithSchedule(initial: true);
     await _refreshSaveFolderDisplay();
-    await _runMicDiagnostic(initial: true);
+
+    try {
+      await _runMicDiagnostic(initial: true);
+    } catch (e, stackTrace) {
+      _loggingService.warning('초기 마이크 진단 실패',
+          error: e, stackTrace: stackTrace);
+      // 마이크 진단 실패는 치명적이지 않으므로 앱 계속 실행
+    }
   }
 
   @override
@@ -333,6 +344,7 @@ class _MainScreenState extends State<MainScreen>
                         onOpenRetention: () => _openRetentionSettings(),
                         onOpenAudioQuality: () => _openAudioQualitySettings(),
                         onOpenWavConversion: () => _openWavConversionSettings(),
+                        onOpenStartup: () => _openStartupSettings(),
                         scheduleShowcaseKey: _settingsScheduleKey,
                         saveFolderShowcaseKey: _settingsSaveKey,
                         retentionShowcaseKey: _settingsRetentionKey,
@@ -574,6 +586,21 @@ class _MainScreenState extends State<MainScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('WAV 자동 변환 설정이 저장되었습니다')),
+        );
+      }
+    }
+  }
+
+  Future<void> _openStartupSettings() async {
+    final result = await AdvancedSettingsDialog.show(
+      context,
+      AdvancedSettingSection.startupSettings,
+    );
+    if (result == 'saved') {
+      // 부팅 시 자동 시작 설정 저장 완료
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Windows 시작 설정이 저장되었습니다')),
         );
       }
     }
@@ -1892,6 +1919,7 @@ class _SettingsTab extends StatelessWidget {
     required this.onOpenRetention,
     required this.onOpenAudioQuality,
     required this.onOpenWavConversion,
+    required this.onOpenStartup,
     required this.scheduleShowcaseKey,
     required this.saveFolderShowcaseKey,
     required this.retentionShowcaseKey,
@@ -1910,6 +1938,7 @@ class _SettingsTab extends StatelessWidget {
   final Future<void> Function() onOpenRetention;
   final Future<void> Function() onOpenAudioQuality;
   final Future<void> Function() onOpenWavConversion;
+  final Future<void> Function() onOpenStartup;
   final GlobalKey scheduleShowcaseKey;
   final GlobalKey saveFolderShowcaseKey;
   final GlobalKey retentionShowcaseKey;
@@ -1999,6 +2028,12 @@ class _SettingsTab extends StatelessWidget {
                 title: 'WAV 파일 자동 변환',
                 description: 'WAV 파일을 AAC/Opus로 자동 변환하여 용량을 75% 이상 절감합니다.',
                 onTap: onOpenWavConversion,
+              ),
+              SettingsDestination(
+                icon: Icons.power_settings_new,
+                title: 'Windows 시작 설정',
+                description: '부팅 시 앱 자동 실행 및 백그라운드 시작 옵션을 설정합니다.',
+                onTap: onOpenStartup,
               ),
             ],
           ),

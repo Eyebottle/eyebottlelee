@@ -12,6 +12,7 @@ class SettingsService {
   static const _keyScheduleJson = 'weekly_schedule_json';
   static const _keySaveFolder = 'save_folder';
   static const _keyLaunchAtStartup = 'launch_at_startup';
+  static const _keyStartMinimizedOnBoot = 'start_minimized_on_boot';
   static const _keyVadEnabled = 'vad_enabled';
   static const _keyVadThreshold = 'vad_threshold';
   static const _keyDailyRecordingSeconds = 'daily_recording_seconds';
@@ -61,6 +62,22 @@ class SettingsService {
   Future<bool> getLaunchAtStartup() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getBool(_keyLaunchAtStartup) ?? true;
+  }
+
+  /// 부팅 시 백그라운드로 시작 여부 설정
+  ///
+  /// **기본값:** false (창 표시)
+  Future<void> setStartMinimizedOnBoot(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_keyStartMinimizedOnBoot, value);
+  }
+
+  /// 부팅 시 백그라운드로 시작 여부 가져오기
+  ///
+  /// **반환값:** true = 백그라운드 시작, false = 창 표시 (기본값)
+  Future<bool> getStartMinimizedOnBoot() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_keyStartMinimizedOnBoot) ?? false;
   }
 
   Future<void> setVad(

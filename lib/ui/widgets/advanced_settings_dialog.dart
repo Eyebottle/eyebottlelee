@@ -11,7 +11,13 @@ import '../../models/recording_profile.dart';
 
 enum RetentionOption { forever, week, month, threeMonths, sixMonths, year }
 
-enum AdvancedSettingSection { audioQuality, vad, retention, wavConversion }
+enum AdvancedSettingSection {
+  audioQuality,
+  vad,
+  retention,
+  wavConversion,
+  startupSettings
+}
 
 class AdvancedSettingsDialog extends StatefulWidget {
   const AdvancedSettingsDialog({super.key, required this.section});
@@ -36,6 +42,7 @@ class _AdvancedSettingsDialogState extends State<AdvancedSettingsDialog> {
   bool _vadEnabled = true;
   double _vadThreshold = 0.006;
   bool _launchAtStartup = true;
+  bool _startMinimizedOnBoot = false;
   bool _loading = true;
   RetentionOption _retentionOption = RetentionOption.forever;
   VadPreset? _vadPreset;
@@ -56,6 +63,7 @@ class _AdvancedSettingsDialogState extends State<AdvancedSettingsDialog> {
     final settings = SettingsService();
     final (vadEnabled, vadThreshold) = await settings.getVad();
     final launch = await settings.getLaunchAtStartup();
+    final startMinimized = await settings.getStartMinimizedOnBoot();
     final retention = await settings.getRetentionDuration();
     final profile = await settings.getRecordingProfile();
     final gainDb = await settings.getMakeupGainDb();
@@ -68,6 +76,7 @@ class _AdvancedSettingsDialogState extends State<AdvancedSettingsDialog> {
       _vadEnabled = vadEnabled;
       _vadThreshold = vadThreshold;
       _launchAtStartup = launch;
+      _startMinimizedOnBoot = startMinimized;
       _retentionOption = _optionFromDuration(retention);
       _vadPreset = _presetFromThreshold(_vadThreshold);
       _recordingProfile = profile;
@@ -154,6 +163,10 @@ class _AdvancedSettingsDialogState extends State<AdvancedSettingsDialog> {
       AdvancedSettingSection.wavConversion => (
           'WAV 파일 자동 변환',
           'WAV 파일을 AAC/Opus로 자동 변환하여 용량을 75% 이상 절감합니다.'
+        ),
+      AdvancedSettingSection.startupSettings => (
+          'Windows 시작 설정',
+          '부팅 시 앱 자동 실행 및 창 표시 옵션을 설정합니다.'
         ),
     };
 
@@ -485,6 +498,60 @@ class _AdvancedSettingsDialogState extends State<AdvancedSettingsDialog> {
             ],
           ),
         );
+      case AdvancedSettingSection.startupSettings:
+        return _SettingsCard(
+          icon: Icons.power_settings_new,
+          title: 'Windows 시작 설정',
+          description:
+              'PC 부팅 시 앱을 자동으로 시작하고, 백그라운드 실행 여부를 설정합니다.',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SwitchListTile.adaptive(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Windows 시작 시 앱 자동 실행'),
+                subtitle: const Text('PC 부팅 시 아이보틀 앱이 자동으로 시작됩니다'),
+                value: _launchAtStartup,
+                onChanged: (v) => setState(() => _launchAtStartup = v),
+              ),
+              if (_launchAtStartup) ...[
+                const SizedBox(height: 12),
+                const Divider(),
+                const SizedBox(height: 12),
+                SwitchListTile.adaptive(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('부팅 시 백그라운드로 시작'),
+                  subtitle: const Text('창을 표시하지 않고 트레이에서만 실행됩니다'),
+                  value: _startMinimizedOnBoot,
+                  onChanged: (v) => setState(() => _startMinimizedOnBoot = v),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.blue.shade200),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.info_outline, color: Colors.blue.shade700, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '백그라운드로 시작하면 시스템 트레이 아이콘을 클릭하여 창을 열 수 있습니다',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: Colors.blue.shade900,
+                              ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+        );
     }
   }
 
@@ -494,6 +561,7 @@ class _AdvancedSettingsDialogState extends State<AdvancedSettingsDialog> {
     await settings.setMakeupGainDb(_makeupGainDb);
     await settings.setVad(enabled: _vadEnabled, threshold: _vadThreshold);
     await settings.setLaunchAtStartup(_launchAtStartup);
+    await settings.setStartMinimizedOnBoot(_startMinimizedOnBoot);
     await settings.setRetentionDuration(_durationForOption(_retentionOption));
     // WAV 자동 변환 설정 저장
     await settings.setWavAutoConvertEnabled(_wavAutoConvertEnabled);
