@@ -39,6 +39,8 @@ Future<void> _initializeApp({required bool isAutostart}) async {
   const minimumSize = Size(640, 900);
 
   WindowOptions windowOptions = const WindowOptions(
+    size: initialSize,
+    minimumSize: minimumSize,
     center: true,
     backgroundColor: Colors.transparent,
     skipTaskbar: false,
@@ -67,10 +69,9 @@ Future<void> _initializeApp({required bool isAutostart}) async {
   });
 
   WidgetsBinding.instance.addPostFrameCallback((_) async {
-    if (!shouldStartMinimized) {
-      await _applyWindowMetrics(
-          initialSize: initialSize, minimumSize: minimumSize);
-    }
+    // 백그라운드 시작이어도 창 크기는 설정 (숨겨진 상태에서도 크기 설정 가능)
+    await _applyWindowMetrics(
+        initialSize: initialSize, minimumSize: minimumSize);
   });
 
   runApp(

@@ -90,10 +90,15 @@ class AutoLaunchService {
 
       final exePath = Platform.resolvedExecutable;
       try {
+        // MSIX Store 버전에서는 packageName 필수 (StartupTask API 사용)
+        // 레지스트리 방식은 MSIX 샌드박스에서 차단됨
+        // --autostart 플래그: 부팅 시 백그라운드 시작 기능을 위해 필요
         await _invokeLauncher(() => _launcher.setup(
               appName: 'Eyebottle Medical Recorder',
               appPath: exePath,
-              args: const <String>[],
+              args: const <String>['--autostart'],
+              // Package Family Name from MS Store
+              packageName: 'DCD952CB.367669DCDC1D3_tmhr7zc3de56j',
             ));
         _setupCompleted = true;
         _logging.debug('자동 실행 등록 준비 완료 (path=$exePath)');

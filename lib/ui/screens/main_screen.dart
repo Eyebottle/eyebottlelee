@@ -73,6 +73,7 @@ class _MainScreenState extends State<MainScreen>
   bool _micDiagnosticRunning = false;
   bool _vadEnabled = true;
   bool _autoLaunchEnabled = false;
+  bool _startMinimizedOnBoot = false;
   Duration? _retentionDuration;
   RecordingQualityProfile _recordingProfile = RecordingQualityProfile.balanced;
   double _makeupGainDb = 0.0;
@@ -229,10 +230,12 @@ class _MainScreenState extends State<MainScreen>
       });
     }
 
-    final launchSettings = await AutoLaunchManagerService().loadSettings();
+    final launchAtStartup = await _settings.getLaunchAtStartup();
+    final startMinimized = await _settings.getStartMinimizedOnBoot();
     if (mounted) {
       setState(() {
-        _autoLaunchEnabled = launchSettings.autoLaunchEnabled;
+        _autoLaunchEnabled = launchAtStartup;
+        _startMinimizedOnBoot = startMinimized;
       });
     }
 
@@ -352,6 +355,8 @@ class _MainScreenState extends State<MainScreen>
                         audioQualityShowcaseKey: _settingsAudioQualityKey,
                         saveFolder: _currentSaveFolder,
                         vadEnabled: _vadEnabled,
+                        launchAtStartup: _autoLaunchEnabled,
+                        startMinimizedOnBoot: _startMinimizedOnBoot,
                         retentionDuration: _retentionDuration,
                         recordingProfile: _recordingProfile,
                         makeupGainDb: _makeupGainDb,
@@ -597,8 +602,13 @@ class _MainScreenState extends State<MainScreen>
       AdvancedSettingSection.startupSettings,
     );
     if (result == 'saved') {
-      // 부팅 시 자동 시작 설정 저장 완료
+      final launchAtStartup = await _settings.getLaunchAtStartup();
+      final startMinimized = await _settings.getStartMinimizedOnBoot();
       if (mounted) {
+        setState(() {
+          _autoLaunchEnabled = launchAtStartup;
+          _startMinimizedOnBoot = startMinimized;
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Windows 시작 설정이 저장되었습니다')),
         );
@@ -1927,6 +1937,8 @@ class _SettingsTab extends StatelessWidget {
     required this.audioQualityShowcaseKey,
     required this.saveFolder,
     required this.vadEnabled,
+    required this.launchAtStartup,
+    required this.startMinimizedOnBoot,
     required this.retentionDuration,
     required this.recordingProfile,
     required this.makeupGainDb,
@@ -1946,6 +1958,8 @@ class _SettingsTab extends StatelessWidget {
   final GlobalKey audioQualityShowcaseKey;
   final String saveFolder;
   final bool vadEnabled;
+  final bool launchAtStartup;
+  final bool startMinimizedOnBoot;
   final Duration? retentionDuration;
   final RecordingQualityProfile recordingProfile;
   final double makeupGainDb;
@@ -1962,8 +1976,8 @@ class _SettingsTab extends StatelessWidget {
             items: [
               SettingsDestination(
                 icon: Icons.schedule,
-                title: '스케줄 설정',
-                description: '진료/녹음 시간을 관리합니다.',
+                title: '진료 시간표',
+                description: '자동 녹음 시간을 설정합니다.',
                 onTap: onOpenSchedule,
                 showcaseKey: scheduleShowcaseKey,
                 showcaseDescription: '진료 시간표에서 오전/오후 구간을 조정해 자동 녹음 시간을 관리하세요.',
@@ -1977,24 +1991,21 @@ class _SettingsTab extends StatelessWidget {
               SettingsDestination(
                 icon: Icons.folder_open,
                 title: '저장 위치',
-                description: '녹음 파일 저장 폴더를 변경합니다.',
+                description: saveFolder,
                 onTap: onOpenSaveFolder,
                 showcaseKey: saveFolderShowcaseKey,
                 showcaseDescription: '녹음 파일을 저장할 폴더(예: OneDrive)를 지정합니다.',
               ),
               SettingsDestination(
                 icon: Icons.history,
-                title: '저장 기간',
-                description: '녹음 파일의 보관 기간을 설정합니다.',
+                title: '보관 기간',
+                description: '오래된 파일을 자동으로 정리합니다.',
                 statusText: _formatRetentionLabel(retentionDuration),
                 onTap: onOpenRetention,
                 showcaseKey: retentionShowcaseKey,
                 showcaseDescription: '자동 보관 기간을 설정해 오래된 파일을 정리할 수 있습니다.',
               ),
             ],
-            footer: _SaveFolderSummary(
-              saveFolder: saveFolder,
-            ),
           ),
           const SizedBox(height: 16),
           _SettingsSection(
@@ -2002,8 +2013,8 @@ class _SettingsTab extends StatelessWidget {
             items: [
               SettingsDestination(
                 icon: Icons.graphic_eq,
-                title: '녹음 품질 · 민감도',
-                description: '파일 용량과 조용한 환경에 맞는 입력 감도를 조절합니다.',
+                title: '녹음 품질',
+                description: '용량 절감 및 마이크 민감도를 조절합니다.',
                 statusText: _formatAudioQualityStatus(
                   recordingProfile,
                   makeupGainDb,
@@ -2015,8 +2026,8 @@ class _SettingsTab extends StatelessWidget {
               ),
               SettingsDestination(
                 icon: Icons.mic,
-                title: '음성 활동 감지 (VAD)',
-                description: '음성이 감지될 때만 녹음하도록 설정합니다.',
+                title: '무음 감지 (VAD)',
+                description: '음성이 감지될 때만 녹음합니다.',
                 statusText: vadEnabled ? '켜짐' : '꺼짐',
                 onTap: onOpenVad,
                 showcaseKey: vadShowcaseKey,
@@ -2025,14 +2036,19 @@ class _SettingsTab extends StatelessWidget {
               ),
               SettingsDestination(
                 icon: Icons.transform,
-                title: 'WAV 파일 자동 변환',
-                description: 'WAV 파일을 AAC/Opus로 자동 변환하여 용량을 75% 이상 절감합니다.',
+                title: 'WAV 자동 변환',
+                description: 'AAC/Opus로 변환하여 용량 75% 절감합니다.',
                 onTap: onOpenWavConversion,
               ),
               SettingsDestination(
                 icon: Icons.power_settings_new,
-                title: 'Windows 시작 설정',
-                description: '부팅 시 앱 자동 실행 및 백그라운드 시작 옵션을 설정합니다.',
+                title: 'Windows 시작',
+                description: '부팅 시 자동 실행 및 백그라운드 시작합니다.',
+                statusText: !launchAtStartup
+                    ? '꺼짐'
+                    : startMinimizedOnBoot
+                        ? '켜짐 · 백그라운드'
+                        : '켜짐 · 창 표시',
                 onTap: onOpenStartup,
               ),
             ],
@@ -2074,65 +2090,14 @@ class SettingsDestination {
   final String? showcaseDescription;
 }
 
-class _SaveFolderSummary extends StatelessWidget {
-  const _SaveFolderSummary({
-    required this.saveFolder,
-  });
-
-  final String saveFolder;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          '현재 저장 경로',
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: AppColors.textSecondary,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Icon(Icons.folder_open,
-                size: 18, color: AppColors.textSecondary),
-            const SizedBox(width: 6),
-            Expanded(
-              child: SelectableText(
-                saveFolder,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: AppColors.textSecondary,
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 6),
-        Text(
-          '경로는 “저장 위치” 메뉴에서 언제든지 바꿀 수 있어요.',
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: AppColors.textSecondary.withOpacity(0.8),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 class _SettingsSection extends StatelessWidget {
   const _SettingsSection({
     required this.title,
     required this.items,
-    this.footer,
   });
 
   final String title;
   final List<SettingsDestination> items;
-  final Widget? footer;
 
   @override
   Widget build(BuildContext context) {
@@ -2157,12 +2122,6 @@ class _SettingsSection extends StatelessWidget {
             ),
           ),
           ...items.map((item) => _SettingsTile(item: item)).toList(),
-          if (footer != null) const Divider(height: 1),
-          if (footer != null)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
-              child: footer!,
-            ),
         ],
       ),
     );
