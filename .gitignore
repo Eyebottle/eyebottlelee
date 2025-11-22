@@ -108,3 +108,7 @@ screenshots/*.jpeg
 # Test releases
 eyebottlelee-test-release/
 eyebottlelee-test-release.zip
+
+# Development test scripts (root directory only)
+/install*.ps1
+/install*.bat

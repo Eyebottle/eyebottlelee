@@ -4,6 +4,20 @@
 
 진료 중 환자와의 대화를 자동으로 녹음하고, 진료실 프로그램을 자동으로 실행하여 체계적으로 관리하는 Windows 데스크톱 애플리케이션입니다.
 
+## 📥 다운로드
+
+<a href="https://www.microsoft.com/store/apps/9NDZB0QSL928">
+  <img src="https://get.microsoft.com/images/en-us%20dark.svg" alt="Microsoft Store에서 다운로드" width="200"/>
+</a>
+
+**Microsoft Store에서 공식 출시!** (2025-11-17)
+
+- **Store ID**: 9NDZB0QSL928
+- **다운로드 링크**: https://www.microsoft.com/store/apps/9NDZB0QSL928
+- **대체 링크**: https://apps.microsoft.com/detail/9NDZB0QSL928
+
+> Microsoft Store를 통한 설치가 가장 간편하고 안전하며, 자동 업데이트를 지원합니다.
+
 ## 🚀 주요 기능
 
 ### 녹음 기능
