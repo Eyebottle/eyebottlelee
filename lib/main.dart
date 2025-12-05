@@ -75,9 +75,11 @@ Future<void> _initializeApp(
     if (shouldStartMinimized) {
       // 백그라운드로 시작 (트레이만 표시)
       await windowManager.hide();
+      await windowManager.setSkipTaskbar(true);
       logging.info('Started minimized to tray (background mode)');
     } else {
       // 정상적으로 창 표시
+      await windowManager.setSkipTaskbar(false);
       await windowManager.show();
       await windowManager.focus();
       logging.info('Started normally (visible window)');

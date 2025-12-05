@@ -42,7 +42,7 @@ class LaunchProgram {
       delaySeconds: json['delaySeconds'] as int? ?? 10,
       windowState: _parseWindowState(json['windowState'] as String?),
       enabled: json['enabled'] as bool? ?? true,
-      order: json['order'] as int,
+      order: json['order'] as int? ?? 0,
       lastExecuted: json['lastExecuted'] != null
           ? DateTime.fromMillisecondsSinceEpoch(json['lastExecuted'] as int)
           : null,
@@ -120,17 +120,22 @@ class LaunchProgram {
   }
 
   /// 프로그램 정보 복사 (일부 속성 변경)
+  ///
+  /// nullable 필드(workingDirectory, lastExecuted)를 명시적으로 null로
+  /// 설정하려면 clearWorkingDirectory, clearLastExecuted를 true로 설정하세요.
   LaunchProgram copyWith({
     String? id,
     String? name,
     String? path,
     List<String>? arguments,
     String? workingDirectory,
+    bool clearWorkingDirectory = false,
     int? delaySeconds,
     WindowState? windowState,
     bool? enabled,
     int? order,
     DateTime? lastExecuted,
+    bool clearLastExecuted = false,
     bool? requiresConfirmation,
   }) {
     return LaunchProgram(
@@ -138,12 +143,14 @@ class LaunchProgram {
       name: name ?? this.name,
       path: path ?? this.path,
       arguments: arguments ?? this.arguments,
-      workingDirectory: workingDirectory ?? this.workingDirectory,
+      workingDirectory:
+          clearWorkingDirectory ? null : (workingDirectory ?? this.workingDirectory),
       delaySeconds: delaySeconds ?? this.delaySeconds,
       windowState: windowState ?? this.windowState,
       enabled: enabled ?? this.enabled,
       order: order ?? this.order,
-      lastExecuted: lastExecuted ?? this.lastExecuted,
+      lastExecuted:
+          clearLastExecuted ? null : (lastExecuted ?? this.lastExecuted),
       requiresConfirmation: requiresConfirmation ?? this.requiresConfirmation,
     );
   }

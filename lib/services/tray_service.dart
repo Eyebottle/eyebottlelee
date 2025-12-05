@@ -155,13 +155,32 @@ class TrayService {
   }
 
   /// 메인 창 보이기
+  ///
+  /// 트레이 아이콘 클릭 시 창을 복원합니다.
+  /// onShowWindow 콜백이 설정되어 있으면 해당 콜백에서 창 복원을 처리합니다.
   void _showMainWindow() {
+    // onShowWindow 콜백이 있으면 해당 콜백에서 창 복원 처리
+    // (MainScreen._bringToFront가 더 완전한 복원 로직을 가짐)
+    if (onShowWindow != null) {
+      onShowWindow!();
+      return;
+    }
+
+    // 콜백이 없는 경우 기본 동작 (폴백)
+    _showMainWindowFallback();
+  }
+
+  /// 창 복원 폴백 메서드
+  Future<void> _showMainWindowFallback() async {
     try {
-      windowManager.show();
-      windowManager.focus();
-      if (onShowWindow != null) {
-        onShowWindow!();
+      await windowManager.setSkipTaskbar(false);
+      final isMinimized = await windowManager.isMinimized();
+      if (isMinimized) {
+        await windowManager.restore();
       }
+      await windowManager.show();
+      await windowManager.focus();
+      debugPrint('메인 창 복원 완료 (폴백)');
     } catch (e) {
       debugPrint('메인 창 표시 실패: $e');
     }
@@ -178,7 +197,8 @@ class TrayService {
 
   /// 설정 창 표시
   void _showSettings() {
-    _showMainWindow(); // 현재는 메인 창으로 이동
+    // 메인 창을 열어서 설정 탭으로 이동
+    _showMainWindow();
   }
 
   /// 앱 종료 처리

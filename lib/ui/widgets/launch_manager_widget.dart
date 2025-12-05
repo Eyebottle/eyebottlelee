@@ -33,6 +33,9 @@ class _LaunchManagerWidgetState extends State<LaunchManagerWidget> {
   bool _loading = true;
   bool _isExecuting = false;
 
+  // Stream 구독 관리
+  dynamic _progressSubscription;
+
   @override
   void initState() {
     super.initState();
@@ -60,7 +63,7 @@ class _LaunchManagerWidgetState extends State<LaunchManagerWidget> {
   }
 
   void _subscribeToProgress() {
-    _launchService.progressStream.listen((progress) {
+    _progressSubscription = _launchService.progressStream.listen((progress) {
       if (mounted) {
         setState(() {
           _isExecuting = progress.isRunning;
@@ -489,6 +492,7 @@ class _LaunchManagerWidgetState extends State<LaunchManagerWidget> {
 
   @override
   void dispose() {
+    _progressSubscription?.cancel();
     super.dispose();
   }
 }

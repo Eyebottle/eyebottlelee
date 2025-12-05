@@ -20,6 +20,7 @@ class AudioService {
   final AudioConverterService _audioConverterService = AudioConverterService();
 
   bool _isRecording = false;
+  bool _isDisposed = false; // dispose 여부 플래그
   bool _vadEnabled = true;
   double vadThreshold = 0.006; // RMS 기반 VAD 임계값
   int _silenceMs = 0;
@@ -413,6 +414,12 @@ class AudioService {
 
       // 지연 실행 (녹음 안정화 시간 확보)
       Future.delayed(Duration(seconds: delaySeconds), () async {
+        // dispose된 경우 변환 건너뜀
+        if (_isDisposed) {
+          _logging.debug('서비스 dispose됨 - WAV 변환 건너뜀: ${path.basename(wavPath)}');
+          return;
+        }
+
         // 안전성 체크: 여전히 녹음 중인가? (skipRecordingCheck가 false인 경우만)
         if (!skipRecordingCheck && !_isRecording) {
           _logging.warning('녹음 중지됨 - WAV 변환 취소: ${path.basename(wavPath)}');
@@ -510,6 +517,7 @@ class AudioService {
         _resumeTimer?.cancel();
         _resumeTimer =
             Timer(const Duration(milliseconds: resumeDelayMs), () async {
+          if (_isDisposed) return;
           try {
             await _recorder.resume();
             _pausedByVad = false;
@@ -525,15 +533,20 @@ class AudioService {
     if (!_pausedByVad && _silenceMs >= silenceHoldMs) {
       _resumeTimer?.cancel();
       _silenceMs = 0;
-      () async {
-        try {
-          await _recorder.pause();
-          _pausedByVad = true;
-          _logging.debug('VAD: 무음 지속으로 녹음 일시정지');
-        } catch (e) {
-          _logging.error('VAD 일시정지 실패', error: e);
-        }
-      }();
+      _pauseByVad();
+    }
+  }
+
+  /// VAD에 의한 일시정지 (안전하게 처리)
+  Future<void> _pauseByVad() async {
+    if (_isDisposed || _pausedByVad) return;
+    try {
+      await _recorder.pause();
+      _pausedByVad = true;
+      _logging.debug('VAD: 무음 지속으로 녹음 일시정지');
+    } catch (e) {
+      _logging.error('VAD 일시정지 실패', error: e);
+      // 실패해도 상태는 변경하지 않음
     }
   }
 
@@ -703,17 +716,23 @@ class AudioService {
 
   String _extensionForEncoder(AudioEncoder encoder) {
     switch (encoder) {
+      case AudioEncoder.aacLc:
+      case AudioEncoder.aacEld:
+      case AudioEncoder.aacHe:
+        return '.m4a';
       case AudioEncoder.opus:
         return '.opus';
       case AudioEncoder.wav:
         return '.wav';
       default:
-        return '.opus';
+        return '.m4a'; // 기본값은 AAC 계열
     }
   }
 
   /// 리소스 정리
   void dispose() {
+    _isDisposed = true;
+    _isRecording = false;
     _amplitudeSubscription?.cancel();
     _segmentTimer?.cancel();
     _resumeTimer?.cancel();

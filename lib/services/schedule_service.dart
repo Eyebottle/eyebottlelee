@@ -9,6 +9,7 @@ class ScheduleService {
   Cron _cron = Cron();
   WeeklySchedule? _currentSchedule;
   final LoggingService _logging = LoggingService();
+  bool _isDisposed = false;
 
   ScheduleService() {
     unawaited(_logging.ensureInitialized());
@@ -63,6 +64,7 @@ class ScheduleService {
     final cronExpression = _buildCronExpression(weekDay, timeOfDay);
 
     _cron.schedule(Schedule.parse(cronExpression), () {
+      if (_isDisposed) return;
       _logging.info('스케줄된 녹음 시작 트리거');
       _logging.debug('요일=$weekDay, 시각=${_formatTime(timeOfDay)}');
       if (onRecordingStart != null) {
@@ -76,6 +78,7 @@ class ScheduleService {
     final cronExpression = _buildCronExpression(weekDay, timeOfDay);
 
     _cron.schedule(Schedule.parse(cronExpression), () {
+      if (_isDisposed) return;
       _logging.info('스케줄된 녹음 중지 트리거');
       _logging.debug('요일=$weekDay, 시각=${_formatTime(timeOfDay)}');
       if (onRecordingStop != null) {
@@ -156,6 +159,7 @@ class ScheduleService {
 
   /// 서비스 정리
   void dispose() {
+    _isDisposed = true;
     _cron.close();
   }
 }

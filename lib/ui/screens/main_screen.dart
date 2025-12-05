@@ -79,7 +79,9 @@ class _MainScreenState extends State<MainScreen>
   double _makeupGainDb = 0.0;
   bool _hasShownTrayReminder = false;
   bool _isHiddenToTray = false;
+  bool _isHidingToTray = false; // 트레이 숨김 진행 중 플래그
   bool _shutdownRequested = false;
+  Timer? _autoLaunchDelayTimer; // 자동 실행 매니저 지연 타이머
 
   @override
   void initState() {
@@ -134,7 +136,8 @@ class _MainScreenState extends State<MainScreen>
       if (launchManagerSettings.autoLaunchEnabled &&
           launchManagerSettings.enabledPrograms.isNotEmpty) {
         // 앱 시작 5초 후에 프로그램 자동 실행
-        Timer(const Duration(seconds: 5), () async {
+        _autoLaunchDelayTimer = Timer(const Duration(seconds: 5), () async {
+          if (!mounted) return;
           try {
             await _autoLaunchManagerService.executePrograms();
           } catch (e, stackTrace) {
@@ -282,8 +285,10 @@ class _MainScreenState extends State<MainScreen>
   @override
   void dispose() {
     _sessionTicker?.cancel();
+    _autoLaunchDelayTimer?.cancel();
     _tabController.dispose();
     _audioService.dispose();
+    _scheduleService.dispose();
     _trayService.dispose();
     _loggingService.removeErrorListener(_handleLoggingError);
     windowManager.removeListener(this);
@@ -693,21 +698,38 @@ class _MainScreenState extends State<MainScreen>
     }
   }
 
-  void _bringToFront() {
-    () async {
-      try {
-        await windowManager.setSkipTaskbar(false);
-        final isMinimized = await windowManager.isMinimized();
-        if (isMinimized) {
-          await windowManager.restore();
-        }
-        await windowManager.show();
-        await windowManager.focus();
-        _isHiddenToTray = false;
-      } catch (e) {
-        _loggingService.warning('창 포커스 이동 실패', error: e);
+  /// 창을 전면으로 가져오는 메서드
+  ///
+  /// 트레이에서 창을 복원할 때 사용됩니다.
+  Future<void> _bringToFront() async {
+    // 숨기는 중이면 완료될 때까지 대기
+    if (_isHidingToTray) {
+      _loggingService.debug('트레이 숨김 진행 중 - 완료 대기');
+      // 최대 500ms 대기
+      for (var i = 0; i < 10 && _isHidingToTray; i++) {
+        await Future.delayed(const Duration(milliseconds: 50));
       }
-    }();
+    }
+
+    try {
+      // 작업표시줄에 먼저 표시
+      await windowManager.setSkipTaskbar(false);
+
+      // 최소화 상태면 복원
+      final isMinimized = await windowManager.isMinimized();
+      if (isMinimized) {
+        await windowManager.restore();
+      }
+
+      // 창 표시 및 포커스
+      await windowManager.show();
+      await windowManager.focus();
+
+      _isHiddenToTray = false;
+      _loggingService.info('창이 전면으로 복원되었습니다.');
+    } catch (e, stackTrace) {
+      _loggingService.warning('창 포커스 이동 실패', error: e, stackTrace: stackTrace);
+    }
   }
 
   void _handleTrayExit() {
@@ -739,35 +761,43 @@ class _MainScreenState extends State<MainScreen>
 
   @override
   void onWindowClose() {
-    if (_shutdownRequested) {
+    // 이미 종료 요청되었거나 숨김 진행 중이면 무시
+    if (_shutdownRequested || _isHidingToTray || _isHiddenToTray) {
       return;
     }
 
-    if (_isHiddenToTray) {
-      return;
-    }
+    // 트레이로 숨기기 시작
+    _hideToTray();
+  }
 
-    _isHiddenToTray = true;
+  /// 창을 트레이로 숨기는 메서드
+  ///
+  /// 비동기 작업을 안전하게 처리하고 상태를 정확히 관리합니다.
+  Future<void> _hideToTray() async {
+    if (_isHidingToTray || _isHiddenToTray) return;
+    _isHidingToTray = true;
 
-    () async {
-      try {
-        await windowManager.hide();
-        await windowManager.setSkipTaskbar(true);
-      } catch (e, stackTrace) {
-        _loggingService.error('창 숨김 실패', error: e, stackTrace: stackTrace);
-      }
-    }();
+    try {
+      // 먼저 창을 숨기고, 그 다음 작업표시줄에서 제거
+      await windowManager.hide();
+      await windowManager.setSkipTaskbar(true);
+      _isHiddenToTray = true;
+      _loggingService.info('창이 트레이로 숨겨졌습니다.');
 
-    if (!_hasShownTrayReminder && mounted) {
-      _hasShownTrayReminder = true;
-      Future.microtask(() {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('앱이 백그라운드에서 계속 실행됩니다. 트레이 아이콘으로 다시 열 수 있어요.'),
-          ),
+      // 첫 번째 트레이 숨김 시 시스템 알림 표시 (SnackBar 대신 트레이 알림)
+      if (!_hasShownTrayReminder) {
+        _hasShownTrayReminder = true;
+        await _trayService.showNotification(
+          '아이보틀 진료녹음',
+          '앱이 백그라운드에서 계속 실행됩니다. 트레이 아이콘으로 다시 열 수 있어요.',
         );
-      });
+      }
+    } catch (e, stackTrace) {
+      _loggingService.error('창 숨김 실패', error: e, stackTrace: stackTrace);
+      // 실패 시 상태 복구
+      _isHiddenToTray = false;
+    } finally {
+      _isHidingToTray = false;
     }
   }
 

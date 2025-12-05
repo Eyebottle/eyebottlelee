@@ -331,6 +331,9 @@ class MicDiagnosticsService {
       try {
         await recorder.stop();
       } catch (_) {}
+      try {
+        await recorder.dispose();
+      } catch (_) {}
       await subscription?.cancel();
       if (tempFilePath != null) {
         final file = File(tempFilePath);

@@ -63,6 +63,9 @@ class AutoLaunchManagerService {
   Stream<LaunchExecutionProgress> get progressStream =>
       _progressController.stream;
 
+  bool _isCancelled = false; // 취소 요청 플래그
+  bool _isDisposed = false; // dispose 여부
+
   LaunchExecutionProgress _currentProgress = const LaunchExecutionProgress(
     status: LaunchExecutionStatus.idle,
     currentIndex: 0,
@@ -95,9 +98,10 @@ class AutoLaunchManagerService {
 
     try {
       _isExecuting = true;
+      _isCancelled = false;
       await _logging.ensureInitialized();
 
-      final settings = await loadSettings();
+      var settings = await loadSettings();
 
       if (!settings.autoLaunchEnabled) {
         _logging.info('자동 실행이 비활성화되어 있습니다.');
@@ -121,6 +125,14 @@ class AutoLaunchManagerService {
       int failureCount = 0;
 
       for (int i = 0; i < programs.length; i++) {
+        // 취소 요청 확인
+        if (_isCancelled) {
+          _logging.info('사용자에 의해 실행이 취소되었습니다.');
+          _updateProgress(LaunchExecutionStatus.idle, i, programs.length,
+              message: '실행이 취소되었습니다. (완료: $successCount개, 실패: $failureCount개)');
+          return;
+        }
+
         final program = programs[i];
 
         _updateProgress(LaunchExecutionStatus.running, i, programs.length,
@@ -133,24 +145,20 @@ class AutoLaunchManagerService {
           successCount++;
           _logging.info('프로그램 실행 성공: ${program.name}');
 
-          // 마지막 실행 시간 업데이트 및 저장
+          // 마지막 실행 시간 업데이트 및 저장 (최신 settings 갱신)
           final updatedProgram = program.copyWith(lastExecuted: DateTime.now());
-          final updatedSettings = settings.updateProgram(updatedProgram);
-          await saveSettings(updatedSettings);
+          settings = settings.updateProgram(updatedProgram);
+          await saveSettings(settings);
         } else {
           failureCount++;
           _logging.error('프로그램 실행 실패: ${program.name}');
-
-          if (!settings.retryOnFailure) {
-            // 재시도 옵션이 비활성화된 경우 다음 프로그램으로 계속
-            continue;
-          }
+          // 실패해도 다음 프로그램으로 계속 진행
         }
 
-        // 마지막 프로그램이 아닌 경우 대기
-        if (i < programs.length - 1) {
+        // 마지막 프로그램이 아닌 경우 대기 (취소 확인 포함)
+        if (i < programs.length - 1 && !_isCancelled) {
           _logging.debug('${program.delaySeconds}초 대기 중...');
-          await Future.delayed(Duration(seconds: program.delaySeconds));
+          await _delayWithCancelCheck(program.delaySeconds);
         }
       }
 
@@ -168,6 +176,17 @@ class AutoLaunchManagerService {
           errorMessage: '실행 중 오류가 발생했습니다: $e');
     } finally {
       _isExecuting = false;
+      _isCancelled = false;
+    }
+  }
+
+  /// 취소 가능한 대기
+  ///
+  /// 1초 단위로 취소 여부를 확인하면서 대기합니다.
+  Future<void> _delayWithCancelCheck(int seconds) async {
+    for (int i = 0; i < seconds; i++) {
+      if (_isCancelled) return;
+      await Future.delayed(const Duration(seconds: 1));
     }
   }
 
@@ -264,21 +283,28 @@ class AutoLaunchManagerService {
       errorMessage: errorMessage,
     );
 
-    _progressController.add(_currentProgress);
+    // StreamController가 닫히지 않은 경우에만 전송
+    if (!_isDisposed && !_progressController.isClosed) {
+      _progressController.add(_currentProgress);
+    }
   }
 
   /// 실행 중단
+  ///
+  /// 현재 실행 중인 프로그램은 완료되지만, 다음 프로그램은 실행되지 않습니다.
+  /// 대기 중인 delay도 즉시 중단됩니다.
   void cancel() {
     if (_isExecuting) {
-      _logging.info('프로그램 자동 실행이 취소되었습니다.');
-      _isExecuting = false;
-      _updateProgress(LaunchExecutionStatus.idle, 0, 0,
-          message: '실행이 취소되었습니다.');
+      _logging.info('프로그램 자동 실행 취소 요청됨');
+      _isCancelled = true;
+      // 실제 상태 업데이트는 executePrograms 루프에서 처리
     }
   }
 
   /// 서비스 종료 시 리소스 정리
   void dispose() {
+    _isDisposed = true;
+    _isCancelled = true;
     _progressController.close();
   }
 }
