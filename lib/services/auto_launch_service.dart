@@ -5,10 +5,27 @@ import 'dart:ffi';
 
 import 'package:ffi/ffi.dart';
 import 'package:launch_at_startup/launch_at_startup.dart';
-import 'package:win32/win32.dart';
+// win32 패키지에서 필요한 상수만 import
+import 'package:win32/win32.dart'
+    show
+        APPMODEL_ERROR_NO_PACKAGE,
+        ERROR_INSUFFICIENT_BUFFER,
+        ERROR_SUCCESS,
+        WCHAR;
 
 import 'logging_service.dart';
 import 'settings_service.dart';
+
+// kernel32.dll에서 GetCurrentPackageFamilyName을 직접 로드
+// (win32 패키지 5.x에서는 이 함수가 export되지 않음)
+final _kernel32 = DynamicLibrary.open('kernel32.dll');
+
+/// GetCurrentPackageFamilyName 함수 시그니처
+/// LONG GetCurrentPackageFamilyName(UINT32 *length, PWSTR familyName);
+final _getCurrentPackageFamilyName = _kernel32.lookupFunction<
+    Int32 Function(Pointer<Uint32> length, Pointer<Utf16> familyName),
+    int Function(
+        Pointer<Uint32> length, Pointer<Utf16> familyName)>('GetCurrentPackageFamilyName');
 
 /// Handles Windows auto-start registration in a single place.
 class AutoLaunchService {
@@ -168,7 +185,7 @@ class AutoLaunchService {
     final length = calloc<Uint32>();
     try {
       // 1) 필요한 버퍼 길이를 먼저 알아냅니다.
-      var rc = GetCurrentPackageFamilyName(length, nullptr.cast<Utf16>());
+      var rc = _getCurrentPackageFamilyName(length, nullptr.cast<Utf16>());
 
       // 패키지 앱이 아닌 경우 (일반 exe 직접 실행)
       if (rc == APPMODEL_ERROR_NO_PACKAGE) {
@@ -184,7 +201,7 @@ class AutoLaunchService {
 
       final buffer = calloc<WCHAR>(length.value);
       try {
-        rc = GetCurrentPackageFamilyName(length, buffer.cast<Utf16>());
+        rc = _getCurrentPackageFamilyName(length, buffer.cast<Utf16>());
         if (rc != ERROR_SUCCESS) {
           _logging.warning('GetCurrentPackageFamilyName(2) failed: rc=$rc');
           return null;

@@ -52,7 +52,7 @@ void main(List<String> args) async {
 
     logging.info('Startup args: $args, hasAutostartArg=$hasAutostartArg');
 
-    await _initializeApp(logging: logging);
+    await _initializeApp(logging: logging, hasAutostartArg: hasAutostartArg);
   }, (error, stack) {
     // Zone에서 캐치되지 않은 에러
     debugPrint('Uncaught Error: $error');
@@ -205,7 +205,10 @@ DateTime? _parseWindowsDateTime(String dateStr) {
   }
 }
 
-Future<void> _initializeApp({required LoggingService logging}) async {
+Future<void> _initializeApp({
+  required LoggingService logging,
+  required bool hasAutostartArg,
+}) async {
   // WidgetsFlutterBinding은 main()에서 이미 초기화됨
 
   // Windows Desktop 초기화
