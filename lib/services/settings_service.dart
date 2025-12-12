@@ -61,7 +61,13 @@ class SettingsService {
 
   Future<bool> getLaunchAtStartup() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool(_keyLaunchAtStartup) ?? true;
+    // **기본값: false (꺼짐)**
+    //
+    // 이유(쉬운 설명):
+    // - “앱이 내 허락 없이 부팅 때 켜진다”는 불편을 막기 위해,
+    //   처음 설치한 사용자는 기본적으로 자동 실행이 꺼져 있어야 합니다.
+    // - 사용자가 설정에서 명시적으로 켜면 그때부터 활성화됩니다.
+    return prefs.getBool(_keyLaunchAtStartup) ?? false;
   }
 
   /// 부팅 시 백그라운드로 시작 여부 설정
