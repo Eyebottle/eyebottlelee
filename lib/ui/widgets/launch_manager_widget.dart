@@ -188,17 +188,27 @@ class _LaunchManagerWidgetState extends State<LaunchManagerWidget> {
       );
     }
 
-    return AppSectionCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildHeader(),
-          const SizedBox(height: AppSpacing.md),
-          _buildProgramList(),
-          const SizedBox(height: AppSpacing.lg),
-          _buildActionButtons(),
-        ],
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return AppSectionCard(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.only(bottom: AppSpacing.md),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildHeader(),
+                  const SizedBox(height: AppSpacing.md),
+                  _buildProgramList(),
+                  const SizedBox(height: AppSpacing.lg),
+                  _buildActionButtons(),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 

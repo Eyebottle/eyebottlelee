@@ -420,7 +420,8 @@ class _AdvancedSettingsDialogState extends State<AdvancedSettingsDialog> {
                       selected: _wavTargetEncoder == AudioEncoder.aacLc,
                       onSelected: (selected) {
                         if (selected) {
-                          setState(() => _wavTargetEncoder = AudioEncoder.aacLc);
+                          setState(
+                              () => _wavTargetEncoder = AudioEncoder.aacLc);
                         }
                       },
                     ),
@@ -481,14 +482,16 @@ class _AdvancedSettingsDialogState extends State<AdvancedSettingsDialog> {
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.info_outline, color: Colors.blue.shade700, size: 20),
+                      Icon(Icons.info_outline,
+                          color: Colors.blue.shade700, size: 20),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           '변환은 백그라운드에서 조용히 진행되며, 실패 시 원본 WAV 파일이 보존됩니다',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: Colors.blue.shade900,
-                              ),
+                          style:
+                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: Colors.blue.shade900,
+                                  ),
                         ),
                       ),
                     ],
@@ -502,11 +505,121 @@ class _AdvancedSettingsDialogState extends State<AdvancedSettingsDialog> {
         return _SettingsCard(
           icon: Icons.power_settings_new,
           title: 'Windows 시작 설정',
-          description:
-              'PC 부팅 시 앱을 자동으로 시작하고, 백그라운드 실행 여부를 설정합니다.',
+          description: 'PC 부팅 시 앱을 자동으로 시작하고, 백그라운드 실행 여부를 설정합니다.',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Startup status indicator
+              FutureBuilder<_StartupSyncStatus>(
+                future: _checkStartupStatus(),
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData) {
+                    return const SizedBox.shrink();
+                  }
+                  final status = snapshot.data!;
+                  if (!status.hasMismatch) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF2E7D32).withValues(alpha:0.12),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: const Color(0xFF2E7D32).withValues(alpha:0.3),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.check_circle,
+                              color: Color(0xFF2E7D32),
+                              size: 18,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'OS와 동기화됨',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.copyWith(
+                                      color: const Color(0xFF2E7D32),
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                              ),
+                            ),
+                            Text(
+                              status.isPackaged ? 'StartupTask' : 'Registry',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .labelSmall
+                                  ?.copyWith(
+                                    color: const Color(0xFF2E7D32)
+                                        .withValues(alpha:0.7),
+                                  ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFA000).withValues(alpha:0.12),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: const Color(0xFFFFA000).withValues(alpha:0.3),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.warning_amber_rounded,
+                                color: Color(0xFFFFA000),
+                                size: 18,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'OS 설정과 불일치',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodySmall
+                                      ?.copyWith(
+                                        color: const Color(0xFFFFA000),
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            '앱 설정: ${status.expectedEnabled ? "켜짐" : "꺼짐"} / '
+                            'OS 상태: ${status.actualEnabled == null ? "확인 불가" : (status.actualEnabled! ? "켜짐" : "꺼짐")}',
+                            style: Theme.of(context)
+                                .textTheme
+                                .labelSmall
+                                ?.copyWith(
+                                  color: Colors.grey.shade700,
+                                ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
               SwitchListTile.adaptive(
                 contentPadding: EdgeInsets.zero,
                 title: const Text('Windows 시작 시 앱 자동 실행'),
@@ -535,14 +648,16 @@ class _AdvancedSettingsDialogState extends State<AdvancedSettingsDialog> {
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.info_outline, color: Colors.blue.shade700, size: 20),
+                      Icon(Icons.info_outline,
+                          color: Colors.blue.shade700, size: 20),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           '백그라운드로 시작하면 시스템 트레이 아이콘을 클릭하여 창을 열 수 있습니다',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: Colors.blue.shade900,
-                              ),
+                          style:
+                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: Colors.blue.shade900,
+                                  ),
                         ),
                       ),
                     ],
@@ -570,7 +685,15 @@ class _AdvancedSettingsDialogState extends State<AdvancedSettingsDialog> {
 
     if (!kIsWeb) {
       try {
-        await AutoLaunchService().apply(_launchAtStartup);
+        final applied = await AutoLaunchService().apply(_launchAtStartup);
+        if (!applied && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content:
+                  Text('Windows 시작프로그램 설정이 반영되지 않았습니다. 시작프로그램에서 상태를 확인해주세요.'),
+            ),
+          );
+        }
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -586,6 +709,31 @@ class _AdvancedSettingsDialogState extends State<AdvancedSettingsDialog> {
       Navigator.of(context).pop('saved');
     }
   }
+
+  Future<_StartupSyncStatus> _checkStartupStatus() async {
+    final snapshot = await AutoLaunchService().getStatusSnapshot();
+    return _StartupSyncStatus(
+      expectedEnabled: snapshot.expectedEnabled,
+      actualEnabled: snapshot.actualEnabled,
+      isPackaged: snapshot.isPackaged,
+      hasMismatch: snapshot.actualEnabled != null &&
+          snapshot.actualEnabled != snapshot.expectedEnabled,
+    );
+  }
+}
+
+class _StartupSyncStatus {
+  const _StartupSyncStatus({
+    required this.expectedEnabled,
+    required this.actualEnabled,
+    required this.isPackaged,
+    required this.hasMismatch,
+  });
+
+  final bool expectedEnabled;
+  final bool? actualEnabled;
+  final bool isPackaged;
+  final bool hasMismatch;
 }
 
 enum VadPreset { quiet, standard, noisy }

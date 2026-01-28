@@ -142,8 +142,8 @@ class WeeklyCalendarGrid extends StatelessWidget {
                       height: 36,
                       decoration: BoxDecoration(
                         color: isWorking
-                            ? AppColors.primary.withOpacity(0.1)
-                            : AppColors.neutral200.withOpacity(0.3),
+                            ? AppColors.primary.withValues(alpha:0.1)
+                            : AppColors.neutral200.withValues(alpha:0.3),
                         shape: BoxShape.circle,
                       ),
                       child: Center(
@@ -171,8 +171,8 @@ class WeeklyCalendarGrid extends StatelessWidget {
                         const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
                       color: isWorking
-                          ? AppColors.success.withOpacity(0.12)
-                          : AppColors.neutral200.withOpacity(0.5),
+                          ? AppColors.success.withValues(alpha:0.12)
+                          : AppColors.neutral200.withValues(alpha:0.5),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(

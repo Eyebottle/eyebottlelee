@@ -3,8 +3,10 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:showcaseview/showcaseview.dart';
 import 'package:window_manager/window_manager.dart';
-import 'services/settings_service.dart';
+import 'services/auto_launch_service.dart';
 import 'services/logging_service.dart';
+import 'services/notification_service.dart';
+import 'services/settings_service.dart';
 import 'ui/screens/main_screen.dart';
 import 'ui/style/app_theme.dart';
 
@@ -29,6 +31,8 @@ void main(List<String> args) async {
     // 로깅 서비스 초기화 (부팅 로그 확보용)
     final logging = LoggingService();
     await logging.ensureInitialized();
+
+    await NotificationService().ensureInitialized();
 
     // Flutter 프레임워크 에러 핸들러
     FlutterError.onError = (FlutterErrorDetails details) {
@@ -64,146 +68,9 @@ void main(List<String> args) async {
   });
 }
 
-/// 시스템 부팅 후 일정 시간(10분) 내에 앱이 시작되었는지 확인
-///
-/// Windows에서 시스템 업타임을 확인하여 부팅 직후 StartupTask로
-/// 실행되었는지 감지합니다. MSIX StartupTask에서 command-line 인자가
-/// 전달되지 않는 버그를 우회하기 위한 방법입니다.
-///
-/// **변경 이력:**
-/// - v1.3.5: 3분 → 10분으로 완화 (느린 PC, 로그인 지연 대응)
-///
-/// 두 가지 방법을 순차적으로 시도:
-/// 1. PowerShell로 LastBootUpTime 조회 (정확함)
-/// 2. wmic로 시스템 업타임 조회 (fallback)
-Future<bool> _isRecentSystemBoot() async {
-  if (!Platform.isWindows) return false;
-
-  // 10분으로 완화: 느린 PC, 로그인 지연, 여러 시작프로그램 대기 등 고려
-  const bootThreshold = Duration(minutes: 10);
-
-  // 방법 1: PowerShell 사용
-  try {
-    final result = await Process.run(
-      'powershell',
-      ['-NoProfile', '-Command', '(Get-CimInstance Win32_OperatingSystem).LastBootUpTime'],
-      runInShell: true,
-    ).timeout(const Duration(seconds: 5));
-
-    if (result.exitCode == 0) {
-      final output = result.stdout.toString().trim();
-      if (output.isNotEmpty) {
-        final bootTime = _parseWindowsDateTime(output);
-        if (bootTime != null) {
-          final timeSinceBoot = DateTime.now().difference(bootTime);
-          debugPrint('PowerShell boot check: bootTime=$bootTime, timeSinceBoot=$timeSinceBoot');
-          return timeSinceBoot <= bootThreshold;
-        }
-      }
-    }
-  } catch (e) {
-    debugPrint('PowerShell boot check failed: $e');
-  }
-
-  // 방법 2: wmic 사용 (fallback)
-  try {
-    final result = await Process.run(
-      'wmic',
-      ['os', 'get', 'lastbootuptime'],
-      runInShell: true,
-    ).timeout(const Duration(seconds: 5));
-
-    if (result.exitCode == 0) {
-      final output = result.stdout.toString().trim();
-      // wmic 출력 예: "LastBootUpTime\n20251205093012.500000+540"
-      final match = RegExp(r'(\d{14})').firstMatch(output);
-      if (match != null) {
-        final wmicTime = match.group(1)!;
-        // 형식: YYYYMMDDHHMMSS
-        final bootTime = DateTime(
-          int.parse(wmicTime.substring(0, 4)),   // year
-          int.parse(wmicTime.substring(4, 6)),   // month
-          int.parse(wmicTime.substring(6, 8)),   // day
-          int.parse(wmicTime.substring(8, 10)),  // hour
-          int.parse(wmicTime.substring(10, 12)), // minute
-          int.parse(wmicTime.substring(12, 14)), // second
-        );
-        final timeSinceBoot = DateTime.now().difference(bootTime);
-        debugPrint('WMIC boot check: bootTime=$bootTime, timeSinceBoot=$timeSinceBoot');
-        return timeSinceBoot <= bootThreshold;
-      }
-    }
-  } catch (e) {
-    debugPrint('WMIC boot check failed: $e');
-  }
-
-  // 모든 방법 실패 시 false 반환 (안전하게 일반 모드로 시작)
-  debugPrint('All boot time detection methods failed');
-  return false;
-}
-
-/// Windows PowerShell 날짜 문자열 파싱
-DateTime? _parseWindowsDateTime(String dateStr) {
-  try {
-    // 다양한 형식 시도
-    // 형식 1: "12/5/2025 12:00:00 PM" (영어 로케일)
-    // 형식 2: "2025년 12월 5일 오후 12:00:00" (한국어 로케일)
-    // 형식 3: "2025-12-05 12:00:00" (ISO 형식)
-
-    // ISO 형식 시도
-    final isoMatch = RegExp(r'(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2}):(\d{2})').firstMatch(dateStr);
-    if (isoMatch != null) {
-      return DateTime(
-        int.parse(isoMatch.group(1)!),
-        int.parse(isoMatch.group(2)!),
-        int.parse(isoMatch.group(3)!),
-        int.parse(isoMatch.group(4)!),
-        int.parse(isoMatch.group(5)!),
-        int.parse(isoMatch.group(6)!),
-      );
-    }
-
-    // 영어 로케일 형식 시도 (MM/DD/YYYY HH:MM:SS AM/PM)
-    final usMatch = RegExp(r'(\d{1,2})/(\d{1,2})/(\d{4})\s+(\d{1,2}):(\d{2}):(\d{2})\s*(AM|PM)?', caseSensitive: false).firstMatch(dateStr);
-    if (usMatch != null) {
-      var hour = int.parse(usMatch.group(4)!);
-      final ampm = usMatch.group(7)?.toUpperCase();
-      if (ampm == 'PM' && hour != 12) hour += 12;
-      if (ampm == 'AM' && hour == 12) hour = 0;
-
-      return DateTime(
-        int.parse(usMatch.group(3)!),
-        int.parse(usMatch.group(1)!),
-        int.parse(usMatch.group(2)!),
-        hour,
-        int.parse(usMatch.group(5)!),
-        int.parse(usMatch.group(6)!),
-      );
-    }
-
-    // 한국어 로케일 형식 시도 (요일 포함 가능: "2025년 12월 2일 화요일 오전 9:30:12")
-    final koMatch = RegExp(r'(\d{4})년\s*(\d{1,2})월\s*(\d{1,2})일\s*(?:\S*요일)?\s*(오전|오후)?\s*(\d{1,2}):(\d{2}):(\d{2})').firstMatch(dateStr);
-    if (koMatch != null) {
-      var hour = int.parse(koMatch.group(5)!);
-      final ampm = koMatch.group(4);
-      if (ampm == '오후' && hour != 12) hour += 12;
-      if (ampm == '오전' && hour == 12) hour = 0;
-
-      return DateTime(
-        int.parse(koMatch.group(1)!),
-        int.parse(koMatch.group(2)!),
-        int.parse(koMatch.group(3)!),
-        hour,
-        int.parse(koMatch.group(6)!),
-        int.parse(koMatch.group(7)!),
-      );
-    }
-
-    return null;
-  } catch (e) {
-    return null;
-  }
-}
+// NOTE: _isRecentSystemBoot() and _parseWindowsDateTime() were removed in v1.3.8.
+// MSIX 환경에서 PowerShell/WMIC 호출이 샌드박스 제한으로 실패하는 문제가 있어,
+// --autostart 인자 기반 감지로 전환했습니다. (A안+C안 적용)
 
 Future<void> _initializeApp({
   required LoggingService logging,
@@ -216,16 +83,6 @@ Future<void> _initializeApp({
 
   const initialSize = Size(660, 980);
   const minimumSize = Size(640, 900);
-
-  WindowOptions windowOptions = const WindowOptions(
-    size: initialSize,
-    minimumSize: minimumSize,
-    center: true,
-    backgroundColor: Colors.transparent,
-    skipTaskbar: false,
-    titleBarStyle: TitleBarStyle.normal,
-    title: '아이보틀 진료녹음 & 자동실행 매니저',
-  );
 
   // ============================================================
   // 부팅 시 백그라운드로 시작할지 결정 (v1.3.8 A안+C안)
@@ -249,9 +106,20 @@ Future<void> _initializeApp({
   final launchAtStartup = await settings.getLaunchAtStartup();
   final startMinimizedOnBoot = await settings.getStartMinimizedOnBoot();
 
-  // 부팅 자동 실행이면 무조건 트레이로 (사용자 체감 최우선)
+  if (hasAutostartArg && !launchAtStartup) {
+    logging.warning(
+        'Autostart launch detected but setting is OFF. Exiting immediately.');
+    try {
+      await AutoLaunchService().apply(false);
+    } catch (e, stackTrace) {
+      logging.warning('자동 실행 비활성화 시도 실패', error: e, stackTrace: stackTrace);
+    }
+    exit(0);
+  }
+
+  // 부팅 자동 실행일 때도 사용자가 선택한 창 표시/숨김 옵션을 따름
   final shouldStartMinimized = hasAutostartArg
-      ? true
+      ? startMinimizedOnBoot
       : (launchAtStartup && startMinimizedOnBoot);
 
   // 전역 플래그 설정 (main_screen.dart에서 참조)
@@ -259,6 +127,16 @@ Future<void> _initializeApp({
 
   logging.info('Background start decision: launchAtStartup=$launchAtStartup, '
       'startMinimizedOnBoot=$startMinimizedOnBoot → shouldStartMinimized=$shouldStartMinimized');
+
+  final windowOptions = WindowOptions(
+    size: initialSize,
+    minimumSize: minimumSize,
+    center: true,
+    backgroundColor: Colors.transparent,
+    skipTaskbar: shouldStartMinimized,
+    titleBarStyle: TitleBarStyle.normal,
+    title: '아이보틀 진료녹음 & 자동실행 매니저',
+  );
 
   await windowManager.waitUntilReadyToShow(windowOptions, () async {
     try {
@@ -275,7 +153,8 @@ Future<void> _initializeApp({
         logging.info('Started normally (visible window)');
       }
     } catch (e, stackTrace) {
-      logging.error('Window initialization failed', error: e, stackTrace: stackTrace);
+      logging.error('Window initialization failed',
+          error: e, stackTrace: stackTrace);
     }
   });
 

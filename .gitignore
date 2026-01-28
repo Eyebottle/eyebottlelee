@@ -112,3 +112,7 @@ eyebottlelee-test-release.zip
 # Development test scripts (root directory only)
 /install*.ps1
 /install*.bat
+
+# Local AI config
+.claude/
+.omc/

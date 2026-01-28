@@ -126,7 +126,7 @@ class AppColors {
 
   /// Primary 색상의 다양한 opacity 변형을 제공
   static Color primaryWithOpacity(double opacity) {
-    return primary.withOpacity(opacity);
+    return primary.withValues(alpha: opacity);
   }
 
   /// 진단 상태에 따른 색상 반환

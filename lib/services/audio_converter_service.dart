@@ -5,10 +5,14 @@ import 'dart:async';
 import 'dart:collection';
 import 'dart:io';
 
+import 'dart:ffi';
+
 import 'package:flutter/services.dart' show rootBundle;
+import 'package:ffi/ffi.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
+import 'package:win32/win32.dart' show GetDiskFreeSpaceEx, TEXT;
 
 import 'logging_service.dart';
 
@@ -164,7 +168,8 @@ class AudioConverterService {
       }
 
       // ffmpeg 명령어 구성
-      final codec = task.targetEncoder == AudioEncoder.aacLc ? 'aac' : 'libopus';
+      final codec =
+          task.targetEncoder == AudioEncoder.aacLc ? 'aac' : 'libopus';
 
       final args = [
         '-i', task.inputPath, // 입력 파일
@@ -197,7 +202,8 @@ class AudioConverterService {
       // 변환 성공
       final inputSize = await File(task.inputPath).length();
       final outputSize = await File(outputPath).length();
-      final compressionRatio = ((1 - outputSize / inputSize) * 100).toStringAsFixed(1);
+      final compressionRatio =
+          ((1 - outputSize / inputSize) * 100).toStringAsFixed(1);
 
       _logging.info(
         '변환 완료: ${path.basename(outputPath)} '
@@ -302,13 +308,53 @@ class AudioConverterService {
   /// 최소한 원본 파일 크기의 2배 이상 여유 공간이 필요합니다
   Future<bool> _hasEnoughDiskSpace(String filePath) async {
     try {
-      // Windows에서 디스크 여유 공간 확인
-      // TODO: 실제로는 Win32 API (GetDiskFreeSpaceEx)를 사용해야 하지만,
-      // 여기서는 간단히 true 반환 (향후 개선 가능)
-      // FFI를 사용하여 구현 가능
-      // 필요 공간: filePath 크기의 약 2배 (원본 + 변환본)
+      if (!Platform.isWindows) {
+        return true;
+      }
 
-      return true; // 임시로 항상 true 반환
+      final file = File(filePath);
+      if (!await file.exists()) {
+        return true;
+      }
+
+      final fileSize = await file.length();
+      final requiredBytes = fileSize * 2;
+      var rootPath = path.rootPrefix(filePath);
+      if (rootPath.isEmpty) {
+        _logging.warning('디스크 공간 확인 실패: 루트 경로를 찾지 못했습니다.');
+        return true;
+      }
+      if (!rootPath.endsWith('\\')) {
+        rootPath = '$rootPath\\';
+      }
+
+      final freeBytes = calloc<Uint64>();
+      final totalBytes = calloc<Uint64>();
+      final totalFreeBytes = calloc<Uint64>();
+      try {
+        final result = GetDiskFreeSpaceEx(
+          TEXT(rootPath),
+          freeBytes,
+          totalBytes,
+          totalFreeBytes,
+        );
+        if (result == 0) {
+          _logging.warning('디스크 공간 확인 실패: GetDiskFreeSpaceEx 실패');
+          return true;
+        }
+
+        final available = freeBytes.value;
+        final hasEnough = available >= requiredBytes;
+        if (!hasEnough) {
+          _logging.warning('디스크 공간 부족: 필요=${_formatFileSize(requiredBytes)}, '
+              '가용=${_formatFileSize(available)}');
+        }
+        return hasEnough;
+      } finally {
+        calloc.free(freeBytes);
+        calloc.free(totalBytes);
+        calloc.free(totalFreeBytes);
+      }
     } catch (e) {
       _logging.warning('디스크 공간 확인 실패: $e (변환 계속 진행)');
       return true; // 확인 실패 시에도 변환 시도

@@ -50,16 +50,16 @@ class MicDiagnosticsService {
       // 2. 장치 목록 확인
       _logging.info('🔍 입력 장치 검색 중...');
       final devices = await recorder.listInputDevices();
-      _logging.info('발견된 입력 장치: ${devices?.length ?? 0}개');
+      _logging.info('발견된 입력 장치: ${devices.length}개');
 
-      if (devices != null && devices.isNotEmpty) {
+      if (devices.isNotEmpty) {
         for (var i = 0; i < devices.length; i++) {
           final device = devices[i];
           _logging.info('  장치 #$i: id=${device.id}, label=${device.label}');
         }
       }
 
-      if (devices == null || devices.isEmpty) {
+      if (devices.isEmpty) {
         _logging.warning('⚠️ 입력 장치를 찾을 수 없음');
         return MicDiagnosticResult(
           timestamp: timestamp,
@@ -165,8 +165,9 @@ class MicDiagnosticsService {
           // PlatformException은 대부분 코덱/설정 문제 → 다음 코덱으로 폴백
           if (e is PlatformException && attempt < fallbackEncoders.length - 1) {
             _logging.warning('코덱 에러 - 다음 코덱으로 폴백 (${fallbackEncoders[attempt + 1].name})');
-            if (tempFilePath != null) {
-              final file = File(tempFilePath!);
+            final currentPath = tempFilePath;
+            if (currentPath != null) {
+              final file = File(currentPath);
               if (await file.exists()) {
                 unawaited(file.delete());
               }

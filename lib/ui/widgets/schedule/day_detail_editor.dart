@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../../../models/schedule_model.dart';
 import '../../style/app_colors.dart';
 import '../../style/app_typography.dart';
-import '../../style/app_spacing.dart';
 import '../common/app_card.dart';
 import 'time_range_slider.dart';
 
@@ -37,8 +36,8 @@ class DayDetailEditor extends StatelessWidget {
                 height: 48,
                 decoration: BoxDecoration(
                   color: daySchedule.isWorkingDay
-                      ? AppColors.primary.withOpacity(0.12)
-                      : AppColors.neutral200.withOpacity(0.3),
+                      ? AppColors.primary.withValues(alpha:0.12)
+                      : AppColors.neutral200.withValues(alpha:0.3),
                   shape: BoxShape.circle,
                 ),
                 child: Center(

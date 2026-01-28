@@ -392,6 +392,11 @@ flutter pub get
 flutter run -d windows
 ```
 
+자동 실행 점검
+- Windows 설정 → 앱 → 시작프로그램(또는 작업 관리자 Startup 탭)에서 Eyebottle 항목 확인
+- 앱 로그 경로: `C:\Users\<user>\Documents\EyebottleRecorder\logs`
+- 로그에서 `Startup args`, `Background start decision`, `자동 실행 상태 불일치` 메시지를 확인
+
 패키징(MSIX)
 ```
 flutter build windows --release
@@ -516,5 +521,4 @@ flutter run -d windows
 - [ ] `flutter build windows --release` 완료 후 `build\windows\x64\runner\Release` 폴더를 ZIP으로 묶어 테스트앱 패키지를 만든 뒤, 진료실 PC에 전달합니다.
 - [ ] 패키지에는 실행 파일 외에 최신 사용자 가이드(`docs/user-guide.md`)의 테스트 절차 요약본과 복구 안내, Soak 테스트 로그 묶음을 포함해 현장에서도 바로 검수할 수 있도록 합니다.
 - [ ] 테스트 중 발견한 이슈는 Phase 1~3 일정(알림, 오류 가시화, 동기화 안정화)과 연결해 티켓을 작성하고, 해결 여부를 회고 로그에 남깁니다.
-
 

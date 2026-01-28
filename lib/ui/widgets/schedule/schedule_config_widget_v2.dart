@@ -3,7 +3,6 @@ import '../../../models/schedule_model.dart';
 import '../../../services/settings_service.dart';
 import '../../style/app_colors.dart';
 import '../../style/app_typography.dart';
-import '../../style/app_elevation.dart';
 import '../common/app_button.dart';
 import 'weekly_calendar_grid.dart';
 import 'day_detail_editor.dart';
@@ -243,10 +242,10 @@ class _ScheduleConfigWidgetV2State extends State<ScheduleConfigWidgetV2> {
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: AppColors.primaryContainer.withOpacity(0.3),
+                color: AppColors.primaryContainer.withValues(alpha:0.3),
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                  color: AppColors.primary.withOpacity(0.3),
+                  color: AppColors.primary.withValues(alpha:0.3),
                 ),
               ),
               child: DayDetailEditor(

@@ -20,8 +20,6 @@ class _DiagnosticInfoDialogState extends State<DiagnosticInfoDialog> {
   final LoggingService _logging = LoggingService();
 
   String _logDirectory = '로그 경로 확인 중...';
-  String? _currentLogFile;
-  List<File> _logFiles = [];
   bool _isLoading = true;
   String _diagnosticInfo = '';
 
@@ -78,8 +76,6 @@ class _DiagnosticInfoDialogState extends State<DiagnosticInfoDialog> {
 
       setState(() {
         _logDirectory = logDir;
-        _currentLogFile = currentLog;
-        _logFiles = logFiles;
         _diagnosticInfo = buffer.toString();
         _isLoading = false;
       });

@@ -306,10 +306,10 @@ class _TimeRangeSliderState extends State<TimeRangeSlider> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.12),
+          color: color.withValues(alpha:0.12),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: _isEditMode ? color : color.withOpacity(0.3),
+            color: _isEditMode ? color : color.withValues(alpha:0.3),
             width: _isEditMode ? 2 : 1,
           ),
         ),

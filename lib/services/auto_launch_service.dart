@@ -1,31 +1,11 @@
 import 'dart:async';
 import 'dart:io' show Platform;
 
-import 'dart:ffi';
-
-import 'package:ffi/ffi.dart';
 import 'package:launch_at_startup/launch_at_startup.dart';
-// win32 패키지에서 필요한 상수만 import
-import 'package:win32/win32.dart'
-    show
-        APPMODEL_ERROR_NO_PACKAGE,
-        ERROR_INSUFFICIENT_BUFFER,
-        ERROR_SUCCESS,
-        WCHAR;
 
 import 'logging_service.dart';
 import 'settings_service.dart';
-
-// kernel32.dll에서 GetCurrentPackageFamilyName을 직접 로드
-// (win32 패키지 5.x에서는 이 함수가 export되지 않음)
-final _kernel32 = DynamicLibrary.open('kernel32.dll');
-
-/// GetCurrentPackageFamilyName 함수 시그니처
-/// LONG GetCurrentPackageFamilyName(UINT32 *length, PWSTR familyName);
-final _getCurrentPackageFamilyName = _kernel32.lookupFunction<
-    Int32 Function(Pointer<Uint32> length, Pointer<Utf16> familyName),
-    int Function(
-        Pointer<Uint32> length, Pointer<Utf16> familyName)>('GetCurrentPackageFamilyName');
+import '../utils/win32_package_identity.dart';
 
 /// Handles Windows auto-start registration in a single place.
 class AutoLaunchService {
@@ -45,28 +25,59 @@ class AutoLaunchService {
   bool _setupCompleted = false;
 
   /// Applies the persisted auto-launch preference on startup.
-  Future<void> applySavedPreference() async {
+  Future<bool> applySavedPreference() async {
     if (!Platform.isWindows) {
       _logging
           .debug('AutoLaunchService: Non-Windows platform, skipping setup.');
-      return;
+      return true;
     }
 
     final enabled = await _settings.getLaunchAtStartup();
-    await _apply(enabled, source: 'startup-sync');
+    return _apply(enabled, source: 'startup-sync');
   }
 
   /// Updates the auto-launch registration to match the provided state.
-  Future<void> apply(bool enabled) async {
+  Future<bool> apply(bool enabled) async {
     if (!Platform.isWindows) {
       _logging
           .debug('AutoLaunchService: Non-Windows platform, apply() ignored.');
-      return;
+      return true;
     }
-    await _apply(enabled, source: 'user-setting');
+    return _apply(enabled, source: 'user-setting');
   }
 
-  Future<void> _apply(bool enabled, {required String source}) async {
+  /// Returns current OS startup enabled state, or null if unavailable.
+  Future<bool?> getCurrentEnabled() async {
+    if (!Platform.isWindows) return null;
+
+    try {
+      await _ensureSetup();
+    } catch (e, stackTrace) {
+      _logging.warning('자동 실행 상태 조회 준비 실패', error: e, stackTrace: stackTrace);
+      return null;
+    }
+
+    try {
+      return await _invokeLauncher(() => _launcher.isEnabled());
+    } catch (e, stackTrace) {
+      _logging.warning('자동 실행 상태 조회 실패', error: e, stackTrace: stackTrace);
+      return null;
+    }
+  }
+
+  Future<AutoLaunchStatusSnapshot> getStatusSnapshot() async {
+    final expected = await _settings.getLaunchAtStartup();
+    final actual = await getCurrentEnabled();
+    final packageFamilyName = tryGetPackageFamilyName(logging: _logging);
+    return AutoLaunchStatusSnapshot(
+      expectedEnabled: expected,
+      actualEnabled: actual,
+      isPackaged: packageFamilyName != null && packageFamilyName.isNotEmpty,
+      packageFamilyName: packageFamilyName,
+    );
+  }
+
+  Future<bool> _apply(bool enabled, {required String source}) async {
     try {
       await _ensureSetup();
     } catch (e, stackTrace) {
@@ -76,7 +87,7 @@ class AutoLaunchService {
         stackTrace: stackTrace,
       );
       // 초기화 실패 시 더 진행하지 않음
-      return;
+      return false;
     }
 
     try {
@@ -98,6 +109,14 @@ class AutoLaunchService {
           _logging.debug('자동 실행이 이미 비활성화되어 있습니다. (source=$source)');
         }
       }
+
+      final verified = await _invokeLauncher(() => _launcher.isEnabled());
+      if (verified != enabled) {
+        _logging.warning(
+            '자동 실행 상태 불일치: expected=$enabled actual=$verified (source=$source)');
+        return false;
+      }
+      return true;
     } catch (e, stackTrace) {
       _logging.error(
         '자동 실행 상태 변경 실패 (enabled=$enabled, source=$source)',
@@ -124,7 +143,7 @@ class AutoLaunchService {
       }
 
       final exePath = Platform.resolvedExecutable;
-      final packageFamilyName = _tryGetCurrentPackageFamilyName();
+      final packageFamilyName = tryGetPackageFamilyName(logging: _logging);
       try {
         // --autostart 플래그: 부팅 시 백그라운드 시작 기능을 위해 필요
         //
@@ -170,55 +189,6 @@ class AutoLaunchService {
     return _setupFuture!;
   }
 
-  /// 현재 프로세스가 MSIX(패키지 앱)로 실행 중이면 PackageFamilyName을 반환합니다.
-  ///
-  /// - **입력**: 없음
-  /// - **출력**: PackageFamilyName 문자열 또는 null(패키지 앱이 아님)
-  /// - **예외**: 던지지 않음 (실패 시 null 반환)
-  ///
-  /// 쉬운 비유:
-  /// - “앱의 주민등록번호” 같은 값입니다. MS Store로 설치된 앱은 이 값으로
-  ///   StartupTask(시작프로그램)를 켜고 끄는 것을 식별합니다.
-  String? _tryGetCurrentPackageFamilyName() {
-    if (!Platform.isWindows) return null;
-
-    final length = calloc<Uint32>();
-    try {
-      // 1) 필요한 버퍼 길이를 먼저 알아냅니다.
-      var rc = _getCurrentPackageFamilyName(length, nullptr.cast<Utf16>());
-
-      // 패키지 앱이 아닌 경우 (일반 exe 직접 실행)
-      if (rc == APPMODEL_ERROR_NO_PACKAGE) {
-        return null;
-      }
-
-      // 버퍼가 부족하면 length에 필요한 크기가 들어옵니다.
-      if (rc != ERROR_INSUFFICIENT_BUFFER) {
-        // 어떤 이유로든 실패하면 null (앱은 계속 동작해야 하므로)
-        _logging.warning('GetCurrentPackageFamilyName(1) failed: rc=$rc');
-        return null;
-      }
-
-      final buffer = calloc<WCHAR>(length.value);
-      try {
-        rc = _getCurrentPackageFamilyName(length, buffer.cast<Utf16>());
-        if (rc != ERROR_SUCCESS) {
-          _logging.warning('GetCurrentPackageFamilyName(2) failed: rc=$rc');
-          return null;
-        }
-        final name = buffer.cast<Utf16>().toDartString();
-        return name.isEmpty ? null : name;
-      } finally {
-        calloc.free(buffer);
-      }
-    } catch (e) {
-      _logging.warning('PackageFamilyName detection failed', error: e);
-      return null;
-    } finally {
-      calloc.free(length);
-    }
-  }
-
   Future<T> _invokeLauncher<T>(FutureOr<T> Function() action) async {
     final result = action();
     if (result is Future) {
@@ -226,4 +196,18 @@ class AutoLaunchService {
     }
     return result;
   }
+}
+
+class AutoLaunchStatusSnapshot {
+  const AutoLaunchStatusSnapshot({
+    required this.expectedEnabled,
+    required this.actualEnabled,
+    required this.isPackaged,
+    required this.packageFamilyName,
+  });
+
+  final bool expectedEnabled;
+  final bool? actualEnabled;
+  final bool isPackaged;
+  final String? packageFamilyName;
 }

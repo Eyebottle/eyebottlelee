@@ -1,8 +1,6 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:flutter/foundation.dart';
-
 import '../models/launch_program.dart';
 import '../models/launch_manager_settings.dart';
 import 'logging_service.dart';

@@ -5,15 +5,18 @@ import 'package:flutter/material.dart';
 import 'package:showcaseview/showcaseview.dart';
 import 'package:window_manager/window_manager.dart';
 
+import '../../main.dart' show gStartedInBackground; // 백그라운드 시작 플래그
 import '../../services/auto_launch_service.dart';
 import '../../services/auto_launch_manager_service.dart';
 import '../../models/mic_diagnostic_result.dart';
 import '../../models/schedule_model.dart';
 import '../../services/audio_service.dart';
 import '../../services/logging_service.dart';
+import '../../services/notification_service.dart';
 import '../../services/schedule_service.dart';
 import '../../services/settings_service.dart';
 import '../../services/tray_service.dart';
+import '../../services/window_taskbar_service.dart';
 import '../../services/mic_diagnostics_service.dart';
 import '../widgets/advanced_settings_dialog.dart';
 import '../widgets/animated_volume_meter.dart';
@@ -74,6 +77,10 @@ class _MainScreenState extends State<MainScreen>
   bool _vadEnabled = true;
   bool _autoLaunchEnabled = false;
   bool _startMinimizedOnBoot = false;
+  bool _startupStatusMismatch = false;
+  bool? _actualStartupEnabled;
+  String? _packageFamilyName;
+  bool _isPackaged = false;
   Duration? _retentionDuration;
   RecordingQualityProfile _recordingProfile = RecordingQualityProfile.balanced;
   double _makeupGainDb = 0.0;
@@ -108,14 +115,48 @@ class _MainScreenState extends State<MainScreen>
 
     try {
       await windowManager.setPreventClose(true);
-      await windowManager.setSkipTaskbar(false);
+      // 백그라운드로 시작한 경우에는 skipTaskbar 상태 유지
+      // (main.dart에서 setSkipTaskbar(true)로 설정됨)
+      if (!gStartedInBackground) {
+        await WindowTaskbarService().setTaskbarVisible(true);
+      }
+      _loggingService
+          .info('Window init: gStartedInBackground=$gStartedInBackground');
     } catch (e, stackTrace) {
       _loggingService.warning('창 닫힘 방지 초기화 실패',
           error: e, stackTrace: stackTrace);
     }
 
     try {
-      await AutoLaunchService().applySavedPreference();
+      final applied = await AutoLaunchService().applySavedPreference();
+      if (!applied) {
+        _loggingService.warning('자동 실행 설정이 OS와 동기화되지 않았습니다.');
+        await NotificationService().show(
+          title: '자동 실행 설정 확인',
+          message: 'Windows 시작프로그램에서 설정 상태를 확인해주세요.',
+        );
+      }
+
+      // Fetch startup status snapshot for diagnostics
+      final statusSnapshot = await AutoLaunchService().getStatusSnapshot();
+      final expected = statusSnapshot.expectedEnabled;
+      final actual = statusSnapshot.actualEnabled;
+      if (mounted) {
+        setState(() {
+          _actualStartupEnabled = actual;
+          _isPackaged = statusSnapshot.isPackaged;
+          _packageFamilyName = statusSnapshot.packageFamilyName;
+          _startupStatusMismatch = actual != null && actual != expected;
+        });
+      }
+      if (actual != null && actual != expected) {
+        _loggingService
+            .warning('자동 실행 상태 불일치: expected=$expected actual=$actual');
+        await NotificationService().show(
+          title: '자동 실행 상태 불일치',
+          message: 'Windows 시작프로그램에서 상태를 확인해주세요.',
+        );
+      }
     } catch (e, stackTrace) {
       _loggingService.warning('자동 실행 설정 동기화 실패',
           error: e, stackTrace: stackTrace);
@@ -164,9 +205,13 @@ class _MainScreenState extends State<MainScreen>
 
     _audioService.onFileSegmentCreated = (filePath) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('분할 저장됨: ${filePath.split('/').last}')),
-      );
+      // context 사용 전 안전하게 microtask로 지연
+      Future.microtask(() {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('분할 저장됨: ${filePath.split('/').last}')),
+        );
+      });
     };
 
     _audioService.onRecordingStarted = (startTime) {
@@ -256,12 +301,15 @@ class _MainScreenState extends State<MainScreen>
       _trayService.onShowWindow = () => _bringToFront();
       _trayService.onExit = () => _handleTrayExit();
       _trayService.onRunDiagnostic = () => _runMicDiagnostic();
-      _trayService.onOpenHelp = () => HelpCenterDialog.show(
-            context,
-            onStartDashboardTutorial: _startDashboardTutorial,
-            onStartSettingsTutorial: _startSettingsTutorial,
-            onStartAutoLaunchTutorial: _startAutoLaunchTutorial,
-          );
+      _trayService.onOpenHelp = () {
+        if (!mounted) return;
+        HelpCenterDialog.show(
+          context,
+          onStartDashboardTutorial: _startDashboardTutorial,
+          onStartSettingsTutorial: _startSettingsTutorial,
+          onStartAutoLaunchTutorial: _startAutoLaunchTutorial,
+        );
+      };
       await _trayService.setRecordingState(_audioService.isRecording);
     } catch (e, stackTrace) {
       _loggingService.warning('시스템 트레이 초기화 실패 (앱은 계속 실행됨)',
@@ -276,8 +324,7 @@ class _MainScreenState extends State<MainScreen>
     try {
       await _runMicDiagnostic(initial: true);
     } catch (e, stackTrace) {
-      _loggingService.warning('초기 마이크 진단 실패',
-          error: e, stackTrace: stackTrace);
+      _loggingService.warning('초기 마이크 진단 실패', error: e, stackTrace: stackTrace);
       // 마이크 진단 실패는 치명적이지 않으므로 앱 계속 실행
     }
   }
@@ -365,6 +412,8 @@ class _MainScreenState extends State<MainScreen>
                         retentionDuration: _retentionDuration,
                         recordingProfile: _recordingProfile,
                         makeupGainDb: _makeupGainDb,
+                        startupStatusMismatch: _startupStatusMismatch,
+                        onShowStartupDiagnostics: _showStartupDiagnostics,
                       ),
                       _LaunchManagerTab(
                         onAutoLaunchChanged: (enabled) {
@@ -609,16 +658,43 @@ class _MainScreenState extends State<MainScreen>
     if (result == 'saved') {
       final launchAtStartup = await _settings.getLaunchAtStartup();
       final startMinimized = await _settings.getStartMinimizedOnBoot();
+      // Re-check startup status after saving
+      final statusSnapshot = await AutoLaunchService().getStatusSnapshot();
       if (mounted) {
         setState(() {
           _autoLaunchEnabled = launchAtStartup;
           _startMinimizedOnBoot = startMinimized;
+          _actualStartupEnabled = statusSnapshot.actualEnabled;
+          _isPackaged = statusSnapshot.isPackaged;
+          _packageFamilyName = statusSnapshot.packageFamilyName;
+          _startupStatusMismatch = statusSnapshot.actualEnabled != null &&
+              statusSnapshot.actualEnabled != launchAtStartup;
         });
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Windows 시작 설정이 저장되었습니다')),
         );
       }
     }
+  }
+
+  void _showStartupDiagnostics() async {
+    // Get log path from logging service
+    String logPath;
+    try {
+      logPath = await _loggingService.getLogDirectoryPath();
+    } catch (_) {
+      logPath = r'C:\Users\<user>\Documents\EyebottleRecorder\logs';
+    }
+
+    if (!mounted) return;
+    StartupDiagnosticsDialog.show(
+      context,
+      expectedEnabled: _autoLaunchEnabled,
+      actualEnabled: _actualStartupEnabled,
+      isPackaged: _isPackaged,
+      packageFamilyName: _packageFamilyName,
+      logPath: logPath,
+    );
   }
 
   Future<void> _refreshSaveFolderDisplay() async {
@@ -712,18 +788,7 @@ class _MainScreenState extends State<MainScreen>
     }
 
     try {
-      // 작업표시줄에 먼저 표시
-      await windowManager.setSkipTaskbar(false);
-
-      // 최소화 상태면 복원
-      final isMinimized = await windowManager.isMinimized();
-      if (isMinimized) {
-        await windowManager.restore();
-      }
-
-      // 창 표시 및 포커스
-      await windowManager.show();
-      await windowManager.focus();
+      await WindowTaskbarService().showMainWindow();
 
       _isHiddenToTray = false;
       _loggingService.info('창이 전면으로 복원되었습니다.');
@@ -748,7 +813,7 @@ class _MainScreenState extends State<MainScreen>
 
       windowManager.removeListener(this);
       await windowManager.setPreventClose(false);
-      await windowManager.setSkipTaskbar(false);
+      await WindowTaskbarService().setTaskbarVisible(true);
       await Future<void>.delayed(const Duration(milliseconds: 80));
 
       try {
@@ -779,8 +844,7 @@ class _MainScreenState extends State<MainScreen>
 
     try {
       // 먼저 창을 숨기고, 그 다음 작업표시줄에서 제거
-      await windowManager.hide();
-      await windowManager.setSkipTaskbar(true);
+      await WindowTaskbarService().hideToTray();
       _isHiddenToTray = true;
       _loggingService.info('창이 트레이로 숨겨졌습니다.');
 
@@ -871,7 +935,6 @@ class _MainScreenState extends State<MainScreen>
 
   void _startDashboardTutorial() {
     final showCase = ShowCaseWidget.of(context);
-    if (showCase == null) return;
 
     if (_tabController.index != 0) {
       _tabController.animateTo(0);
@@ -889,7 +952,6 @@ class _MainScreenState extends State<MainScreen>
 
   void _startSettingsTutorial() {
     final showCase = ShowCaseWidget.of(context);
-    if (showCase == null) return;
 
     void startShowcase() {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -913,7 +975,6 @@ class _MainScreenState extends State<MainScreen>
 
   void _startAutoLaunchTutorial() {
     final showCase = ShowCaseWidget.of(context);
-    if (showCase == null) return;
 
     void startShowcase() {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -967,7 +1028,21 @@ class _MainScreenState extends State<MainScreen>
       setState(() => _micDiagnosticRunning = true);
     }
 
-    final result = await _micDiagnosticsService.runDiagnostic();
+    MicDiagnosticResult result;
+    try {
+      result = await _micDiagnosticsService.runDiagnostic();
+    } catch (e, stackTrace) {
+      _loggingService.error('마이크 진단 중 예외 발생', error: e, stackTrace: stackTrace);
+      if (mounted) {
+        setState(() => _micDiagnosticRunning = false);
+      }
+      if (!initial && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('마이크 진단 실패: $e')),
+        );
+      }
+      return;
+    }
     _loggingService.info(
       'Mic diagnostic result: ${result.status.name} (signalDb=${result.peakDb?.toStringAsFixed(1) ?? 'n/a'}, snr=${result.snrDb?.toStringAsFixed(1) ?? 'n/a'})',
     );
@@ -1548,9 +1623,9 @@ class _DashboardTab extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFF0F7ABF).withOpacity(0.08),
+        color: const Color(0xFF0F7ABF).withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF0F7ABF).withOpacity(0.25)),
+        border: Border.all(color: const Color(0xFF0F7ABF).withValues(alpha: 0.25)),
       ),
       child: Row(
         children: [
@@ -1814,7 +1889,7 @@ class _StatusBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(12),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -1889,64 +1964,82 @@ class _LaunchManagerTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 간단한 헤더
-          Row(
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: AppColors.primaryContainer,
-                  borderRadius: BorderRadius.circular(12),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Use scrollable layout on small screens
+        final content = Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 간단한 헤더
+            Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryContainer,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.rocket_launch,
+                    color: AppColors.primary,
+                    size: 24,
+                  ),
                 ),
-                child: const Icon(
-                  Icons.rocket_launch,
-                  color: AppColors.primary,
-                  size: 24,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      '자동 실행 매니저',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF1E2329),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        '자동 실행 매니저',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1E2329),
+                        ),
                       ),
-                    ),
-                    Text(
-                      '진료실에서 자주 사용하는 프로그램들을 앱 시작 시 자동으로 실행합니다',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: AppColors.textSecondary,
+                      Text(
+                        '진료실에서 자주 사용하는 프로그램들을 앱 시작 시 자동으로 실행합니다',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: AppColors.textSecondary,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          // LaunchManagerWidget
-          Expanded(
-            child: LaunchManagerWidget(
-              onAutoLaunchChanged: onAutoLaunchChanged,
-              switchShowcaseKey: switchShowcaseKey,
-              addButtonShowcaseKey: addButtonShowcaseKey,
-              testButtonShowcaseKey: testButtonShowcaseKey,
+              ],
             ),
-          ),
-        ],
-      ),
+            const SizedBox(height: 20),
+            // LaunchManagerWidget
+            Expanded(
+              child: LaunchManagerWidget(
+                onAutoLaunchChanged: onAutoLaunchChanged,
+                switchShowcaseKey: switchShowcaseKey,
+                addButtonShowcaseKey: addButtonShowcaseKey,
+                testButtonShowcaseKey: testButtonShowcaseKey,
+              ),
+            ),
+          ],
+        );
+
+        // Wrap in scrollable container for small screens
+        if (constraints.maxHeight < 480) {
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: SizedBox(
+              height: 600, // Minimum height for proper layout
+              child: content,
+            ),
+          );
+        }
+
+        return Container(
+          padding: const EdgeInsets.all(24),
+          child: content,
+        );
+      },
     );
   }
 }
@@ -1972,6 +2065,8 @@ class _SettingsTab extends StatelessWidget {
     required this.retentionDuration,
     required this.recordingProfile,
     required this.makeupGainDb,
+    this.startupStatusMismatch = false,
+    this.onShowStartupDiagnostics,
   });
 
   final Future<void> Function() onOpenSchedule;
@@ -1993,6 +2088,8 @@ class _SettingsTab extends StatelessWidget {
   final Duration? retentionDuration;
   final RecordingQualityProfile recordingProfile;
   final double makeupGainDb;
+  final bool startupStatusMismatch;
+  final VoidCallback? onShowStartupDiagnostics;
 
   @override
   Widget build(BuildContext context) {
@@ -2079,6 +2176,12 @@ class _SettingsTab extends StatelessWidget {
                     : startMinimizedOnBoot
                         ? '켜짐 · 백그라운드'
                         : '켜짐 · 창 표시',
+                statusBadge: startupStatusMismatch
+                    ? _StartupStatusBadge(
+                        hasMismatch: true,
+                        onTap: onShowStartupDiagnostics,
+                      )
+                    : null,
                 onTap: onOpenStartup,
               ),
             ],
@@ -2107,6 +2210,7 @@ class SettingsDestination {
     required this.description,
     required this.onTap,
     this.statusText,
+    this.statusBadge,
     this.showcaseKey,
     this.showcaseDescription,
   });
@@ -2116,6 +2220,7 @@ class SettingsDestination {
   final String description;
   final Future<void> Function() onTap;
   final String? statusText;
+  final Widget? statusBadge;
   final GlobalKey? showcaseKey;
   final String? showcaseDescription;
 }
@@ -2203,13 +2308,17 @@ class _SettingsTile extends StatelessWidget {
                 ],
               ),
             ),
+            if (item.statusBadge != null) ...[
+              item.statusBadge!,
+              const SizedBox(width: 8),
+            ],
             if (item.statusText != null) ...[
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: item.statusText == '켜짐'
                       ? AppColors.primaryContainer
-                      : AppColors.textSecondary.withOpacity(0.12),
+                      : AppColors.textSecondary.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
@@ -2350,6 +2459,361 @@ class _LiveIndicatorState extends State<_LiveIndicator>
           color: widget.color,
           shape: BoxShape.circle,
         ),
+      ),
+    );
+  }
+}
+
+/// Status badge for startup task showing sync state
+class _StartupStatusBadge extends StatelessWidget {
+  const _StartupStatusBadge({
+    required this.hasMismatch,
+    this.onTap,
+  });
+
+  final bool hasMismatch;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!hasMismatch) return const SizedBox.shrink();
+
+    return Tooltip(
+      message: '자동 실행 설정이 OS와 동기화되지 않았습니다. 클릭하여 상세정보를 확인하세요.',
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+          decoration: BoxDecoration(
+            color: AppColors.warning.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: AppColors.warning.withValues(alpha: 0.3)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.warning_amber_rounded,
+                  color: AppColors.warning, size: 14),
+              const SizedBox(width: 4),
+              Text(
+                '동기화 필요',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.warning,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Dialog to show autostart diagnostics details
+class StartupDiagnosticsDialog extends StatelessWidget {
+  const StartupDiagnosticsDialog({
+    super.key,
+    required this.expectedEnabled,
+    required this.actualEnabled,
+    required this.isPackaged,
+    this.packageFamilyName,
+    required this.logPath,
+  });
+
+  final bool expectedEnabled;
+  final bool? actualEnabled;
+  final bool isPackaged;
+  final String? packageFamilyName;
+  final String logPath;
+
+  static Future<void> show(
+    BuildContext context, {
+    required bool expectedEnabled,
+    required bool? actualEnabled,
+    required bool isPackaged,
+    String? packageFamilyName,
+    required String logPath,
+  }) {
+    return showDialog(
+      context: context,
+      builder: (context) => StartupDiagnosticsDialog(
+        expectedEnabled: expectedEnabled,
+        actualEnabled: actualEnabled,
+        isPackaged: isPackaged,
+        packageFamilyName: packageFamilyName,
+        logPath: logPath,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final hasMismatch =
+        actualEnabled != null && actualEnabled != expectedEnabled;
+
+    return Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 480, maxHeight: 520),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Header
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 20, 24, 12),
+              child: Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: hasMismatch
+                          ? AppColors.warning.withValues(alpha: 0.12)
+                          : AppColors.success.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      hasMismatch
+                          ? Icons.warning_amber_rounded
+                          : Icons.check_circle,
+                      color:
+                          hasMismatch ? AppColors.warning : AppColors.success,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '자동 시작 진단',
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          hasMismatch
+                              ? 'Windows 설정과 앱 설정이 일치하지 않습니다'
+                              : '설정이 정상적으로 동기화되어 있습니다',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: '닫기',
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            // Content
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildStatusRow(
+                      context,
+                      label: '앱 설정 (예상)',
+                      value: expectedEnabled ? '켜짐' : '꺼짐',
+                      isOk: !hasMismatch,
+                    ),
+                    const SizedBox(height: 12),
+                    _buildStatusRow(
+                      context,
+                      label: 'OS 상태 (실제)',
+                      value: actualEnabled == null
+                          ? '확인 불가'
+                          : actualEnabled!
+                              ? '켜짐'
+                              : '꺼짐',
+                      isOk: !hasMismatch,
+                      isUnknown: actualEnabled == null,
+                    ),
+                    const SizedBox(height: 16),
+                    const Divider(),
+                    const SizedBox(height: 16),
+                    // Package info
+                    Text(
+                      '패키지 정보',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    _buildInfoRow(context, '패키지 형태',
+                        isPackaged ? 'MSIX (Store)' : '비패키지 실행'),
+                    if (packageFamilyName != null &&
+                        packageFamilyName!.isNotEmpty)
+                      _buildInfoRow(
+                          context, 'PackageFamilyName', packageFamilyName!),
+                    const SizedBox(height: 16),
+                    const Divider(),
+                    const SizedBox(height: 16),
+                    // Log path
+                    Text(
+                      '로그 파일 경로',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.neutral50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppColors.surfaceBorder),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.folder_outlined,
+                              color: AppColors.textSecondary, size: 18),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: SelectableText(
+                              logPath,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                fontFamily: 'monospace',
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (hasMismatch) ...[
+                      const SizedBox(height: 16),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.blue.shade200),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(Icons.info_outline,
+                                color: Colors.blue.shade700, size: 18),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Windows 설정 > 앱 > 시작프로그램에서 "Eyebottle Medical Recorder" 상태를 확인하세요.',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: Colors.blue.shade900,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+            const Divider(height: 1),
+            // Actions
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  FilledButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('확인'),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatusRow(
+    BuildContext context, {
+    required String label,
+    required String value,
+    required bool isOk,
+    bool isUnknown = false,
+  }) {
+    final theme = Theme.of(context);
+    final color = isUnknown
+        ? AppColors.textSecondary
+        : isOk
+            ? AppColors.success
+            : AppColors.warning;
+
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            label,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            value,
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: color,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildInfoRow(BuildContext context, String label, String value) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 120,
+            child: Text(
+              label,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: AppColors.textPrimary,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -2,7 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:system_tray/system_tray.dart';
-import 'package:window_manager/window_manager.dart';
+
+import 'notification_service.dart';
+import 'window_taskbar_service.dart';
 
 enum TrayIconState { recording, waiting, error }
 
@@ -173,13 +175,7 @@ class TrayService {
   /// 창 복원 폴백 메서드
   Future<void> _showMainWindowFallback() async {
     try {
-      await windowManager.setSkipTaskbar(false);
-      final isMinimized = await windowManager.isMinimized();
-      if (isMinimized) {
-        await windowManager.restore();
-      }
-      await windowManager.show();
-      await windowManager.focus();
+      await WindowTaskbarService().showMainWindow();
       debugPrint('메인 창 복원 완료 (폴백)');
     } catch (e) {
       debugPrint('메인 창 표시 실패: $e');
@@ -232,8 +228,7 @@ class TrayService {
   /// 알림 표시
   Future<void> showNotification(String title, String message) async {
     try {
-      // TODO: 알림 구현 (향후 추가)
-      debugPrint('알림: $title - $message');
+      await NotificationService().show(title: title, message: message);
     } catch (e) {
       debugPrint('알림 표시 실패: $e');
     }
