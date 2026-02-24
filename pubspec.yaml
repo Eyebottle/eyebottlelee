@@ -54,7 +54,7 @@ flutter:
   assets:
     - assets/images/
     - assets/icons/
-    # - assets/bin/ffmpeg.exe  # 임시 제외: Partner Center 테스트
+    - assets/bin/ffmpeg.exe
 
 msix_config:
   display_name: 아이보틀 진료 녹음
