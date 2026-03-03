@@ -119,6 +119,16 @@ class _MainScreenState extends State<MainScreen>
       // (main.dart에서 setSkipTaskbar(true)로 설정됨)
       if (!gStartedInBackground) {
         await WindowTaskbarService().setTaskbarVisible(true);
+      } else {
+        // v1.3.11: Flutter 위젯 트리 빌드 후 창이 다시 보여질 수 있으므로
+        // 백그라운드 시작 시 한 번 더 숨김 상태를 강제 적용
+        final isVisible = await windowManager.isVisible();
+        if (isVisible) {
+          _loggingService.warning(
+              'initServices: 백그라운드 시작인데 창이 보임 감지, 재숨김 처리');
+          await windowManager.hide();
+          await windowManager.setSkipTaskbar(true);
+        }
       }
       _loggingService
           .info('Window init: gStartedInBackground=$gStartedInBackground');

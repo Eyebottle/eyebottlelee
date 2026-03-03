@@ -43,15 +43,10 @@ void main(List<String> args) async {
 
     // 부팅 시 자동 시작 여부 확인
     //
-    // **v1.3.8 변경사항 (A안+C안 적용):**
-    // - MSIX 환경에서 PowerShell/WMIC 호출이 실패하는 문제 해결
-    // - _isRecentSystemBoot() 의존성 제거, 설정값 기반으로 단순화
-    // - --autostart 인자는 참고용 로그로만 사용
-    //
-    // **로직:**
-    // - --autostart 인자 존재(=부팅 자동 실행으로 시작) → 무조건 백그라운드 시작
-    //   (부팅 시 창이 뜨는 스트레스를 원천 차단)
-    // - 그 외(사용자가 직접 실행) → startMinimizedOnBoot=true AND launchAtStartup=true일 때만 백그라운드
+    // **v1.3.14 변경사항:**
+    // - --autostart 인자 존재(=MSIX 부팅 자동 실행) → 백그라운드(트레이) 시작
+    // - --autostart 인자 없음(=사용자 수동 실행) → 무조건 창 표시
+    // - 수동 실행 시 설정값에 관계없이 항상 창을 보여줌 (v1.3.13 버그 수정)
     final hasAutostartArg = args.contains('--autostart');
 
     logging.info('Startup args: $args, hasAutostartArg=$hasAutostartArg');
@@ -85,83 +80,78 @@ Future<void> _initializeApp({
   const minimumSize = Size(640, 900);
 
   // ============================================================
-  // 부팅 시 백그라운드로 시작할지 결정 (v1.3.8 A안+C안)
+  // 부팅 시 백그라운드로 시작할지 결정 (v1.3.14)
   // ============================================================
   //
   // **핵심 원칙:**
-  // 설정값이 진실의 원천. 외부 프로세스 호출(PowerShell/WMIC) 없이
-  // SharedPreferences에 저장된 값만으로 결정합니다.
+  // 1. windowManager.waitUntilReadyToShow()를 반드시 사용한다!
+  //    (직접 호출하면 window_manager_plugin.dll이 크래시함)
   //
-  // **로직:**
-  // - launchAtStartup=true AND startMinimizedOnBoot=true → 백그라운드 시작
-  // - 그 외 → 창 표시
+  // **주의: MSIX의 uap10:Parameters**
+  // MSIX 패키지에서는 uap10:Parameters="--autostart"가 Application 요소에
+  // 적용되므로, StartupTask뿐 아니라 시작 메뉴 클릭 등 **모든 실행**에
+  // --autostart 인자가 붙습니다.
   //
-  // **주의:**
-  // 이 방식은 "수동으로 앱을 실행해도 백그라운드로 시작"될 수 있습니다.
-  // 하지만 사용자가 설정에서 명시적으로 둘 다 켜놓은 상태이므로,
-  // 의도된 동작으로 간주합니다. 창을 보려면 트레이 아이콘을 클릭하면 됩니다.
+  // 따라서 --autostart만으로 "부팅 시 자동 실행"을 판단할 수 없습니다.
+  // 대신: launchAtStartup=ON + startMinimizedOnBoot=ON 일 때만 트레이 숨김.
   //
   // ============================================================
   final settings = SettingsService();
   final launchAtStartup = await settings.getLaunchAtStartup();
   final startMinimizedOnBoot = await settings.getStartMinimizedOnBoot();
 
-  if (hasAutostartArg && !launchAtStartup) {
-    logging.warning(
-        'Autostart launch detected but setting is OFF. Exiting immediately.');
-    try {
-      await AutoLaunchService().apply(false);
-    } catch (e, stackTrace) {
-      logging.warning('자동 실행 비활성화 시도 실패', error: e, stackTrace: stackTrace);
-    }
-    exit(0);
-  }
-
-  // 부팅 자동 실행일 때도 사용자가 선택한 창 표시/숨김 옵션을 따름
-  final shouldStartMinimized = hasAutostartArg
-      ? startMinimizedOnBoot
-      : (launchAtStartup && startMinimizedOnBoot);
+  // ★★★ 핵심 로직 ★★★
+  // 트레이로 숨기려면 3가지 조건이 모두 충족되어야 함:
+  // 1. --autostart 인자 있음 (MSIX에서는 항상 true — 방어적 체크)
+  // 2. launchAtStartup = true (사용자가 자동 실행을 켜놓았음)
+  // 3. startMinimizedOnBoot = true (사용자가 백그라운드 시작을 원함)
+  //
+  // 하나라도 false면 → 창을 보여준다!
+  final shouldStartMinimized =
+      hasAutostartArg && launchAtStartup && startMinimizedOnBoot;
 
   // 전역 플래그 설정 (main_screen.dart에서 참조)
   gStartedInBackground = shouldStartMinimized;
 
-  logging.info('Background start decision: launchAtStartup=$launchAtStartup, '
-      'startMinimizedOnBoot=$startMinimizedOnBoot → shouldStartMinimized=$shouldStartMinimized');
+  logging.info('Background start decision: hasAutostartArg=$hasAutostartArg, '
+      'launchAtStartup=$launchAtStartup, '
+      'startMinimizedOnBoot=$startMinimizedOnBoot → '
+      'shouldStartMinimized=$shouldStartMinimized');
 
-  final windowOptions = WindowOptions(
+  // ============================================================
+  // WindowOptions를 사용하여 waitUntilReadyToShow()로 창 초기화
+  // ============================================================
+  // !! 중요 !!
+  // windowManager.setSize(), setTitle() 등을 ensureInitialized() 직후에
+  // 직접 호출하면 window_manager_plugin.dll에서 Access Violation(0xc0000005)
+  // 크래시가 발생합니다.
+  //
+  // 반드시 waitUntilReadyToShow()의 콜백 안에서 창 조작을 해야 합니다.
+  // (v1.3.4에서 정상 작동하던 패턴 복원)
+  // ============================================================
+
+  const windowOptions = WindowOptions(
     size: initialSize,
     minimumSize: minimumSize,
     center: true,
     backgroundColor: Colors.transparent,
-    skipTaskbar: shouldStartMinimized,
+    skipTaskbar: false,
     titleBarStyle: TitleBarStyle.normal,
     title: '아이보틀 진료녹음 & 자동실행 매니저',
   );
 
-  await windowManager.waitUntilReadyToShow(windowOptions, () async {
-    try {
-      if (shouldStartMinimized) {
-        // 백그라운드로 시작 (트레이만 표시)
-        await windowManager.hide();
-        await windowManager.setSkipTaskbar(true);
-        logging.info('Started minimized to tray (background mode)');
-      } else {
-        // 정상적으로 창 표시
-        await windowManager.setSkipTaskbar(false);
-        await windowManager.show();
-        await windowManager.focus();
-        logging.info('Started normally (visible window)');
-      }
-    } catch (e, stackTrace) {
-      logging.error('Window initialization failed',
-          error: e, stackTrace: stackTrace);
+  windowManager.waitUntilReadyToShow(windowOptions, () async {
+    if (shouldStartMinimized) {
+      // --autostart + 백그라운드 시작: 창 숨기고 트레이만 표시
+      await windowManager.setSkipTaskbar(true);
+      await windowManager.hide();
+      logging.info('Started minimized to tray (background mode)');
+    } else {
+      // 일반 실행: 창 표시
+      await windowManager.show();
+      await windowManager.focus();
+      logging.info('Started normally (visible window)');
     }
-  });
-
-  WidgetsBinding.instance.addPostFrameCallback((_) async {
-    // 백그라운드 시작이어도 창 크기는 설정 (숨겨진 상태에서도 크기 설정 가능)
-    await _applyWindowMetrics(
-        initialSize: initialSize, minimumSize: minimumSize);
   });
 
   runApp(
@@ -171,34 +161,7 @@ Future<void> _initializeApp({
   );
 }
 
-Future<void> _applyWindowMetrics({
-  required Size initialSize,
-  required Size minimumSize,
-}) async {
-  // DPI 스케일링이 즉시 적용되지 않는 경우가 있어 약간의 지연 후 재시도
-  // (window_manager 이슈 대응)
-  for (var attempt = 0; attempt < 5; attempt++) {
-    if (attempt > 0) {
-      await Future.delayed(const Duration(milliseconds: 120));
-    } else {
-      await Future.delayed(const Duration(milliseconds: 60));
-    }
 
-    final ratio = await windowManager.getDevicePixelRatio();
-
-    await windowManager.setMinimumSize(minimumSize);
-    await windowManager.setSize(initialSize);
-    await windowManager.center();
-
-    // DPI가 정상 범위(1.0 근처)가 아니거나, High DPI 환경에서 안정화되었는지 체크
-    // 1.01/0.99는 부동소수점 오차 고려
-    if (ratio > 1.01 || ratio < 0.99) {
-      // DPI 값이 안정적인지 확인 (실제로는 OS 스케일에 따라 다름)
-      // 여기서는 "값이 읽혀졌다"는 것을 간접 확인함
-      break;
-    }
-  }
-}
 
 class MedicalRecorderApp extends StatelessWidget {
   const MedicalRecorderApp({super.key});

@@ -27,13 +27,20 @@ bool FlutterWindow::OnCreate() {
   RegisterPlugins(flutter_controller_->engine());
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
-  flutter_controller_->engine()->SetNextFrameCallback([&]() {
-    this->Show();
-  });
+  // v1.3.11-fix: Removed auto Show() but kept ForceRedraw().
+  //
+  // Previously, SetNextFrameCallback called Show() after the first frame,
+  // which overrode Dart-side windowManager.hide() and broke the
+  // "start minimized to tray" feature.
+  //
+  // ForceRedraw() is essential - it forces the Flutter engine to render
+  // the first frame. Without it, the engine stalls and Dart code never
+  // executes, causing the app to not launch at all.
+  //
+  // Window visibility is now controlled by Dart code (main.dart) via
+  // windowManager.show() / windowManager.hide().
 
-  // Flutter can complete the first frame before the "show window" callback is
-  // registered. The following call ensures a frame is pending to ensure the
-  // window is shown. It is a no-op if the first frame hasn't completed yet.
+  // Force the Flutter engine to render the first frame (REQUIRED!)
   flutter_controller_->ForceRedraw();
 
   return true;
