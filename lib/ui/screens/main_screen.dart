@@ -12,7 +12,7 @@ import '../../models/mic_diagnostic_result.dart';
 import '../../models/schedule_model.dart';
 import '../../services/audio_service.dart';
 import '../../services/logging_service.dart';
-import '../../services/notification_service.dart';
+// import '../../services/notification_service.dart'; // v1.3.16: autostart 동기화 알림 제거
 import '../../services/schedule_service.dart';
 import '../../services/settings_service.dart';
 import '../../services/tray_service.dart';
@@ -75,12 +75,10 @@ class _MainScreenState extends State<MainScreen>
   MicDiagnosticResult? _lastMicDiagnostic;
   bool _micDiagnosticRunning = false;
   bool _vadEnabled = true;
-  bool _autoLaunchEnabled = false;
   bool _startMinimizedOnBoot = false;
-  bool _startupStatusMismatch = false;
-  bool? _actualStartupEnabled;
-  String? _packageFamilyName;
+  bool _autoLaunchEnabled = false; // 자동 실행 매니저 (별도 기능)
   bool _isPackaged = false;
+  String? _packageFamilyName;
   Duration? _retentionDuration;
   RecordingQualityProfile _recordingProfile = RecordingQualityProfile.balanced;
   double _makeupGainDb = 0.0;
@@ -137,47 +135,22 @@ class _MainScreenState extends State<MainScreen>
           error: e, stackTrace: stackTrace);
     }
 
+    // v1.3.16: WinRT StartupTask API로 자동 실행 상태 확인
     try {
-      final applied = await AutoLaunchService().applySavedPreference();
-      if (!applied) {
-        _loggingService.warning('자동 실행 설정이 OS와 동기화되지 않았습니다.');
-        await NotificationService().show(
-          title: '자동 실행 설정 확인',
-          message: 'Windows 시작프로그램에서 설정 상태를 확인해주세요.',
-        );
-      }
+      await AutoLaunchService().applySavedPreference();
 
       // Fetch startup status snapshot for diagnostics
       final statusSnapshot = await AutoLaunchService().getStatusSnapshot();
-      final expected = statusSnapshot.expectedEnabled;
-      final actual = statusSnapshot.actualEnabled;
       if (mounted) {
         setState(() {
-          _actualStartupEnabled = actual;
           _isPackaged = statusSnapshot.isPackaged;
           _packageFamilyName = statusSnapshot.packageFamilyName;
-          _startupStatusMismatch = actual != null && actual != expected;
+          _autoLaunchEnabled = statusSnapshot.startupTaskEnabled;
         });
-      }
-      if (actual != null && actual != expected) {
-        _loggingService
-            .warning('자동 실행 상태 불일치: expected=$expected actual=$actual');
-        await NotificationService().show(
-          title: '자동 실행 상태 불일치',
-          message: 'Windows 시작프로그램에서 상태를 확인해주세요.',
-        );
       }
     } catch (e, stackTrace) {
-      _loggingService.warning('자동 실행 설정 동기화 실패',
+      _loggingService.warning('자동 실행 설정 읽기 실패',
           error: e, stackTrace: stackTrace);
-      if (mounted) {
-        Future.microtask(() {
-          if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('자동 실행 설정을 동기화하지 못했습니다: $e')),
-          );
-        });
-      }
     }
 
     // 자동 실행 매니저 초기화 및 프로그램 실행
@@ -288,11 +261,9 @@ class _MainScreenState extends State<MainScreen>
       });
     }
 
-    final launchAtStartup = await _settings.getLaunchAtStartup();
     final startMinimized = await _settings.getStartMinimizedOnBoot();
     if (mounted) {
       setState(() {
-        _autoLaunchEnabled = launchAtStartup;
         _startMinimizedOnBoot = startMinimized;
       });
     }
@@ -417,12 +388,12 @@ class _MainScreenState extends State<MainScreen>
                         audioQualityShowcaseKey: _settingsAudioQualityKey,
                         saveFolder: _currentSaveFolder,
                         vadEnabled: _vadEnabled,
-                        launchAtStartup: _autoLaunchEnabled,
+                        launchAtStartup: _autoLaunchEnabled, // WinRT StartupTask 상태
                         startMinimizedOnBoot: _startMinimizedOnBoot,
                         retentionDuration: _retentionDuration,
                         recordingProfile: _recordingProfile,
                         makeupGainDb: _makeupGainDb,
-                        startupStatusMismatch: _startupStatusMismatch,
+                        startupStatusMismatch: false,
                         onShowStartupDiagnostics: _showStartupDiagnostics,
                       ),
                       _LaunchManagerTab(
@@ -666,19 +637,10 @@ class _MainScreenState extends State<MainScreen>
       AdvancedSettingSection.startupSettings,
     );
     if (result == 'saved') {
-      final launchAtStartup = await _settings.getLaunchAtStartup();
       final startMinimized = await _settings.getStartMinimizedOnBoot();
-      // Re-check startup status after saving
-      final statusSnapshot = await AutoLaunchService().getStatusSnapshot();
       if (mounted) {
         setState(() {
-          _autoLaunchEnabled = launchAtStartup;
           _startMinimizedOnBoot = startMinimized;
-          _actualStartupEnabled = statusSnapshot.actualEnabled;
-          _isPackaged = statusSnapshot.isPackaged;
-          _packageFamilyName = statusSnapshot.packageFamilyName;
-          _startupStatusMismatch = statusSnapshot.actualEnabled != null &&
-              statusSnapshot.actualEnabled != launchAtStartup;
         });
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Windows 시작 설정이 저장되었습니다')),
@@ -699,8 +661,8 @@ class _MainScreenState extends State<MainScreen>
     if (!mounted) return;
     StartupDiagnosticsDialog.show(
       context,
-      expectedEnabled: _autoLaunchEnabled,
-      actualEnabled: _actualStartupEnabled,
+      expectedEnabled: true, // Windows StartupTask로 관리
+      actualEnabled: null, // OS 상태 직접 확인 불가 (네이티브 API 제거)
       isPackaged: _isPackaged,
       packageFamilyName: _packageFamilyName,
       logPath: logPath,

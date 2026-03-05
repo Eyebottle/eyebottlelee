@@ -1,6 +1,5 @@
 // ignore_for_file: invalid_use_of_protected_member
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'package:record/record.dart';
@@ -42,6 +41,7 @@ class _AdvancedSettingsDialogState extends State<AdvancedSettingsDialog> {
   bool _vadEnabled = true;
   double _vadThreshold = 0.006;
   bool _launchAtStartup = true;
+  bool _startupDisabledByUser = false; // Windows 설정에서 사용자가 직접 비활성화
   bool _startMinimizedOnBoot = false;
   bool _loading = true;
   RetentionOption _retentionOption = RetentionOption.forever;
@@ -62,7 +62,7 @@ class _AdvancedSettingsDialogState extends State<AdvancedSettingsDialog> {
   Future<void> _load() async {
     final settings = SettingsService();
     final (vadEnabled, vadThreshold) = await settings.getVad();
-    final launch = await settings.getLaunchAtStartup();
+    // final launch = await settings.getLaunchAtStartup(); // v1.3.16: 미사용
     final startMinimized = await settings.getStartMinimizedOnBoot();
     final retention = await settings.getRetentionDuration();
     final profile = await settings.getRecordingProfile();
@@ -71,11 +71,16 @@ class _AdvancedSettingsDialogState extends State<AdvancedSettingsDialog> {
     final wavAutoConvert = await settings.isWavAutoConvertEnabled();
     final wavTarget = await settings.getWavTargetEncoder();
     final conversionDelay = await settings.getConversionDelay();
+    // WinRT StartupTask 상태 확인
+    final autoLaunchService = AutoLaunchService();
+    final isEnabled = await autoLaunchService.isEnabled();
+    final isDisabledByUser = await autoLaunchService.isDisabledByUser();
     if (!mounted) return;
     setState(() {
       _vadEnabled = vadEnabled;
       _vadThreshold = vadThreshold;
-      _launchAtStartup = launch;
+      _launchAtStartup = isEnabled;
+      _startupDisabledByUser = isDisabledByUser;
       _startMinimizedOnBoot = startMinimized;
       _retentionOption = _optionFromDuration(retention);
       _vadPreset = _presetFromThreshold(_vadThreshold);
@@ -509,135 +514,59 @@ class _AdvancedSettingsDialogState extends State<AdvancedSettingsDialog> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Startup status indicator
-              FutureBuilder<_StartupSyncStatus>(
-                future: _checkStartupStatus(),
-                builder: (context, snapshot) {
-                  if (!snapshot.hasData) {
-                    return const SizedBox.shrink();
-                  }
-                  final status = snapshot.data!;
-                  if (!status.hasMismatch) {
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF2E7D32).withValues(alpha:0.12),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: const Color(0xFF2E7D32).withValues(alpha:0.3),
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons.check_circle,
-                              color: Color(0xFF2E7D32),
-                              size: 18,
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                'OS와 동기화됨',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .bodySmall
-                                    ?.copyWith(
-                                      color: const Color(0xFF2E7D32),
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                              ),
-                            ),
-                            Text(
-                              status.isPackaged ? 'StartupTask' : 'Registry',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .labelSmall
-                                  ?.copyWith(
-                                    color: const Color(0xFF2E7D32)
-                                        .withValues(alpha:0.7),
-                                  ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  }
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 16),
-                    child: Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFFA000).withValues(alpha:0.12),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: const Color(0xFFFFA000).withValues(alpha:0.3),
-                        ),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              const Icon(
-                                Icons.warning_amber_rounded,
-                                color: Color(0xFFFFA000),
-                                size: 18,
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  'OS 설정과 불일치',
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .bodySmall
-                                      ?.copyWith(
-                                        color: const Color(0xFFFFA000),
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            '앱 설정: ${status.expectedEnabled ? "켜짐" : "꺼짐"} / '
-                            'OS 상태: ${status.actualEnabled == null ? "확인 불가" : (status.actualEnabled! ? "켜짐" : "꺼짐")}',
-                            style: Theme.of(context)
-                                .textTheme
-                                .labelSmall
-                                ?.copyWith(
-                                  color: Colors.grey.shade700,
-                                ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
+              // v1.3.16: WinRT StartupTask API로 자동 실행 직접 제어
               SwitchListTile.adaptive(
                 contentPadding: EdgeInsets.zero,
-                title: const Text('Windows 시작 시 앱 자동 실행'),
-                subtitle: const Text('PC 부팅 시 아이보틀 앱이 자동으로 시작됩니다'),
-                value: _launchAtStartup,
-                onChanged: (v) => setState(() => _launchAtStartup = v),
-              ),
-              if (_launchAtStartup) ...[
-                const SizedBox(height: 12),
-                const Divider(),
-                const SizedBox(height: 12),
-                SwitchListTile.adaptive(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('부팅 시 백그라운드로 시작'),
-                  subtitle: const Text('창을 표시하지 않고 트레이에서만 실행됩니다'),
-                  value: _startMinimizedOnBoot,
-                  onChanged: (v) => setState(() => _startMinimizedOnBoot = v),
+                title: const Text('Windows 시작 시 자동 실행'),
+                subtitle: Text(
+                  _startupDisabledByUser
+                      ? '사용자가 Windows 설정에서 비활성화함'
+                      : _launchAtStartup
+                          ? 'PC 부팅 시 앱이 자동으로 시작됩니다'
+                          : '수동으로만 앱을 실행합니다',
                 ),
+                value: _launchAtStartup,
+                onChanged: _startupDisabledByUser
+                    ? null  // Windows 설정에서 비활성화된 경우 토글 비활성화
+                    : (v) => setState(() => _launchAtStartup = v),
+              ),
+              if (_startupDisabledByUser)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.amber.shade300),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.settings,
+                            color: Colors.amber.shade800, size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Windows 설정 > 시작프로그램에서 다시 활성화해주세요.',
+                            style:
+                                Theme.of(context).textTheme.bodySmall?.copyWith(
+                                      color: Colors.amber.shade900,
+                                    ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              const SizedBox(height: 12),
+              SwitchListTile.adaptive(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('부팅 시 백그라운드로 시작'),
+                subtitle: const Text('창을 표시하지 않고 트레이에서만 실행됩니다'),
+                value: _startMinimizedOnBoot,
+                onChanged: (v) => setState(() => _startMinimizedOnBoot = v),
+              ),
+              if (_startMinimizedOnBoot) ...[
                 const SizedBox(height: 12),
                 Container(
                   padding: const EdgeInsets.all(12),
@@ -675,7 +604,7 @@ class _AdvancedSettingsDialogState extends State<AdvancedSettingsDialog> {
     await settings.setRecordingProfile(_recordingProfile);
     await settings.setMakeupGainDb(_makeupGainDb);
     await settings.setVad(enabled: _vadEnabled, threshold: _vadThreshold);
-    await settings.setLaunchAtStartup(_launchAtStartup);
+    // v1.3.16: launchAtStartup 설정은 더 이상 사용하지 않으나 호환성을 위해 유지
     await settings.setStartMinimizedOnBoot(_startMinimizedOnBoot);
     await settings.setRetentionDuration(_durationForOption(_retentionOption));
     // WAV 자동 변환 설정 저장
@@ -683,57 +612,23 @@ class _AdvancedSettingsDialogState extends State<AdvancedSettingsDialog> {
     await settings.setWavTargetEncoder(_wavTargetEncoder);
     await settings.setConversionDelay(_conversionDelay);
 
-    if (!kIsWeb) {
-      try {
-        final applied = await AutoLaunchService().apply(_launchAtStartup);
-        if (!applied && mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content:
-                  Text('Windows 시작프로그램 설정이 반영되지 않았습니다. 시작프로그램에서 상태를 확인해주세요.'),
-            ),
-          );
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('자동 실행 설정 적용 중 오류가 발생했습니다: $e'),
-            ),
-          );
-        }
+    // v1.3.16: WinRT StartupTask API로 자동 실행 제어
+    final autoLaunchService = AutoLaunchService();
+    try {
+      if (_launchAtStartup) {
+        await autoLaunchService.enable();
+      } else {
+        await autoLaunchService.disable();
       }
+    } catch (e) {
+      // StartupTask API 호출 실패해도 나머지 설정은 저장
+      debugPrint('StartupTask API error: $e');
     }
 
     if (mounted) {
       Navigator.of(context).pop('saved');
     }
   }
-
-  Future<_StartupSyncStatus> _checkStartupStatus() async {
-    final snapshot = await AutoLaunchService().getStatusSnapshot();
-    return _StartupSyncStatus(
-      expectedEnabled: snapshot.expectedEnabled,
-      actualEnabled: snapshot.actualEnabled,
-      isPackaged: snapshot.isPackaged,
-      hasMismatch: snapshot.actualEnabled != null &&
-          snapshot.actualEnabled != snapshot.expectedEnabled,
-    );
-  }
-}
-
-class _StartupSyncStatus {
-  const _StartupSyncStatus({
-    required this.expectedEnabled,
-    required this.actualEnabled,
-    required this.isPackaged,
-    required this.hasMismatch,
-  });
-
-  final bool expectedEnabled;
-  final bool? actualEnabled;
-  final bool isPackaged;
-  final bool hasMismatch;
 }
 
 enum VadPreset { quiet, standard, noisy }

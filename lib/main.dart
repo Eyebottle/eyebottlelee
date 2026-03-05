@@ -1,9 +1,7 @@
 import 'dart:async';
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:showcaseview/showcaseview.dart';
 import 'package:window_manager/window_manager.dart';
-import 'services/auto_launch_service.dart';
 import 'services/logging_service.dart';
 import 'services/notification_service.dart';
 import 'services/settings_service.dart';
@@ -14,13 +12,6 @@ import 'ui/style/app_theme.dart';
 ///
 /// main.dart에서 설정되고, main_screen.dart에서 참조하여
 /// setSkipTaskbar 호출 충돌을 방지합니다.
-///
-/// **사용 예:**
-/// ```dart
-/// if (!gStartedInBackground) {
-///   await windowManager.setSkipTaskbar(false);
-/// }
-/// ```
 bool gStartedInBackground = false;
 
 void main(List<String> args) async {
@@ -41,38 +32,23 @@ void main(List<String> args) async {
           error: details.exception, stackTrace: details.stack);
     };
 
-    // 부팅 시 자동 시작 여부 확인
-    //
-    // **v1.3.14 변경사항:**
-    // - --autostart 인자 존재(=MSIX 부팅 자동 실행) → 백그라운드(트레이) 시작
-    // - --autostart 인자 없음(=사용자 수동 실행) → 무조건 창 표시
-    // - 수동 실행 시 설정값에 관계없이 항상 창을 보여줌 (v1.3.13 버그 수정)
-    final hasAutostartArg = args.contains('--autostart');
+    logging.info('Startup args: $args');
 
-    logging.info('Startup args: $args, hasAutostartArg=$hasAutostartArg');
-
-    await _initializeApp(logging: logging, hasAutostartArg: hasAutostartArg);
+    await _initializeApp(args: args, logging: logging);
   }, (error, stack) {
     // Zone에서 캐치되지 않은 에러
     debugPrint('Uncaught Error: $error');
     debugPrint('StackTrace: $stack');
-    // LoggingService가 초기화되지 않았을 수도 있으므로 안전하게 시도
     try {
       LoggingService().error('Uncaught Error', error: error, stackTrace: stack);
     } catch (_) {}
   });
 }
 
-// NOTE: _isRecentSystemBoot() and _parseWindowsDateTime() were removed in v1.3.8.
-// MSIX 환경에서 PowerShell/WMIC 호출이 샌드박스 제한으로 실패하는 문제가 있어,
-// --autostart 인자 기반 감지로 전환했습니다. (A안+C안 적용)
-
 Future<void> _initializeApp({
+  required List<String> args,
   required LoggingService logging,
-  required bool hasAutostartArg,
 }) async {
-  // WidgetsFlutterBinding은 main()에서 이미 초기화됨
-
   // Windows Desktop 초기화
   await windowManager.ensureInitialized();
 
@@ -80,43 +56,47 @@ Future<void> _initializeApp({
   const minimumSize = Size(640, 900);
 
   // ============================================================
-  // 부팅 시 백그라운드로 시작할지 결정 (v1.3.14)
+  // 부팅 시 백그라운드로 시작할지 결정 (v1.3.16)
   // ============================================================
   //
-  // **핵심 원칙:**
-  // 1. windowManager.waitUntilReadyToShow()를 반드시 사용한다!
-  //    (직접 호출하면 window_manager_plugin.dll이 크래시함)
+  // **v1.3.16: WinRT StartupTask API로 근본 교체**
   //
-  // **주의: MSIX의 uap10:Parameters**
-  // MSIX 패키지에서는 uap10:Parameters="--autostart"가 Application 요소에
-  // 적용되므로, StartupTask뿐 아니라 시작 메뉴 클릭 등 **모든 실행**에
-  // --autostart 인자가 붙습니다.
+  // MSIX manifest의 StartupTask 설정:
+  //   task_id: EyebottleMedicalRecorder
+  //   parameters: "--autostart"
   //
-  // 따라서 --autostart만으로 "부팅 시 자동 실행"을 판단할 수 없습니다.
-  // 대신: launchAtStartup=ON + startMinimizedOnBoot=ON 일 때만 트레이 숨김.
+  // Windows가 StartupTask로 앱을 실행할 때만 --autostart 인자가 전달됩니다.
+  // 사용자가 시작 메뉴에서 수동 실행할 때는 인자가 없습니다.
   //
+  // 자동 실행 ON/OFF는 WinRT StartupTask API (Platform Channel)로 제어합니다.
+  // → lib/services/startup_task_service.dart
+  // → windows/runner/startup_task_handler.cpp
+  //
+  // **트레이 숨김 조건:**
+  // 1. --autostart 인자가 있음 (StartupTask에 의한 실행)
+  // 2. startMinimizedOnBoot = true (사용자가 백그라운드 시작을 원함)
+  //
+  // 수동 실행(인자 없음) → 항상 창 표시
   // ============================================================
+
+  final hasAutostart = args.contains('--autostart');
   final settings = SettingsService();
   final launchAtStartup = await settings.getLaunchAtStartup();
   final startMinimizedOnBoot = await settings.getStartMinimizedOnBoot();
 
-  // ★★★ 핵심 로직 ★★★
-  // 트레이로 숨기려면 3가지 조건이 모두 충족되어야 함:
-  // 1. --autostart 인자 있음 (MSIX에서는 항상 true — 방어적 체크)
-  // 2. launchAtStartup = true (사용자가 자동 실행을 켜놓았음)
-  // 3. startMinimizedOnBoot = true (사용자가 백그라운드 시작을 원함)
-  //
-  // 하나라도 false면 → 창을 보여준다!
   final shouldStartMinimized =
-      hasAutostartArg && launchAtStartup && startMinimizedOnBoot;
+      hasAutostart && launchAtStartup && startMinimizedOnBoot;
 
   // 전역 플래그 설정 (main_screen.dart에서 참조)
   gStartedInBackground = shouldStartMinimized;
 
-  logging.info('Background start decision: hasAutostartArg=$hasAutostartArg, '
-      'launchAtStartup=$launchAtStartup, '
-      'startMinimizedOnBoot=$startMinimizedOnBoot → '
-      'shouldStartMinimized=$shouldStartMinimized');
+  logging.info(
+    'Background start decision: '
+    'hasAutostart=$hasAutostart, '
+    'launchAtStartup=$launchAtStartup, '
+    'startMinimizedOnBoot=$startMinimizedOnBoot → '
+    'shouldStartMinimized=$shouldStartMinimized',
+  );
 
   // ============================================================
   // WindowOptions를 사용하여 waitUntilReadyToShow()로 창 초기화
@@ -127,7 +107,6 @@ Future<void> _initializeApp({
   // 크래시가 발생합니다.
   //
   // 반드시 waitUntilReadyToShow()의 콜백 안에서 창 조작을 해야 합니다.
-  // (v1.3.4에서 정상 작동하던 패턴 복원)
   // ============================================================
 
   const windowOptions = WindowOptions(
@@ -142,7 +121,7 @@ Future<void> _initializeApp({
 
   windowManager.waitUntilReadyToShow(windowOptions, () async {
     if (shouldStartMinimized) {
-      // --autostart + 백그라운드 시작: 창 숨기고 트레이만 표시
+      // 부팅 직후 + 백그라운드 시작: 창 숨기고 트레이만 표시
       await windowManager.setSkipTaskbar(true);
       await windowManager.hide();
       logging.info('Started minimized to tray (background mode)');
