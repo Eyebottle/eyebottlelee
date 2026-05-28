@@ -75,13 +75,11 @@ msix_config:
   # 윈도우 부팅 시 자동 시작 (StartupTask)
   startup_task:
     task_id: EyebottleMedicalRecorder
-    # 기본값은 꺼짐(OFF). 앱 설정 토글에서 사용자가 켜면 WinRT StartupTask API로
-    # 활성화됩니다(advanced_settings_dialog → AutoLaunchService.enable()).
-    # 이유: "설정에서 껐는데도 부팅 시 실행" 상태 꼬임 방지 + 사용자의 명시적
-    # 동의 우선. v1.3.17부터 부팅 결정이 --autostart 인자만으로 트리거되므로,
-    # enabled:true로 두면 신규 설치 사용자가 동의 없이 매 부팅 창이 떠 v1.3.17이
-    # 고치려는 문제가 재발하고 MS Store 심사 지적 소지가 있습니다.
-    # (MSIX는 동일 task_id 업데이트 시 기존 사용자의 ON/OFF 선택을 보존하므로,
-    #  이미 자동시작을 켠 기존 설치는 이 값과 무관하게 ON 상태가 유지됩니다.)
-    enabled: false
+    # 기본값 켜짐(ON). 이 앱은 "자동실행 매니저"이므로 설치 즉시 부팅 자동시작이
+    # 켜진 상태로 등록됩니다. 사용자는 앱 설정 토글에서 끌 수 있습니다
+    # (advanced_settings_dialog → AutoLaunchService.disable()).
+    # 참고: 신규 설치 시 자동시작이 ON이고 startMinimizedOnBoot 기본값은 false라,
+    # 사용자가 "백그라운드 시작"을 켜기 전까지는 부팅 시 메인 창이 표시됩니다.
+    # (MSIX는 동일 task_id 업데이트 시 기존 사용자의 ON/OFF 선택을 보존합니다.)
+    enabled: true
     parameters: "--autostart"
