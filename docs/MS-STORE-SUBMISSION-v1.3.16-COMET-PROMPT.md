@@ -65,33 +65,3 @@ TEST CASES:
 13. "저장" 후 "제출"을 클릭해.
 14. 제출 완료 후 제출 ID를 알려줘.
 ```
-
----
-
-## 변경 사항 요약
-
-### 근본 원인
-`launch_at_startup` v0.5.1의 MSIX 구현체가 PowerShell로 .lnk 바로가기를 생성 → MSIX 샌드박스에서 네이티브 크래시
-
-### 근본 수정 (임시방편 아님)
-- `launch_at_startup` 패키지 **완전 제거**
-- **WinRT StartupTask API를 C++ Platform Channel로 직접 구현**
-  - `RequestEnableAsync()` → 자동 실행 활성화
-  - `Disable()` → 자동 실행 비활성화
-  - `get_State()` → 현재 상태 조회 (Enabled/Disabled/DisabledByUser/DisabledByPolicy)
-- 앱 내 자동 실행 토글 **완전 복원**
-- `DisabledByUser` 상태 감지 및 UI 안내
-
-### 영향 파일
-| 파일 | 변경 유형 |
-|------|-----------|
-| `windows/runner/startup_task_handler.h` | 신규 (Platform Channel 헤더) |
-| `windows/runner/startup_task_handler.cpp` | 신규 (WinRT StartupTask API 구현) |
-| `windows/runner/CMakeLists.txt` | 수정 (파일 추가, RuntimeObject 링크) |
-| `windows/runner/flutter_window.cpp` | 수정 (채널 등록) |
-| `lib/services/startup_task_service.dart` | 신규 (Dart Platform Channel 래퍼) |
-| `lib/services/auto_launch_service.dart` | 전면 재작성 (WinRT API 기반) |
-| `lib/main.dart` | 수정 (--autostart 인자 감지 복원) |
-| `lib/ui/widgets/advanced_settings_dialog.dart` | 수정 (토글 복원) |
-| `lib/ui/screens/main_screen.dart` | 수정 (실제 StartupTask 상태 표시) |
-| `pubspec.yaml` | 수정 (v1.3.16, launch_at_startup 제거) |

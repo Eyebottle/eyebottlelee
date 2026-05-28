@@ -7,6 +7,7 @@ import 'package:record/record.dart';
 import '../../services/auto_launch_service.dart';
 import '../../services/settings_service.dart';
 import '../../models/recording_profile.dart';
+import 'startup_diagnostics_section.dart';
 
 enum RetentionOption { forever, week, month, threeMonths, sixMonths, year }
 
@@ -593,6 +594,8 @@ class _AdvancedSettingsDialogState extends State<AdvancedSettingsDialog> {
                   ),
                 ),
               ],
+              // v1.3.17: 부팅 자동시작 진단 패널
+              const StartupDiagnosticsSection(),
             ],
           ),
         );
@@ -604,7 +607,10 @@ class _AdvancedSettingsDialogState extends State<AdvancedSettingsDialog> {
     await settings.setRecordingProfile(_recordingProfile);
     await settings.setMakeupGainDb(_makeupGainDb);
     await settings.setVad(enabled: _vadEnabled, threshold: _vadThreshold);
-    // v1.3.16: launchAtStartup 설정은 더 이상 사용하지 않으나 호환성을 위해 유지
+    // v1.3.17: 부팅 결정은 더 이상 launch_at_startup SharedPreferences 값을 보지
+    // 않습니다(--autostart 인자 자체가 StartupTask 활성 증거). 다만 enable()/
+    // disable() 호출 시 AutoLaunchService가 이 값을 함께 갱신하므로, 진단 패널의
+    // "자동 실행(설정 저장값)" 표시·참고용으로 유지됩니다.
     await settings.setStartMinimizedOnBoot(_startMinimizedOnBoot);
     await settings.setRetentionDuration(_durationForOption(_retentionOption));
     // WAV 자동 변환 설정 저장

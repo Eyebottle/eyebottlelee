@@ -7,6 +7,43 @@
 
 ---
 
+## [1.3.17] - 2026-05-29
+
+### 🔧 버그 수정 — 부팅 자동시작 백그라운드 모드 안정화
+
+v1.3.4부터 여러 차례 시도했지만 환경에 따라 간헐적으로 실패하던 "부팅 시
+백그라운드(트레이)로만 시작" 기능을 **구조적으로 재설계**했습니다.
+
+**해결된 문제:**
+- ✅ 자동 실행 ON + 백그라운드 시작 ON 상태에서도 메인 창이 보이던 문제
+- ✅ 자동 실행 모드에서 로그가 남지 않던 문제
+- ✅ Dart `hide()`와 C++ `Show()` 사이의 race condition (창 깜빡임)
+
+**기술적 변경:**
+- `windows/runner/main.cpp`: `--autostart` 인자가 있으면 native 단의 `Show()`
+  호출 자체를 생략 — 자동시작 경로에서 창은 처음부터 hidden 상태
+- `lib/main.dart`: 백그라운드 시작 조건을 `hasAutostart && startMinimizedOnBoot`
+  이중 AND로 단순화 (이전 삼중 AND의 `launchAtStartup` 중복 체크 제거)
+- `lib/services/logging_service.dart`: 로그 디렉터리 해석에 4단계 우선순위
+  탐색 추가(Documents → ApplicationSupport → LOCALAPPDATA → Temp) + 쓰기 가능
+  여부 검증 — 어떤 환경에서도 진단 로그 확보
+- 앱 내 **"진단" 패널** 신설 — 자동시작/StartupTask 상태·부팅 결정 이력·로그
+  위치를 한눈에 확인하고, 로그 폴더 열기/진단 정보 복사 제공
+- `pubspec.yaml`: StartupTask 기본값을 `enabled: false`로 교정(주석과 일치) —
+  신규 설치 시 자동시작은 꺼진 상태이며, 설정에서 사용자가 켤 때만 활성화됩니다.
+  (이미 자동시작을 켠 기존 설치는 업데이트 후에도 ON 상태 유지)
+
+**개발/운영 도구:**
+- 사이드로딩 검증 파이프라인 (`scripts/sideload/`): 인증서 생성·설치·제거·진단
+- 제출 전 자동 사전 점검 (`scripts/preflight/verify-msix.ps1`)
+- 부팅 동작 회귀 테스트 매트릭스 (`docs/STARTUP-TEST-MATRIX.md`)
+
+### 📦 패키지 정보
+- **버전**: 1.3.17.0 (Build 28)
+- **필수 OS**: Windows 10 버전 1809 이상
+
+---
+
 ## [1.3.10] - 2026-02-24
 
 ### 📦 MS Store 제출용 버전 업데이트

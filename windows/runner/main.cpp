@@ -24,6 +24,18 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   std::vector<std::string> command_line_arguments =
       GetCommandLineArguments();
 
+  // v1.3.17: Detect whether Windows StartupTask launched us with --autostart
+  // BEFORE moving the argument vector into the Dart project. When launched at
+  // boot we leave the native window hidden so Dart can decide visibility
+  // without a Show()->hide() race on slower hardware.
+  bool launched_by_startup_task = false;
+  for (const auto& arg : command_line_arguments) {
+    if (arg == "--autostart") {
+      launched_by_startup_task = true;
+      break;
+    }
+  }
+
   // Command line arguments (including --autostart) are passed to Dart.
   // Window visibility is controlled entirely by Dart's
   // windowManager.waitUntilReadyToShow() based on these arguments.
@@ -37,10 +49,14 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   }
   window.SetQuitOnClose(true);
 
-  // Always call Show() here. Window visibility is controlled by Dart's
-  // windowManager.waitUntilReadyToShow() which hides the window initially
-  // and shows/hides it in its callback based on --autostart and settings.
-  window.Show();
+  // v1.3.17: Only show the window natively for manual launches. When started
+  // by StartupTask (--autostart), leave it hidden; Dart's
+  // windowManager.waitUntilReadyToShow() callback calls show() explicitly only
+  // when the user wants the window visible. This eliminates the prior race
+  // where the native Show() beat the Dart-side hide().
+  if (!launched_by_startup_task) {
+    window.Show();
+  }
 
   ::MSG msg;
   while (::GetMessage(&msg, nullptr, 0, 0)) {

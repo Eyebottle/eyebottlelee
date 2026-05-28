@@ -116,3 +116,8 @@ eyebottlelee-test-release.zip
 # Local AI config
 .claude/
 .omc/
+
+# 사이드로딩 인증서 / 빌드 산출물 (절대 커밋 금지)
+*.pfx
+scripts/sideload/eyebottle-sideload.cer
+dist/

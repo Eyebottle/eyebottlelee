@@ -22,6 +22,19 @@ class LoggingService {
   _DailyRotatingFileOutput? _fileOutput;
   Future<void>? _initializationFuture;
 
+  /// 마지막으로 해석된 로그 디렉터리 경로 (진단 패널 표시용)
+  String? _resolvedLogDirPath;
+
+  /// 로그 디렉터리 해석에 사용된 fallback 단계
+  /// (documents / support / localappdata / temp) — 진단 패널 표시용
+  String? _resolvedLogDirSource;
+
+  /// 마지막으로 해석된 로그 디렉터리 경로 (없으면 null)
+  String? get resolvedLogDirPath => _resolvedLogDirPath;
+
+  /// 로그 디렉터리 해석 단계 (없으면 null)
+  String? get resolvedLogDirSource => _resolvedLogDirSource;
+
   /// 로거 초기화를 보장한다. 반복 호출 시 최초 초기화 완료 여부만 기다린다.
   Future<void> ensureInitialized() {
     if (_logger != null) {
@@ -59,7 +72,8 @@ class LoggingService {
         filter: ProductionFilter(),
       );
 
-      _logger!.i('LoggingService initialized at ${logDirectory.path}');
+      _logger!.i('LoggingService initialized at ${logDirectory.path} '
+          '(source=$_resolvedLogDirSource)');
     } catch (e, stackTrace) {
       debugPrint('로그 초기화 실패: $e');
       _notifyError('로그 초기화 실패: $e');
@@ -188,14 +202,82 @@ class LoggingService {
     }
   }
 
+  /// 로그 디렉터리를 해석한다.
+  ///
+  /// MSIX 컨테이너 환경에서는 `getApplicationDocumentsDirectory()`의 Documents
+  /// 리디렉션이 환경에 따라 실패하거나 쓰기 불가한 경로를 반환하는 사례가
+  /// 확인됐다(진료실 PC에서 부팅 모드 로그가 전혀 남지 않음). 단일 경로에
+  /// 의존하면 그 환경에서 진단 자체가 불가능해지므로, 쓰기 가능한 디렉터리를
+  /// 찾을 때까지 우선순위대로 시도한다:
+  ///   1) Documents/EyebottleRecorder/logs   (기존 동작, 1순위)
+  ///   2) ApplicationSupport/logs            (MSIX 안전, 항상 쓰기 가능)
+  ///   3) %LOCALAPPDATA%/EyebottleRecorder/logs
+  ///   4) 시스템 임시 디렉터리/EyebottleRecorder/logs (최후의 보루)
+  ///
+  /// 어느 단계가 채택됐는지 [_resolvedLogDirSource]에 기록해 진단 패널에서
+  /// 확인할 수 있게 한다.
   Future<Directory> _resolveLogDirectory() async {
-    final appDocDir = await getApplicationDocumentsDirectory();
-    final logDir =
-        Directory(path.join(appDocDir.path, 'EyebottleRecorder', 'logs'));
-    if (!await logDir.exists()) {
-      await logDir.create(recursive: true);
+    final candidates = <_LogDirCandidate>[
+      _LogDirCandidate('documents', () async {
+        final dir = await getApplicationDocumentsDirectory();
+        return path.join(dir.path, 'EyebottleRecorder', 'logs');
+      }),
+      _LogDirCandidate('support', () async {
+        final dir = await getApplicationSupportDirectory();
+        return path.join(dir.path, 'logs');
+      }),
+      _LogDirCandidate('localappdata', () async {
+        final base = Platform.environment['LOCALAPPDATA'];
+        if (base == null || base.isEmpty) {
+          throw StateError('LOCALAPPDATA not set');
+        }
+        return path.join(base, 'EyebottleRecorder', 'logs');
+      }),
+      _LogDirCandidate('temp', () async {
+        return path.join(
+            Directory.systemTemp.path, 'EyebottleRecorder', 'logs');
+      }),
+    ];
+
+    Object? lastError;
+    for (final candidate in candidates) {
+      try {
+        final resolvedPath = await candidate.resolve();
+        final logDir = Directory(resolvedPath);
+        if (!await logDir.exists()) {
+          await logDir.create(recursive: true);
+        }
+        // 실제로 쓰기 가능한지 검증 (생성됐다고 쓰기 가능한 건 아님)
+        await _assertWritable(logDir);
+
+        _resolvedLogDirPath = logDir.path;
+        _resolvedLogDirSource = candidate.source;
+        if (candidate.source != 'documents') {
+          // fallback 발동 사실을 stdout/DebugView로도 남긴다.
+          debugPrint(
+              '[LoggingService] log dir fallback → ${candidate.source}: ${logDir.path}');
+        }
+        return logDir;
+      } catch (e) {
+        lastError = e;
+        debugPrint(
+            '[LoggingService] log dir candidate "${candidate.source}" 실패: $e');
+      }
     }
-    return logDir;
+
+    // 모든 후보 실패 — 호출부에서 catch 하도록 throw
+    throw StateError('로그 디렉터리 해석 실패 (모든 후보 소진): $lastError');
+  }
+
+  /// 디렉터리에 실제로 파일을 쓸 수 있는지 검증한다.
+  Future<void> _assertWritable(Directory dir) async {
+    final probe = File(path.join(dir.path, '.write_probe'));
+    await probe.writeAsString('ok', flush: true);
+    try {
+      await probe.delete();
+    } catch (_) {
+      // 삭제 실패는 무시 (쓰기 자체는 성공)
+    }
   }
 
   void _notifyError(String message) {
@@ -207,6 +289,15 @@ class LoggingService {
       }
     }
   }
+}
+
+/// 로그 디렉터리 후보 하나. [resolve]는 후보 경로 문자열을 반환하며,
+/// 실패 시 예외를 던져 다음 후보로 넘어가게 한다.
+class _LogDirCandidate {
+  _LogDirCandidate(this.source, this.resolve);
+
+  final String source;
+  final Future<String> Function() resolve;
 }
 
 class _DailyRotatingFileOutput extends LogOutput {

@@ -13,6 +13,10 @@ class SettingsService {
   static const _keySaveFolder = 'save_folder';
   static const _keyLaunchAtStartup = 'launch_at_startup';
   static const _keyStartMinimizedOnBoot = 'start_minimized_on_boot';
+  static const _keyBootDecisionHistory = 'boot_decision_history';
+
+  /// 부팅 결정 이력 최대 보관 개수
+  static const _bootDecisionHistoryLimit = 10;
   static const _keyVadEnabled = 'vad_enabled';
   static const _keyVadThreshold = 'vad_threshold';
   static const _keyDailyRecordingSeconds = 'daily_recording_seconds';
@@ -84,6 +88,61 @@ class SettingsService {
   Future<bool> getStartMinimizedOnBoot() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getBool(_keyStartMinimizedOnBoot) ?? false;
+  }
+
+  /// 부팅 결정 트레이스를 한 건 추가한다 (최대 [_bootDecisionHistoryLimit]개 유지).
+  ///
+  /// 자동시작 백그라운드 시작이 다시 어긋날 경우, 진단 패널에서 "최근 부팅 때
+  /// 실제로 어떤 인자/설정으로 어떤 결정이 내려졌는지"를 즉시 확인하기 위함이다.
+  Future<void> appendBootDecision({
+    required bool hasAutostart,
+    required bool startMinimizedOnBoot,
+    required bool shouldStartMinimized,
+    required List<String> args,
+  }) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final history = _decodeBootDecisions(
+          prefs.getString(_keyBootDecisionHistory));
+
+      history.add({
+        'timestamp': DateTime.now().toIso8601String(),
+        'args': args,
+        'hasAutostart': hasAutostart,
+        'startMinimizedOnBoot': startMinimizedOnBoot,
+        'shouldStartMinimized': shouldStartMinimized,
+      });
+
+      // 최신 N개만 유지
+      while (history.length > _bootDecisionHistoryLimit) {
+        history.removeAt(0);
+      }
+
+      await prefs.setString(_keyBootDecisionHistory, jsonEncode(history));
+    } catch (_) {
+      // 진단용 부가 기능이므로 실패해도 앱 동작에 영향 주지 않는다.
+    }
+  }
+
+  /// 부팅 결정 이력을 최신순으로 반환한다.
+  Future<List<Map<String, dynamic>>> getBootDecisionHistory() async {
+    final prefs = await SharedPreferences.getInstance();
+    final history =
+        _decodeBootDecisions(prefs.getString(_keyBootDecisionHistory));
+    return history.reversed.toList();
+  }
+
+  List<Map<String, dynamic>> _decodeBootDecisions(String? jsonStr) {
+    if (jsonStr == null) return [];
+    try {
+      final decoded = jsonDecode(jsonStr) as List<dynamic>;
+      return decoded
+          .whereType<Map<String, dynamic>>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
+    } catch (_) {
+      return [];
+    }
   }
 
   Future<void> setVad(

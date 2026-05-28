@@ -118,12 +118,14 @@ class _MainScreenState extends State<MainScreen>
       if (!gStartedInBackground) {
         await WindowTaskbarService().setTaskbarVisible(true);
       } else {
-        // v1.3.11: Flutter 위젯 트리 빌드 후 창이 다시 보여질 수 있으므로
-        // 백그라운드 시작 시 한 번 더 숨김 상태를 강제 적용
+        // v1.3.17: native main.cpp가 --autostart일 때 Show()를 호출하지 않으므로
+        // 평상시엔 여기서 isVisible=false 입니다. 아래는 위젯 트리 빌드 과정에서
+        // 드물게 창이 다시 떠오르는 경우를 대비한 안전망(backup)이며, 정상
+        // 경로에서는 발동하지 않습니다. (이전 v1.3.11 race 대응 코드의 잔존)
         final isVisible = await windowManager.isVisible();
         if (isVisible) {
-          _loggingService.warning(
-              'initServices: 백그라운드 시작인데 창이 보임 감지, 재숨김 처리');
+          _loggingService.info(
+              'initServices: 백그라운드 시작인데 창이 보임 감지(안전망 발동), 재숨김 처리');
           await windowManager.hide();
           await windowManager.setSkipTaskbar(true);
         }
