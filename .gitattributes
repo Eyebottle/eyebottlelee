@@ -8,3 +8,21 @@
 # Generated Windows runner sources can keep CRLF
 windows/** text eol=crlf
 
+# Binary assets — MUST override the broad rules above so git never applies
+# text/EOL conversion (CRLF normalization corrupts binaries like .ico).
+# 이 규칙들이 위의 'windows/** text eol=crlf'보다 나중에 와서 우선합니다.
+*.ico binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ttf binary
+*.otf binary
+*.msix binary
+*.exe binary
+*.dll binary
+*.so binary
+*.pfx binary
+*.cer binary
+*.zip binary
+

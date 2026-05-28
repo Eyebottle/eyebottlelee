@@ -114,21 +114,27 @@ try {
         $zip.Dispose()
     }
 
-    # 7) 빌드 시각 vs git HEAD
+    # 7) 빌드 시각 vs git HEAD (git 작업트리가 아닐 수 있음 — 예: 비-git 빌드 복사본)
     $buildTime = (Get-Item $fullMsix).LastWriteTime
-    Push-Location $repoRoot
-    try {
-        $headEpoch = git log -1 --format=%ct 2>$null
-        if ($headEpoch) {
-            $headTime = [DateTimeOffset]::FromUnixTimeSeconds([long]$headEpoch).LocalDateTime
-            if ($buildTime -ge $headTime) {
-                Pass "빌드 시각($buildTime)이 HEAD 커밋($headTime) 이후"
-            } else {
-                Warn "빌드 시각($buildTime)이 HEAD 커밋($headTime)보다 이전 — 재빌드 권장"
+    $gitAvailable = $null -ne (Get-Command git -ErrorAction SilentlyContinue)
+    $isGitRepo = Test-Path (Join-Path $repoRoot ".git")
+    if ($gitAvailable -and $isGitRepo) {
+        Push-Location $repoRoot
+        try {
+            $headEpoch = (git log -1 --format=%ct 2>$null | Out-String).Trim()
+            if ($headEpoch) {
+                $headTime = [DateTimeOffset]::FromUnixTimeSeconds([long]$headEpoch).LocalDateTime
+                if ($buildTime -ge $headTime) {
+                    Pass "빌드 시각($buildTime)이 HEAD 커밋($headTime) 이후"
+                } else {
+                    Warn "빌드 시각($buildTime)이 HEAD 커밋($headTime)보다 이전 — 재빌드 권장"
+                }
             }
+        } finally {
+            Pop-Location
         }
-    } finally {
-        Pop-Location
+    } else {
+        Warn "git 작업트리가 아니어서 빌드 시각 vs HEAD 비교를 생략 (빌드 시각: $buildTime)"
     }
 }
 finally {
