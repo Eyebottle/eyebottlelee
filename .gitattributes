@@ -11,18 +11,18 @@ windows/** text eol=crlf
 # Binary assets — MUST override the broad rules above so git never applies
 # text/EOL conversion (CRLF normalization corrupts binaries like .ico).
 # 이 규칙들이 위의 'windows/** text eol=crlf'보다 나중에 와서 우선합니다.
-*.ico binary
-*.png binary
-*.jpg binary
-*.jpeg binary
-*.gif binary
-*.ttf binary
-*.otf binary
-*.msix binary
-*.exe binary
-*.dll binary
-*.so binary
-*.pfx binary
-*.cer binary
-*.zip binary
+*.ico binary -eol
+*.png binary -eol
+*.jpg binary -eol
+*.jpeg binary -eol
+*.gif binary -eol
+*.ttf binary -eol
+*.otf binary -eol
+*.msix binary -eol
+*.exe binary -eol
+*.dll binary -eol
+*.so binary -eol
+*.pfx binary -eol
+*.cer binary -eol
+*.zip binary -eol
 

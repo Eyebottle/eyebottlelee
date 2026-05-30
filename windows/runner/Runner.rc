@@ -89,13 +89,13 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "com.example" "\0"
-            VALUE "FileDescription", "medical_recorder" "\0"
+            VALUE "CompanyName", "Eyebottle" "\0"
+            VALUE "FileDescription", "Eyebottle Medical Recorder & Auto-Launch Manager" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
             VALUE "InternalName", "medical_recorder" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2025 com.example. All rights reserved." "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026 Eyebottle. All rights reserved." "\0"
             VALUE "OriginalFilename", "medical_recorder.exe" "\0"
-            VALUE "ProductName", "medical_recorder" "\0"
+            VALUE "ProductName", "Eyebottle Medical Recorder" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

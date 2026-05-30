@@ -12,7 +12,6 @@ import '../../models/mic_diagnostic_result.dart';
 import '../../models/schedule_model.dart';
 import '../../services/audio_service.dart';
 import '../../services/logging_service.dart';
-// import '../../services/notification_service.dart'; // v1.3.16: autostart 동기화 알림 제거
 import '../../services/schedule_service.dart';
 import '../../services/settings_service.dart';
 import '../../services/tray_service.dart';
@@ -2230,7 +2229,7 @@ class _SettingsSection extends StatelessWidget {
               ),
             ),
           ),
-          ...items.map((item) => _SettingsTile(item: item)).toList(),
+          ...items.map((item) => _SettingsTile(item: item)),
         ],
       ),
     );

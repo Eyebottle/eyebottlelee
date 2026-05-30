@@ -1,3 +1,4 @@
+import 'package:desktop_drop/desktop_drop.dart';
 import 'package:flutter/material.dart';
 import 'package:file_selector/file_selector.dart';
 
@@ -9,15 +10,22 @@ class AddProgramDialog extends StatefulWidget {
   const AddProgramDialog({
     super.key,
     this.program, // null이면 새 프로그램 추가, 있으면 편집
+    this.initialPath, // 드래그 앤 드롭 등으로 미리 채울 경로
   });
 
   final LaunchProgram? program;
+  final String? initialPath;
 
   /// 새 프로그램 추가 다이얼로그
-  static Future<LaunchProgram?> showAdd(BuildContext context) {
+  ///
+  /// [initialPath]가 주어지면 경로/이름을 미리 채운다(드래그 앤 드롭 진입용).
+  static Future<LaunchProgram?> showAdd(
+    BuildContext context, {
+    String? initialPath,
+  }) {
     return showDialog<LaunchProgram>(
       context: context,
-      builder: (context) => const AddProgramDialog(),
+      builder: (context) => AddProgramDialog(initialPath: initialPath),
     );
   }
 
@@ -59,16 +67,31 @@ class _AddProgramDialogState extends State<AddProgramDialog> {
     _initializeFromProgram();
   }
 
+  bool _isPathDragging = false;
+
   void _initializeFromProgram() {
     if (widget.program != null) {
       final program = widget.program!;
       _nameController.text = program.name;
       _pathController.text = program.path;
-      _argumentsController.text = program.arguments.join(' ');
+      _argumentsController.text = program.arguments
+          .map((a) => a.contains(' ') || a.contains('\t') ? '"$a"' : a)
+          .join(' ');
       _workingDirectoryController.text = program.workingDirectory ?? '';
       _delaySeconds = program.delaySeconds.toDouble();
       _windowState = program.windowState;
       _enabled = program.enabled;
+    } else if (widget.initialPath != null &&
+        widget.initialPath!.trim().isNotEmpty) {
+      _fillFromPath(widget.initialPath!.trim());
+    }
+  }
+
+  /// 경로로부터 경로/이름 필드를 채운다(이름이 비어 있을 때만 자동 추출).
+  void _fillFromPath(String path) {
+    _pathController.text = path;
+    if (_nameController.text.trim().isEmpty) {
+      _nameController.text = LaunchProgram.extractProgramName(path);
     }
   }
 
@@ -148,14 +171,48 @@ class _AddProgramDialogState extends State<AddProgramDialog> {
     }
   }
 
+  /// 따옴표를 인식하는 인수 토크나이저.
+  ///
+  /// `--config="C:\Program Files\x"` 처럼 공백이 포함된 인수를 따옴표 기준으로
+  /// 하나의 논리 인수로 묶는다. (기존 `split(' ')`는 공백마다 쪼개 인수를 깨뜨렸다.)
+  /// 반환값은 논리 인수 목록이며, Windows에서 셸/프로세스 호출 시 각 요소의
+  /// 따옴표 처리는 하위 계층(win32_shell_execute)이 담당하므로 여기서는
+  /// 이스케이프 백슬래시를 넣지 않는다.
+  static List<String> _tokenizeArguments(String input) {
+    final args = <String>[];
+    final buf = StringBuffer();
+    String? quote; // null, '"' 또는 "'"
+    var hasToken = false;
+    for (var i = 0; i < input.length; i++) {
+      final c = input[i];
+      if (quote != null) {
+        if (c == quote) {
+          quote = null;
+        } else {
+          buf.write(c);
+        }
+      } else if (c == '"' || c == "'") {
+        quote = c;
+        hasToken = true;
+      } else if (c == ' ' || c == '\t') {
+        if (hasToken) {
+          args.add(buf.toString());
+          buf.clear();
+          hasToken = false;
+        }
+      } else {
+        buf.write(c);
+        hasToken = true;
+      }
+    }
+    if (hasToken) args.add(buf.toString());
+    return args;
+  }
+
   LaunchProgram? _createProgram() {
     if (_pathController.text.isEmpty) return null;
 
-    final arguments = _argumentsController.text
-        .trim()
-        .split(' ')
-        .where((arg) => arg.isNotEmpty)
-        .toList();
+    final arguments = _tokenizeArguments(_argumentsController.text.trim());
 
     final workingDirectory = _workingDirectoryController.text.trim();
 
@@ -261,27 +318,59 @@ class _AddProgramDialogState extends State<AddProgramDialog> {
           ),
         ),
         const SizedBox(height: AppSpacing.sm),
+        DropTarget(
+          onDragEntered: (_) => setState(() => _isPathDragging = true),
+          onDragExited: (_) => setState(() => _isPathDragging = false),
+          onDragDone: (detail) {
+            setState(() => _isPathDragging = false);
+            if (detail.files.isEmpty) return;
+            final path = detail.files.first.path.trim();
+            if (path.isEmpty) return;
+            setState(() => _fillFromPath(path));
+          },
+          child: Row(
+            children: [
+              Expanded(
+                child: TextFormField(
+                  controller: _pathController,
+                  decoration: InputDecoration(
+                    hintText: '경로를 선택하거나 파일을 끌어다 놓으세요',
+                    border: const OutlineInputBorder(),
+                    enabledBorder: _isPathDragging
+                        ? OutlineInputBorder(
+                            borderSide: BorderSide(
+                              color: Theme.of(context).primaryColor,
+                              width: 2,
+                            ),
+                          )
+                        : null,
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return '프로그램 경로를 선택해주세요';
+                    }
+                    return null;
+                  },
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              OutlinedButton(
+                onPressed: _selectFile,
+                child: const Text('찾기'),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: AppSpacing.xs),
         Row(
           children: [
+            Icon(Icons.drag_indicator, size: 14, color: Colors.grey[500]),
+            const SizedBox(width: 4),
             Expanded(
-              child: TextFormField(
-                controller: _pathController,
-                decoration: const InputDecoration(
-                  hintText: '실행할 프로그램의 경로를 선택하세요',
-                  border: OutlineInputBorder(),
-                ),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return '프로그램 경로를 선택해주세요';
-                  }
-                  return null;
-                },
+              child: Text(
+                '실행 파일(.exe)·바로가기(.lnk)를 여기로 끌어다 놓아도 됩니다',
+                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
               ),
-            ),
-            const SizedBox(width: AppSpacing.sm),
-            OutlinedButton(
-              onPressed: _selectFile,
-              child: const Text('찾기'),
             ),
           ],
         ),

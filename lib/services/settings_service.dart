@@ -7,6 +7,7 @@ import '../models/mic_diagnostic_result.dart';
 import '../models/schedule_model.dart';
 import '../models/recording_profile.dart';
 import '../models/launch_manager_settings.dart';
+import 'logging_service.dart';
 
 class SettingsService {
   static const _keyScheduleJson = 'weekly_schedule_json';
@@ -99,6 +100,8 @@ class SettingsService {
     required bool startMinimizedOnBoot,
     required bool shouldStartMinimized,
     required List<String> args,
+    int? uptimeSeconds,
+    bool isLikelyBootLaunch = false,
   }) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -109,6 +112,8 @@ class SettingsService {
         'timestamp': DateTime.now().toIso8601String(),
         'args': args,
         'hasAutostart': hasAutostart,
+        'uptimeSeconds': uptimeSeconds,
+        'isLikelyBootLaunch': isLikelyBootLaunch,
         'startMinimizedOnBoot': startMinimizedOnBoot,
         'shouldStartMinimized': shouldStartMinimized,
       });
@@ -296,8 +301,11 @@ class SettingsService {
 
       // 버전 마이그레이션 수행
       return settings.migrate();
-    } catch (e) {
-      // JSON 파싱 실패 시 기본 설정 반환
+    } catch (e, stackTrace) {
+      // JSON 파싱 실패 시 기본 설정 반환. 부팅 자동실행에 직결되므로 조용히 삼키지
+      // 않고 경고로 남긴다(진단 패널/로그에서 원인 추적 가능).
+      LoggingService().warning('자동실행 매니저 설정 JSON 파싱 실패, 기본값 사용',
+          error: e, stackTrace: stackTrace);
       return LaunchManagerSettings.defaultSettings();
     }
   }

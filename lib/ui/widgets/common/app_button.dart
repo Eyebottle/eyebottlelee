@@ -38,22 +38,6 @@ class AppButton extends StatelessWidget {
     this.icon,
   }) : _type = _ButtonType.text;
 
-  const AppButton.success({
-    super.key,
-    required this.onPressed,
-    required this.child,
-    this.style,
-    this.icon,
-  }) : _type = _ButtonType.success;
-
-  const AppButton.error({
-    super.key,
-    required this.onPressed,
-    required this.child,
-    this.style,
-    this.icon,
-  }) : _type = _ButtonType.error;
-
   final VoidCallback? onPressed;
   final Widget child;
   final ButtonStyle? style;
@@ -90,20 +74,6 @@ class AppButton extends StatelessWidget {
           style: style ?? _getDefaultTextStyle(AppColors.primary),
           child: child,
         );
-
-      case _ButtonType.success:
-        return FilledButton(
-          onPressed: onPressed,
-          style: style ?? _getDefaultFilledStyle(AppColors.success),
-          child: child,
-        );
-
-      case _ButtonType.error:
-        return FilledButton(
-          onPressed: onPressed,
-          style: style ?? _getDefaultFilledStyle(AppColors.error),
-          child: child,
-        );
     }
   }
 
@@ -129,22 +99,6 @@ class AppButton extends StatelessWidget {
         return TextButton.icon(
           onPressed: onPressed,
           style: style ?? _getDefaultTextStyle(AppColors.primary),
-          icon: Icon(icon),
-          label: child,
-        );
-
-      case _ButtonType.success:
-        return FilledButton.icon(
-          onPressed: onPressed,
-          style: style ?? _getDefaultFilledStyle(AppColors.success),
-          icon: Icon(icon),
-          label: child,
-        );
-
-      case _ButtonType.error:
-        return FilledButton.icon(
-          onPressed: onPressed,
-          style: style ?? _getDefaultFilledStyle(AppColors.error),
           icon: Icon(icon),
           label: child,
         );
@@ -192,115 +146,4 @@ enum _ButtonType {
   filled,
   outlined,
   text,
-  success,
-  error,
-}
-
-/// 크기별 버튼 확장
-extension AppButtonSize on AppButton {
-  /// 작은 버튼
-  static Widget small({
-    required VoidCallback? onPressed,
-    required Widget child,
-    IconData? icon,
-    bool outlined = false,
-  }) {
-    final style = outlined
-        ? OutlinedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-            side: BorderSide(color: AppColors.primary, width: 1.5),
-            textStyle: AppTypography.labelMedium,
-          )
-        : FilledButton.styleFrom(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-            textStyle: AppTypography.labelMedium,
-          );
-
-    if (icon != null) {
-      return outlined
-          ? OutlinedButton.icon(
-              onPressed: onPressed,
-              style: style,
-              icon: Icon(icon, size: 18),
-              label: child,
-            )
-          : FilledButton.icon(
-              onPressed: onPressed,
-              style: style,
-              icon: Icon(icon, size: 18),
-              label: child,
-            );
-    }
-
-    return outlined
-        ? OutlinedButton(
-            onPressed: onPressed,
-            style: style,
-            child: child,
-          )
-        : FilledButton(
-            onPressed: onPressed,
-            style: style,
-            child: child,
-          );
-  }
-
-  /// 큰 버튼
-  static Widget large({
-    required VoidCallback? onPressed,
-    required Widget child,
-    IconData? icon,
-    bool outlined = false,
-  }) {
-    final style = outlined
-        ? OutlinedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 20),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            side: BorderSide(color: AppColors.primary, width: 2),
-            textStyle: AppTypography.titleMedium,
-          )
-        : FilledButton.styleFrom(
-            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 20),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            textStyle: AppTypography.titleMedium,
-          );
-
-    if (icon != null) {
-      return outlined
-          ? OutlinedButton.icon(
-              onPressed: onPressed,
-              style: style,
-              icon: Icon(icon, size: 24),
-              label: child,
-            )
-          : FilledButton.icon(
-              onPressed: onPressed,
-              style: style,
-              icon: Icon(icon, size: 24),
-              label: child,
-            );
-    }
-
-    return outlined
-        ? OutlinedButton(
-            onPressed: onPressed,
-            style: style,
-            child: child,
-          )
-        : FilledButton(
-            onPressed: onPressed,
-            style: style,
-            child: child,
-          );
-  }
 }

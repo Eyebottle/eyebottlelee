@@ -7,6 +7,7 @@ import 'services/notification_service.dart';
 import 'services/settings_service.dart';
 import 'ui/screens/main_screen.dart';
 import 'ui/style/app_theme.dart';
+import 'utils/win32_uptime.dart';
 
 /// 백그라운드(트레이) 모드로 시작했는지 여부
 ///
@@ -76,24 +77,41 @@ Future<void> _initializeApp({
   // 기본값(false)이 반환될 때 사용자가 켜둔 "백그라운드 시작"이 조용히 깨졌습니다.
   // → 부팅 결정에서는 launchAtStartup을 제거하고 두 조건만 봅니다.
   //
-  // **트레이 숨김 조건 (이중 AND):**
-  // 1. --autostart 인자가 있음 (StartupTask에 의한 실행)
-  // 2. startMinimizedOnBoot = true (사용자가 백그라운드 시작을 원함)
+  // **v1.3.18: --autostart 인자에만 의존하지 않도록 보강**
   //
-  // 수동 실행(인자 없음) → 항상 창 표시
+  // 진료실 Windows 10 Home PC에서, 백그라운드 시작을 켜고 재부팅했는데도 창이
+  // 떴고 부팅 이력의 args가 비어 있었다(hasAutostart=false). 원인은 MSIX
+  // StartupTask의 uap10:Parameters("--autostart")가 해당 환경에서 실제 argv로
+  // 전달되지 않는 것. (full-trust 앱은 활성화 파이프라인이 아니라 CreateProcess로
+  // 실행되며, uap10:Parameters는 Windows 10 1903+에서만 동작 보장)
   //
-  // native(main.cpp)는 --autostart일 때 Show()를 호출하지 않으므로, 자동시작
-  // 경로에서는 창이 처음부터 hidden 상태입니다. 따라서:
-  //   - 백그라운드 시작: setSkipTaskbar(true)만, show() 안 함
-  //   - 자동시작인데 백그라운드 OFF: 명시적으로 show()+focus() 필요
-  //   - 수동 실행: native가 이미 Show 했으나 일관성을 위해 show()+focus()
+  // **트레이 숨김 조건 (v1.3.18):**
+  //   shouldStartMinimized = startMinimizedOnBoot && isLikelyBootLaunch
+  //   isLikelyBootLaunch    = hasAutostart || (시스템 부팅 후 경과 < 5분)
+  //
+  // - hasAutostart: 인자가 전달되는 환경에서는 정확한 신호(부팅 즉시 확정).
+  // - 부팅 후 경과 시간: 인자가 안 오는 환경의 보조 신호. 로그인 직후
+  //   StartupTask 실행이면 경과가 짧다. 진료 중 수동 실행은 경과가 길어 창 표시.
+  //
+  // **창 표시 제어(v1.3.18):** native(main.cpp)는 더 이상 Show()를 호출하지 않고,
+  // 가시성을 전적으로 여기 Dart에서 제어한다(window_manager 권장 패턴). 따라서
+  // 창은 항상 hidden으로 생성되며:
+  //   - shouldStartMinimized=true  → setSkipTaskbar(true)만 (계속 트레이 전용)
+  //   - shouldStartMinimized=false → show()+focus()로 명시 표시
+  // 이로써 native Show()와 Dart hide() 사이의 race(창 깜빡임)가 원천 제거된다.
   // ============================================================
 
   final hasAutostart = args.contains('--autostart');
   final settings = SettingsService();
   final startMinimizedOnBoot = await settings.getStartMinimizedOnBoot();
 
-  final shouldStartMinimized = hasAutostart && startMinimizedOnBoot;
+  // 부팅/로그인 직후 자동시작인지 추정하는 보조 신호 (위 주석 참고).
+  final uptime = systemUptime();
+  const bootWindow = Duration(minutes: 5);
+  final withinBootWindow = uptime != null && uptime < bootWindow;
+  final isLikelyBootLaunch = hasAutostart || withinBootWindow;
+
+  final shouldStartMinimized = startMinimizedOnBoot && isLikelyBootLaunch;
 
   // 전역 플래그 설정 (main_screen.dart에서 참조)
   gStartedInBackground = shouldStartMinimized;
@@ -101,15 +119,20 @@ Future<void> _initializeApp({
   logging.info(
     'Background start decision: '
     'hasAutostart=$hasAutostart, '
+    'uptime=${uptime?.inSeconds}s, '
+    'withinBootWindow=$withinBootWindow, '
+    'isLikelyBootLaunch=$isLikelyBootLaunch, '
     'startMinimizedOnBoot=$startMinimizedOnBoot → '
     'shouldStartMinimized=$shouldStartMinimized',
   );
 
-  // v1.3.17: 부팅 결정을 영구 이력으로 저장 (진단 패널에서 확인)
+  // 부팅 결정을 영구 이력으로 저장 (진단 패널에서 확인)
   await settings.appendBootDecision(
     hasAutostart: hasAutostart,
     startMinimizedOnBoot: startMinimizedOnBoot,
     shouldStartMinimized: shouldStartMinimized,
+    uptimeSeconds: uptime?.inSeconds,
+    isLikelyBootLaunch: isLikelyBootLaunch,
     args: args,
   );
 
@@ -135,15 +158,14 @@ Future<void> _initializeApp({
   );
 
   windowManager.waitUntilReadyToShow(windowOptions, () async {
+    // v1.3.18: native(main.cpp)는 더 이상 Show()를 호출하지 않으므로, 창은 항상
+    // hidden 상태로 생성된다. 가시성은 여기서 전적으로 결정한다.
     if (shouldStartMinimized) {
-      // 부팅 직후 + 백그라운드 시작: 트레이만 표시.
-      // native(main.cpp)가 --autostart일 때 Show()를 호출하지 않으므로 창은
-      // 이미 hidden 상태입니다. hide()를 다시 부를 필요가 없어졌습니다.
+      // 백그라운드 시작: 트레이만. 창은 이미 hidden이므로 skipTaskbar만 설정.
       await windowManager.setSkipTaskbar(true);
       logging.info('Started minimized to tray (background mode)');
     } else {
-      // 일반 실행 또는 자동시작-백그라운드OFF: 창을 명시적으로 표시.
-      // 자동시작 경로는 native가 창을 숨겨둔 상태이므로 show()가 반드시 필요.
+      // 일반 실행: 창을 명시적으로 표시 (native가 띄우지 않으므로 필수).
       await windowManager.setSkipTaskbar(false);
       await windowManager.show();
       await windowManager.focus();

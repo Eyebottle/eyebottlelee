@@ -183,12 +183,14 @@ class AudioConverterService {
       _logging.debug('ffmpeg 명령: $ffmpegPath ${args.join(" ")}');
 
       // ffmpeg 프로세스 실행
+      // 타임아웃을 두지 않으면 ffmpeg가 멈췄을 때 변환 큐 전체가 영구히 정지한다.
+      // (5분 초과 시 TimeoutException → 아래 catch에서 처리, 큐는 계속 진행)
       final stopwatch = Stopwatch()..start();
       final result = await Process.run(
         ffmpegPath,
         args,
         runInShell: false,
-      );
+      ).timeout(const Duration(minutes: 5));
       stopwatch.stop();
 
       if (result.exitCode != 0) {

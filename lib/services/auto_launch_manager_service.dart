@@ -1,8 +1,8 @@
 import 'dart:async';
-import 'dart:io';
 
 import '../models/launch_program.dart';
 import '../models/launch_manager_settings.dart';
+import '../utils/win32_shell_execute.dart';
 import 'logging_service.dart';
 import 'settings_service.dart';
 
@@ -94,12 +94,16 @@ class AutoLaunchManagerService {
       return;
     }
 
+    // 각 프로그램의 마지막 실행 시각을 메모리에 모았다가, 루프 종료(또는 취소·예외)
+    // 후 한 번만 저장한다. 매 프로그램마다 저장하던 기존 방식은 O(n) 디스크 쓰기 +
+    // 실행 도중 사용자의 설정 편집을 통째로 덮어쓰는 lost-update 경합이 있었다.
+    final executedTimes = <String, DateTime>{};
     try {
       _isExecuting = true;
       _isCancelled = false;
       await _logging.ensureInitialized();
 
-      var settings = await loadSettings();
+      final settings = await loadSettings();
 
       if (!settings.autoLaunchEnabled) {
         _logging.info('자동 실행이 비활성화되어 있습니다.');
@@ -126,6 +130,7 @@ class AutoLaunchManagerService {
         // 취소 요청 확인
         if (_isCancelled) {
           _logging.info('사용자에 의해 실행이 취소되었습니다.');
+          await _persistLastExecuted(executedTimes);
           _updateProgress(LaunchExecutionStatus.idle, i, programs.length,
               message: '실행이 취소되었습니다. (완료: $successCount개, 실패: $failureCount개)');
           return;
@@ -142,11 +147,8 @@ class AutoLaunchManagerService {
         if (success) {
           successCount++;
           _logging.info('프로그램 실행 성공: ${program.name}');
-
-          // 마지막 실행 시간 업데이트 및 저장 (최신 settings 갱신)
-          final updatedProgram = program.copyWith(lastExecuted: DateTime.now());
-          settings = settings.updateProgram(updatedProgram);
-          await saveSettings(settings);
+          // 저장은 루프 종료 후 한 번에 (위 executedTimes 주석 참고).
+          executedTimes[program.id] = DateTime.now();
         } else {
           failureCount++;
           _logging.error('프로그램 실행 실패: ${program.name}');
@@ -163,6 +165,8 @@ class AutoLaunchManagerService {
       final totalPrograms = programs.length;
       final completionMessage = '완료: $successCount개, 실패: $failureCount개';
 
+      await _persistLastExecuted(executedTimes);
+
       _updateProgress(
           LaunchExecutionStatus.completed, totalPrograms, totalPrograms,
           message: completionMessage);
@@ -170,11 +174,34 @@ class AutoLaunchManagerService {
       _logging.info('프로그램 자동 실행 완료. $completionMessage');
     } catch (e, stackTrace) {
       _logging.error('프로그램 자동 실행 중 오류 발생', error: e, stackTrace: stackTrace);
+      await _persistLastExecuted(executedTimes);
       _updateProgress(LaunchExecutionStatus.failed, 0, 0,
           errorMessage: '실행 중 오류가 발생했습니다: $e');
     } finally {
       _isExecuting = false;
       _isCancelled = false;
+    }
+  }
+
+  /// 모아둔 lastExecuted 값을 한 번에 저장한다.
+  ///
+  /// 실행 도중 사용자가 UI에서 프로그램을 추가/삭제/재정렬했을 수 있으므로,
+  /// 시작 시점 스냅샷을 통째로 덮어쓰지 않고 최신 설정을 다시 읽어 id가 일치하는
+  /// 항목의 lastExecuted만 병합한다. (lost-update 방지)
+  Future<void> _persistLastExecuted(Map<String, DateTime> executed) async {
+    if (executed.isEmpty) return;
+    try {
+      var latest = await loadSettings();
+      for (final entry in executed.entries) {
+        final idx = latest.programs.indexWhere((p) => p.id == entry.key);
+        if (idx < 0) continue; // 실행 도중 사용자가 삭제한 프로그램
+        latest = latest.updateProgram(
+          latest.programs[idx].copyWith(lastExecuted: entry.value),
+        );
+      }
+      await saveSettings(latest);
+    } catch (e, stackTrace) {
+      _logging.warning('lastExecuted 저장 실패', error: e, stackTrace: stackTrace);
     }
   }
 
@@ -188,69 +215,46 @@ class AutoLaunchManagerService {
     }
   }
 
-  /// 개별 프로그램 실행
+  /// 개별 프로그램 실행 (Windows 셸 ShellExecuteEx 사용)
+  ///
+  /// 실행 파일(.exe), 바로가기(.lnk), 배치(.bat/.cmd), 문서, URL을 모두 셸이
+  /// 알맞게 처리하며, 프로그램별 [WindowState]를 창 표시 방식으로 반영한다.
   Future<bool> _launchProgram(LaunchProgram program) async {
     try {
-      // 파일 존재 여부 확인
       _logging.debug('프로그램 실행 검증 시작: ${program.name}');
       _logging.debug('  - 경로: ${program.path}');
       _logging.debug('  - 인수: ${program.arguments}');
       _logging.debug('  - 작업 디렉터리: ${program.workingDirectory ?? "(없음)"}');
-      _logging.debug('  - 배치 파일 여부: ${program.isBatchFile}');
+      _logging.debug('  - 창 상태: ${program.windowState.name}');
 
       if (!program.isValid) {
         _logging.error('프로그램 파일을 찾을 수 없습니다: ${program.path}');
-        _logging.error('  - File.existsSync() = false');
         return false;
       }
 
-      _logging.info('프로그램 실행 시도: ${program.name} (${program.path})');
+      _logging.info(
+          '프로그램 실행 시도(ShellExecuteEx): ${program.name} (${program.path})');
 
-      // 실행 파일 여부 확인
-      final isExecutable = program.isExecutable;
-      final isShortcut = program.isShortcut;
-
-      if (!isExecutable) {
-        _logging.debug('문서 파일 감지 - Windows 기본 프로그램으로 실행');
-      } else if (isShortcut) {
-        _logging.debug('바로가기 파일 감지 - cmd.exe로 실행');
-      }
-
-      // Process.start로 프로그램 실행
-      final String executable;
-      final List<String> args;
-
-      if (!isExecutable || isShortcut) {
-        // 문서 파일 또는 바로가기는 cmd /c start로 실행
-        // 빈 문자열("")은 창 제목을 지정하는 것으로, 경로에 공백이 있어도 올바르게 동작
-        executable = 'cmd.exe';
-        args = ['/c', 'start', '""', program.path, ...program.arguments];
-      } else {
-        // 실행 파일은 직접 실행
-        executable = program.path;
-        args = program.arguments;
-      }
-
-      _logging.debug('실행 명령: $executable ${args.join(" ")}');
-
-      final process = await Process.start(
-        executable,
-        args,
-        workingDirectory: program.workingDirectory?.isNotEmpty == true
-            ? program.workingDirectory
-            : null,
-        mode: ProcessStartMode.detached,
-        runInShell: true, // cmd.exe 사용 시 항상 true
+      final result = shellExecuteProgram(
+        path: program.path,
+        arguments: program.arguments,
+        workingDirectory: program.workingDirectory,
+        windowState: program.windowState,
+        logging: _logging,
       );
 
-      _logging.info('프로그램 실행 성공: ${program.name} (PID: ${process.pid})');
-      return true;
+      if (result.success) {
+        _logging.info(
+            '프로그램 실행 성공: ${program.name} (hInstApp: ${result.hInstApp})');
+        return true;
+      }
+
+      _logging.error(
+          '프로그램 실행 실패: ${program.name} (errorCode: ${result.errorCode})');
+      return false;
     } catch (e, stackTrace) {
-      _logging.error('프로그램 실행 실패: ${program.name}');
-      _logging.error('  - 에러 타입: ${e.runtimeType}');
-      _logging.error('  - 에러 메시지: $e');
-      _logging.error('  - 경로: ${program.path}');
-      _logging.error('  - 스택트레이스: $stackTrace');
+      _logging.error('프로그램 실행 실패: ${program.name}',
+          error: e, stackTrace: stackTrace);
       return false;
     }
   }

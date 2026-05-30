@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:desktop_drop/desktop_drop.dart';
 import 'package:flutter/material.dart';
 import 'package:showcaseview/showcaseview.dart';
 
@@ -32,9 +35,10 @@ class _LaunchManagerWidgetState extends State<LaunchManagerWidget> {
   LaunchManagerSettings _settings = LaunchManagerSettings.defaultSettings();
   bool _loading = true;
   bool _isExecuting = false;
+  bool _isDragging = false;
 
   // Stream 구독 관리
-  dynamic _progressSubscription;
+  StreamSubscription<LaunchExecutionProgress>? _progressSubscription;
 
   @override
   void initState() {
@@ -116,6 +120,59 @@ class _LaunchManagerWidgetState extends State<LaunchManagerWidget> {
     _showInfoSnackBar('${program.name} 프로그램이 추가되었습니다.');
   }
 
+  /// 드래그 앤 드롭으로 떨어진 파일 경로들을 프로그램으로 등록한다.
+  ///
+  /// - 1개: 추가 다이얼로그를 경로/이름이 채워진 채로 열어 사용자가 확인·조정.
+  /// - 여러 개: 기본값(대기 10초, 활성화)으로 일괄 등록. 이미 등록된 경로는 건너뜀.
+  Future<void> _handleDroppedPaths(List<String> paths) async {
+    if (_isExecuting) return;
+
+    final valid = paths.map((p) => p.trim()).where((p) => p.isNotEmpty).toList();
+    if (valid.isEmpty) return;
+
+    if (valid.length == 1) {
+      final program =
+          await AddProgramDialog.showAdd(context, initialPath: valid.first);
+      if (program == null) return;
+      setState(() {
+        _settings = _settings.addProgram(program);
+      });
+      await _saveSettings();
+      _showInfoSnackBar('${program.name} 프로그램이 추가되었습니다.');
+      return;
+    }
+
+    final existingPaths =
+        _settings.programs.map((p) => p.path.toLowerCase()).toSet();
+    var working = _settings;
+    var added = 0;
+    for (final path in valid) {
+      final key = path.toLowerCase();
+      if (existingPaths.contains(key)) continue;
+      existingPaths.add(key);
+      working = working.addProgram(
+        LaunchProgram(
+          id: LaunchProgram.generateId(path),
+          name: LaunchProgram.extractProgramName(path),
+          path: path,
+          order: 0, // 실제 순서는 addProgram에서 재할당
+        ),
+      );
+      added++;
+    }
+
+    if (added == 0) {
+      _showInfoSnackBar('이미 등록된 프로그램입니다.');
+      return;
+    }
+
+    setState(() {
+      _settings = working;
+    });
+    await _saveSettings();
+    _showInfoSnackBar('$added개 프로그램이 추가되었습니다. 목록에서 대기 시간을 조정하세요.');
+  }
+
   Future<void> _editProgram(LaunchProgram program) async {
     final updatedProgram = await AddProgramDialog.showEdit(context, program);
     if (updatedProgram == null) return;
@@ -188,27 +245,72 @@ class _LaunchManagerWidgetState extends State<LaunchManagerWidget> {
       );
     }
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return AppSectionCard(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.only(bottom: AppSpacing.md),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(minHeight: constraints.maxHeight),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildHeader(),
-                  const SizedBox(height: AppSpacing.md),
-                  _buildProgramList(),
-                  const SizedBox(height: AppSpacing.lg),
-                  _buildActionButtons(),
-                ],
+    return DropTarget(
+      onDragEntered: (_) {
+        if (!_isExecuting) setState(() => _isDragging = true);
+      },
+      onDragExited: (_) => setState(() => _isDragging = false),
+      onDragDone: (detail) {
+        setState(() => _isDragging = false);
+        _handleDroppedPaths(detail.files.map((f) => f.path).toList());
+      },
+      child: Stack(
+        children: [
+          LayoutBuilder(
+            builder: (context, constraints) {
+              return AppSectionCard(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                  child: ConstrainedBox(
+                    constraints:
+                        BoxConstraints(minHeight: constraints.maxHeight),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildHeader(),
+                        const SizedBox(height: AppSpacing.md),
+                        _buildProgramList(),
+                        const SizedBox(height: AppSpacing.lg),
+                        _buildActionButtons(),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+          if (_isDragging) Positioned.fill(child: _buildDropOverlay()),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDropOverlay() {
+    final color = Theme.of(context).primaryColor;
+    return IgnorePointer(
+      child: Container(
+        decoration: BoxDecoration(
+          color: color.withAlpha((0.06 * 255).round()),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: color, width: 2),
+        ),
+        alignment: Alignment.center,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.file_download_outlined, size: 40, color: color),
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              '여기에 놓아 프로그램 추가',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: color,
               ),
             ),
-          ),
-        );
-      },
+          ],
+        ),
+      ),
     );
   }
 
@@ -447,6 +549,17 @@ class _LaunchManagerWidgetState extends State<LaunchManagerWidget> {
               fontSize: 14,
               color: Colors.grey[500],
             ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            '실행 파일(.exe)이나 바로가기(.lnk)를 여기로 끌어다 놓아도 됩니다',
+            style: TextStyle(
+              fontSize: 13,
+              color: Theme.of(context).primaryColor,
+              fontWeight: FontWeight.w500,
+            ),
+            textAlign: TextAlign.center,
           ),
         ],
       ),

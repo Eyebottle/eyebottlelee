@@ -155,9 +155,18 @@ class LaunchProgram {
     );
   }
 
-  /// 고유 ID 생성 (파일 경로 기반)
-  static String generateId(String filePath) {
-    return filePath.hashCode.toString();
+  static int _idCounter = 0;
+
+  /// 항상 고유한 ID를 생성한다.
+  ///
+  /// 이전에는 `filePath.hashCode`를 사용해, 같은 프로그램을 두 번 등록하면
+  /// 동일한 id가 만들어져 편집/삭제/토글이 엉뚱한 항목에 적용되는 버그가 있었다
+  /// (서로 다른 경로 간 해시 충돌 위험도 있었다). 이제 경로와 무관하게 고유
+  /// 값을 생성한다. 파라미터는 기존 호출부 호환을 위해 남겨두되 사용하지 않는다.
+  static String generateId([String? _]) {
+    final micros = DateTime.now().microsecondsSinceEpoch;
+    final n = _idCounter++;
+    return '${micros}_$n';
   }
 
   @override

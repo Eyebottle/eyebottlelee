@@ -71,7 +71,8 @@ class AnimatedVolumeMeter extends StatelessWidget {
 
   Widget _buildLevelIndicator() {
     final currentLevel = history.isNotEmpty ? history.last : 0.0;
-    final levelText = currentLevel < 0.35
+    // 임계값을 AppColors.getVolumeColor(0.4/0.7)와 일치시켜 라벨과 색이 어긋나지 않게 한다.
+    final levelText = currentLevel < 0.4
         ? '낮음'
         : currentLevel < 0.7
             ? '적정'
@@ -107,7 +108,7 @@ class AnimatedVolumeMeter extends StatelessWidget {
     final bars = <Widget>[];
     for (var i = 0; i < barCount; i++) {
       final value = padded[i].clamp(0.0, 1.0);
-      final color = _colorForValue(value);
+      final color = AppColors.getVolumeColor(value);
       final height = math.max(value * maxHeight, 4.0);
       bars.add(
         Expanded(
@@ -125,15 +126,5 @@ class AnimatedVolumeMeter extends StatelessWidget {
       );
     }
     return bars;
-  }
-
-  Color _colorForValue(double value) {
-    if (value < 0.35) {
-      return AppColors.volumeLow;
-    } else if (value < 0.7) {
-      return AppColors.volumeMedium;
-    } else {
-      return AppColors.volumeHigh;
-    }
   }
 }

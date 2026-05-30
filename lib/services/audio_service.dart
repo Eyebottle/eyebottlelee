@@ -295,9 +295,9 @@ class AudioService {
       }
       _currentSegmentStartedAt = null;
 
-      // 6. 보관 정책 적용
+      // 6. 보관 정책 적용 (백그라운드 — 녹음 중지 반환을 막지 않음. splitSegment와 동일)
       _logging.info('🧹 보관 정책 적용 중...');
-      await _pruneOldFiles();
+      unawaited(_pruneOldFiles());
 
       _logging.info('✅ 녹음 중지 완료');
       return filePath;

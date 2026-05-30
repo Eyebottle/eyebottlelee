@@ -38,9 +38,9 @@ class ScheduleService {
   }
 
   Future<void> _resetCron() async {
-    _cron.close();
-    // 기존 스케줄이 완전히 취소될 때까지 대기
-    await Future.delayed(const Duration(milliseconds: 200));
+    // Cron.close()는 모든 예약 작업의 취소가 끝날 때까지 await 가능하므로,
+    // 임의의 200ms 지연 대신 완료를 직접 기다린다.
+    await _cron.close();
     _cron = Cron();
   }
 

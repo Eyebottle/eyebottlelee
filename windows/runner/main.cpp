@@ -24,21 +24,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   std::vector<std::string> command_line_arguments =
       GetCommandLineArguments();
 
-  // v1.3.17: Detect whether Windows StartupTask launched us with --autostart
-  // BEFORE moving the argument vector into the Dart project. When launched at
-  // boot we leave the native window hidden so Dart can decide visibility
-  // without a Show()->hide() race on slower hardware.
-  bool launched_by_startup_task = false;
-  for (const auto& arg : command_line_arguments) {
-    if (arg == "--autostart") {
-      launched_by_startup_task = true;
-      break;
-    }
-  }
-
-  // Command line arguments (including --autostart) are passed to Dart.
-  // Window visibility is controlled entirely by Dart's
-  // windowManager.waitUntilReadyToShow() based on these arguments.
+  // Command line arguments (including --autostart when the OS delivers it) are
+  // passed to Dart, where they are used only as a hint (see below).
   project.set_dart_entrypoint_arguments(std::move(command_line_arguments));
 
   FlutterWindow window(project);
@@ -49,14 +36,18 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   }
   window.SetQuitOnClose(true);
 
-  // v1.3.17: Only show the window natively for manual launches. When started
-  // by StartupTask (--autostart), leave it hidden; Dart's
-  // windowManager.waitUntilReadyToShow() callback calls show() explicitly only
-  // when the user wants the window visible. This eliminates the prior race
-  // where the native Show() beat the Dart-side hide().
-  if (!launched_by_startup_task) {
-    window.Show();
-  }
+  // v1.3.18: Do NOT Show() the window natively. Visibility is controlled
+  // entirely by Dart (main.dart) via windowManager.waitUntilReadyToShow():
+  //   - background start (boot + "start minimized") -> stays hidden (tray only)
+  //   - otherwise                                    -> Dart calls show()+focus()
+  //
+  // Why: MSIX StartupTask's uap10:Parameters("--autostart") is NOT reliably
+  // delivered as argv on some Windows 10 setups, so the native layer cannot
+  // know whether this is a boot launch. Making Dart the single source of truth
+  // (it also uses a system-uptime heuristic) removes the previous
+  // native-Show() vs Dart-hide() race entirely. The window is created hidden
+  // and FlutterWindow::OnCreate already calls ForceRedraw() to render the first
+  // frame without showing it.
 
   ::MSG msg;
   while (::GetMessage(&msg, nullptr, 0, 0)) {

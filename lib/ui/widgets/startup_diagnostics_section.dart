@@ -300,6 +300,8 @@ class _DiagnosticsData {
         buffer.writeln(
           '${e['timestamp']} | args=${e['args']} | '
           'hasAutostart=${e['hasAutostart']} | '
+          'uptime=${e['uptimeSeconds'] ?? "-"}s | '
+          'likelyBoot=${e['isLikelyBootLaunch'] ?? "-"} | '
           'startMinimizedOnBoot=${e['startMinimizedOnBoot']} | '
           'shouldStartMinimized=${e['shouldStartMinimized']}',
         );

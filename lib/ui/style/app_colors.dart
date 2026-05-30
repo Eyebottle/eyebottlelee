@@ -58,7 +58,9 @@ class AppColors {
   static const Color success = Color(0xFF2E7D32);
 
   /// 경고, 주의 필요
-  static const Color warning = Color(0xFFA000);
+  // 주의: 0xFFA000(6자리)은 알파 0x00 → 완전 투명으로 렌더링되어 경고 표시가
+  // 보이지 않던 버그가 있었다. 8자리 ARGB(0xFFFFA000)로 불투명 앰버 고정.
+  static const Color warning = Color(0xFFFFA000);
 
   /// 오류, 위험
   static const Color error = Color(0xFFD32F2F);
