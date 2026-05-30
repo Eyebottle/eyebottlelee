@@ -479,29 +479,8 @@ class _AdvancedSettingsDialogState extends State<AdvancedSettingsDialog> {
                   },
                 ),
                 const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.shade50,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.blue.shade200),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.info_outline,
-                          color: Colors.blue.shade700, size: 20),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          '변환은 백그라운드에서 조용히 진행되며, 실패 시 원본 WAV 파일이 보존됩니다',
-                          style:
-                              Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: Colors.blue.shade900,
-                                  ),
-                        ),
-                      ),
-                    ],
-                  ),
+                const _InfoCallout(
+                  text: '변환은 백그라운드에서 조용히 진행되며, 실패 시 원본 WAV 파일이 보존됩니다',
                 ),
               ],
             ],
@@ -569,29 +548,8 @@ class _AdvancedSettingsDialogState extends State<AdvancedSettingsDialog> {
               ),
               if (_startMinimizedOnBoot) ...[
                 const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.shade50,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.blue.shade200),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.info_outline,
-                          color: Colors.blue.shade700, size: 20),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          '백그라운드로 시작하면 시스템 트레이 아이콘을 클릭하여 창을 열 수 있습니다',
-                          style:
-                              Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: Colors.blue.shade900,
-                                  ),
-                        ),
-                      ),
-                    ],
-                  ),
+                const _InfoCallout(
+                  text: '백그라운드로 시작하면 시스템 트레이 아이콘을 클릭하여 창을 열 수 있습니다',
                 ),
               ],
               // v1.3.17: 부팅 자동시작 진단 패널
@@ -768,5 +726,39 @@ Duration? _durationForOption(RetentionOption option) {
       return ('6개월', '반기 단위로 정리하는 환경에 적합합니다.');
     case RetentionOption.year:
       return ('1년', '장기 보관이 필요할 때 사용하세요.');
+  }
+}
+
+/// 설정 카드 안의 파란색 정보 안내 박스 (반복되던 동일 컨테이너를 위젯화).
+class _InfoCallout extends StatelessWidget {
+  const _InfoCallout({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.blue.shade50,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.blue.shade200),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.info_outline, color: Colors.blue.shade700, size: 20),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: Theme.of(context)
+                  .textTheme
+                  .bodySmall
+                  ?.copyWith(color: Colors.blue.shade900),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

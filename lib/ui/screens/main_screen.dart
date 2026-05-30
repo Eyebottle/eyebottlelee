@@ -1036,11 +1036,7 @@ class _MainScreenState extends State<MainScreen>
 
     if (!initial && mounted) {
       // 에러 상태 확인
-      final bool hasIssue = result.status == MicDiagnosticStatus.failure ||
-          result.status == MicDiagnosticStatus.noSignal ||
-          result.status == MicDiagnosticStatus.lowInput ||
-          result.status == MicDiagnosticStatus.permissionDenied ||
-          result.status == MicDiagnosticStatus.noInputDevice;
+      final bool hasIssue = result.status.isProblem;
 
       if (hasIssue) {
         // 에러 발생: 로그 확인 안내

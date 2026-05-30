@@ -113,11 +113,7 @@ class _DashboardTab extends StatelessWidget {
     required VoidCallback onPressed,
   }) {
     // 에러/경고 상태 확인
-    final bool hasIssue = status == MicDiagnosticStatus.failure ||
-        status == MicDiagnosticStatus.noSignal ||
-        status == MicDiagnosticStatus.lowInput ||
-        status == MicDiagnosticStatus.permissionDenied ||
-        status == MicDiagnosticStatus.noInputDevice;
+    final bool hasIssue = status?.isProblem ?? false;
 
     if (hasIssue) {
       // 에러 상태: 경고 스타일 버튼

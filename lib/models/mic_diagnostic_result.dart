@@ -10,6 +10,17 @@ enum MicDiagnosticStatus {
   failure,
 }
 
+/// 진단 상태가 "사용자 조치가 필요한 문제"인지 여부.
+/// 여러 화면에서 동일하게 쓰던 5개 상태 OR 목록을 한 곳으로 모은다.
+extension MicDiagnosticStatusProblem on MicDiagnosticStatus {
+  bool get isProblem =>
+      this == MicDiagnosticStatus.failure ||
+      this == MicDiagnosticStatus.noSignal ||
+      this == MicDiagnosticStatus.lowInput ||
+      this == MicDiagnosticStatus.permissionDenied ||
+      this == MicDiagnosticStatus.noInputDevice;
+}
+
 class MicDiagnosticResult {
   MicDiagnosticResult({
     required this.timestamp,
