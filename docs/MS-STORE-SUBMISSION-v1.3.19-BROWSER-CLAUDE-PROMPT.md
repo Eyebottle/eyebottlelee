@@ -1,10 +1,10 @@
-# MS Store v1.3.18 — 브라우저 조작 Claude용 최종 프롬프트
+# MS Store v1.3.19 — 브라우저 조작 Claude용 최종 프롬프트
 
 > 크롬을 직접 조작하는 Claude(browser automation)에게 아래 **"프롬프트"** 블록을
 > 그대로 복사해 전달하세요. 로그인은 사용자가 직접 하며, Claude는 로그인 화면에서
 > 멈추고 기다립니다. 최종 "제출" 직전에도 사용자 확인을 받습니다.
 >
-> ⚠️ **먼저 빌드부터**: 이 프롬프트는 v1.3.18 `.msix`가 빌드되어 있어야 동작합니다.
+> ⚠️ **먼저 빌드부터**: 이 프롬프트는 v1.3.19 `.msix`가 빌드되어 있어야 동작합니다.
 > 같은 Windows PC에서 아래를 먼저 실행하세요(데스크톱 드롭 신규 의존성 때문에
 > `flutter pub get`·`flutter analyze`가 반드시 선행):
 >
@@ -38,7 +38,7 @@
 
 [제출 정보]
 - 앱: "아이보틀 진료녹음" (앱 목록에서 "아이보틀"로 검색/식별)
-- 새 버전: 1.3.18.0
+- 새 버전: 1.3.19.0
 - 업로드할 파일(이 PC 경로):
   C:\ws-workspace\eyebottlelee\build\windows\x64\runner\Release\medical_recorder.msix
 - 직전 버전: 1.3.17 (패키지 탭에서 발견되면 삭제하고 새로 올림)
@@ -59,13 +59,13 @@
    경로를 입력/선택해 업로드해라:
    C:\ws-workspace\eyebottlelee\build\windows\x64\runner\Release\medical_recorder.msix
 8. 업로드 후 자동 검증이 끝날 때까지 기다려라(진행 표시가 사라지고 녹색
-   체크/성공 표시가 뜰 때까지). 패키지 버전이 1.3.18.0 으로 표시되는지
+   체크/성공 표시가 뜰 때까지). 패키지 버전이 1.3.19.0 으로 표시되는지
    확인해라. 경고/오류가 뜨면 그 내용을 사용자에게 그대로 보고하고 멈춰라.
 9. "스토어 목록(Store listings)" → 한국어(ko-kr) 목록으로 이동해라.
    "이 릴리스의 새로운 기능 / What's new in this release" 입력란에 아래를
    그대로 입력해라:
 
-v1.3.18 업데이트
+v1.3.19 업데이트
 
 [버그 수정]
 • 일부 PC에서 "백그라운드로 시작"을 켜도 부팅 시 창이 뜨던 문제 해결
@@ -81,12 +81,12 @@ v1.3.18 업데이트
 • 오디오 변환 멈춤 방지(타임아웃) 및 내부 코드 정리
 
    (만약 글자 수 초과/"too long" 오류가 나면 위 내용을 아래 한 줄로 교체해라:
-    v1.3.18: 부팅 백그라운드 시작 안정화 + 바로가기/드래그 등록 + 정리)
+    v1.3.19: 부팅 백그라운드 시작 안정화 + 바로가기/드래그 등록 + 정리)
 
 10. "제출 옵션(Submission options)" 탭으로 이동해라. "인증 노트(Notes for
     certification)" 입력란에 아래 영문을 그대로 입력해라:
 
-v1.3.18 - Fix: boot-to-tray on PCs where StartupTask args are not delivered
+v1.3.19 - Fix: boot-to-tray on PCs where StartupTask args are not delivered
 
 ROOT CAUSE (boot-to-tray still failing for some users):
 v1.3.16/1.3.17 detected a startup launch by checking for a "--autostart"
@@ -134,7 +134,7 @@ Requires: Windows 10 1809+, VCLibs.140.00.UWPDesktop
 12. 최종 제출 직전 확인: "제출(Submit)" 버튼을 누르기 전에, 다음을 요약해
     사용자에게 보고하고 "제출할까요?"라고 물어라. 사용자가 명시적으로
     "제출"이라고 답할 때까지 누르지 마라:
-    - 업로드된 패키지 버전(1.3.18.0)
+    - 업로드된 패키지 버전(1.3.19.0)
     - "새로운 기능" 입력 완료 여부
     - "인증 노트" 입력 완료 여부
     - 검증 경고/오류 유무
@@ -152,8 +152,8 @@ Requires: Windows 10 1809+, VCLibs.140.00.UWPDesktop
 
 ## 사용 메모 (사용자용 — 브라우저 Claude에게 전달하지 않아도 됨)
 
-- 업로드 파일은 **반드시 v1.3.18 빌드본**이어야 합니다. 탐색기에서
-  `medical_recorder.msix` 속성 → 자세히 → 제품 버전이 **1.3.18.0**, 빌드 시각이
+- 업로드 파일은 **반드시 v1.3.19 빌드본**이어야 합니다. 탐색기에서
+  `medical_recorder.msix` 속성 → 자세히 → 제품 버전이 **1.3.19.0**, 빌드 시각이
   오늘인지 확인하세요.
 - **신규 의존성(desktop_drop)** 때문에 빌드 전 `flutter pub get`이 반드시
   선행되어야 하며, `flutter analyze`로 에러 0을 확인한 뒤 빌드하세요.

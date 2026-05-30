@@ -1,7 +1,7 @@
-# MS Store v1.3.18 코멧 프롬프트
+# MS Store v1.3.19 코멧 프롬프트
 
 아래 프롬프트를 코멧 브라우저에 그대로 복사-붙여넣기하세요.
-(빌드가 끝나 `medical_recorder.msix`가 v1.3.18.0로 생성된 뒤에 진행)
+(빌드가 끝나 `medical_recorder.msix`가 v1.3.19.0로 생성된 뒤에 진행)
 
 ---
 
@@ -17,11 +17,11 @@ Microsoft Store Partner Center에서 앱 업데이트를 제출해줘.
 5. "패키지" 또는 "Packages" 탭으로 이동해.
 6. 기존 패키지(v1.3.17 이하)가 있으면 X 버튼으로 삭제해.
 7. "찾아보기" 또는 "Browse"를 클릭하고 이 파일을 업로드해: C:\ws-workspace\eyebottlelee\build\windows\x64\runner\Release\medical_recorder.msix
-8. 업로드 후 자동 검증이 통과(녹색 체크마크)되는지 확인해. 버전이 1.3.18.0으로 표시되어야 해.
+8. 업로드 후 자동 검증이 통과(녹색 체크마크)되는지 확인해. 버전이 1.3.19.0으로 표시되어야 해.
 9. "스토어 목록" 탭으로 이동해.
 10. "이 릴리스의 새로운 기능" 또는 "What's new in this release" 입력란에 아래 내용을 입력해:
 
-v1.3.18 업데이트
+v1.3.19 업데이트
 
 [버그 수정]
 • 일부 PC에서 "백그라운드로 시작"을 켜도 부팅 시 창이 뜨던 문제 해결
@@ -39,7 +39,7 @@ v1.3.18 업데이트
 11. "제출 옵션" 또는 "Submission options" 탭으로 이동해.
 12. "인증 노트" 또는 "Notes for certification" 입력란에 아래 내용을 입력해:
 
-v1.3.18 - Fix: boot-to-tray on systems where StartupTask args are not delivered
+v1.3.19 - Fix: boot-to-tray on systems where StartupTask args are not delivered
 
 ROOT CAUSE (boot-to-tray still failing for some users):
 v1.3.16/1.3.17 detected a startup launch by checking for a "--autostart"
@@ -97,5 +97,5 @@ Requires: Windows 10 1809+, VCLibs.140.00.UWPDesktop
 **참고:** "long file" 에러가 발생하면 10번의 릴리스 노트를 아래로 교체:
 
 ```
-v1.3.18: 부팅 백그라운드 시작 안정화 + 바로가기/드래그 등록 + 정리
+v1.3.19: 부팅 백그라운드 시작 안정화 + 바로가기/드래그 등록 + 정리
 ```
