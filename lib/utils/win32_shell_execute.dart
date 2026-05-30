@@ -126,10 +126,10 @@ ShellExecuteResult shellExecuteProgram({
   final argsStr = _joinArguments(arguments);
   final argsPtr =
       argsStr.isEmpty ? nullptr : argsStr.toNativeUtf16(allocator: calloc);
-  final hasWorkingDir =
-      workingDirectory != null && workingDirectory.isNotEmpty;
-  final dirPtr = hasWorkingDir
-      ? workingDirectory!.toNativeUtf16(allocator: calloc)
+  // 조건을 삼항 안에 직접 두어 true 분기에서 workingDirectory가 non-null로 승격되도록.
+  // (별도 bool 변수 + `!`는 불필요한 non-null 단언 경고를 유발)
+  final dirPtr = (workingDirectory != null && workingDirectory.isNotEmpty)
+      ? workingDirectory.toNativeUtf16(allocator: calloc)
       : nullptr;
 
   try {
