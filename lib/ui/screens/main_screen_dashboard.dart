@@ -5,7 +5,6 @@ class _DashboardTab extends StatelessWidget {
     required this.isRecording,
     required this.todayRecordingTime,
     required this.plannedSessions,
-    required this.volumeLevel,
     required this.volumeHistory,
     required this.lastDiagnostic,
     required this.diagnosticInProgress,
@@ -23,8 +22,7 @@ class _DashboardTab extends StatelessWidget {
   final bool isRecording;
   final String todayRecordingTime;
   final List<String> plannedSessions;
-  final double volumeLevel;
-  final List<double> volumeHistory;
+  final ValueListenable<List<double>> volumeHistory;
   final MicDiagnosticResult? lastDiagnostic;
   final bool diagnosticInProgress;
   final Future<void> Function() onRunDiagnostic;
@@ -667,9 +665,12 @@ class _DashboardTab extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
-          AnimatedVolumeMeter(
-            history: volumeHistory,
-            maxHeight: 60,
+          ValueListenableBuilder<List<double>>(
+            valueListenable: volumeHistory,
+            builder: (context, history, _) => AnimatedVolumeMeter(
+              history: history,
+              maxHeight: 60,
+            ),
           ),
           const SizedBox(height: 16),
           Row(

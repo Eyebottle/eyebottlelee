@@ -67,8 +67,10 @@ class _MainScreenState extends State<MainScreen>
   late final TabController _tabController;
 
   bool _isRecording = false;
-  double _volumeLevel = 0.0;
-  List<double> _volumeHistory = const [];
+  // 볼륨 파형 히스토리. ValueNotifier로 분리해 녹음 중 파형 갱신이 화면 전체를
+  // setState로 리빌드하지 않도록 한다(_DashboardTab은 ValueListenableBuilder로 소비).
+  final ValueNotifier<List<double>> _volumeHistory =
+      ValueNotifier<List<double>>(const []);
   String _todayRecordingTime = '0시간 0분';
   Duration _todayDuration = Duration.zero;
   DateTime? _currentSessionStart;
@@ -183,13 +185,12 @@ class _MainScreenState extends State<MainScreen>
 
     _audioService.onAmplitudeChanged = (level) {
       if (!mounted) return;
-      setState(() {
-        _volumeLevel = level.clamp(0.0, 1.0);
-        final history = List<double>.from(_volumeHistory)..add(_volumeLevel);
-        _volumeHistory = history.length > _volumeHistoryLimit
-            ? history.sublist(history.length - _volumeHistoryLimit)
-            : history;
-      });
+      // 파형만 갱신(setState 없음) — 녹음 중 초당 ~5회 전체 트리 리빌드 제거.
+      final sample = level.clamp(0.0, 1.0);
+      final history = List<double>.from(_volumeHistory.value)..add(sample);
+      _volumeHistory.value = history.length > _volumeHistoryLimit
+          ? history.sublist(history.length - _volumeHistoryLimit)
+          : history;
     };
 
     _audioService.onFileSegmentCreated = (filePath) {
@@ -321,6 +322,7 @@ class _MainScreenState extends State<MainScreen>
     _sessionTicker?.cancel();
     _autoLaunchDelayTimer?.cancel();
     _tabController.dispose();
+    _volumeHistory.dispose();
     _audioService.dispose();
     _scheduleService.dispose();
     _trayService.dispose();
@@ -365,7 +367,6 @@ class _MainScreenState extends State<MainScreen>
                         isRecording: _isRecording,
                         todayRecordingTime: _todayRecordingTime,
                         plannedSessions: _plannedSessionsForToday(),
-                        volumeLevel: _volumeLevel,
                         volumeHistory: _volumeHistory,
                         lastDiagnostic: _lastMicDiagnostic,
                         diagnosticInProgress: _micDiagnosticRunning,
