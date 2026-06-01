@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../utils/time_format.dart';
 
 /// 주간 진료 시간표 모델
 class WeeklySchedule {
@@ -246,14 +247,11 @@ class DaySchedule {
   String toString() {
     if (!isWorkingDay || sessions.isEmpty) return '휴무';
     final ranges = sessions
-        .map((slot) => '${_formatTime(slot.start)}~${_formatTime(slot.end)}')
+        .map((slot) => '${formatHm(slot.start)}~${formatHm(slot.end)}')
         .join(', ');
     return ranges;
   }
 
-  String _formatTime(TimeOfDay time) {
-    return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
-  }
 }
 
 class WorkingSession {

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:cron/cron.dart';
 import 'package:flutter/material.dart';
 import '../models/schedule_model.dart';
+import '../utils/time_format.dart';
 import 'logging_service.dart';
 
 class ScheduleService {
@@ -66,7 +67,7 @@ class ScheduleService {
     _cron.schedule(Schedule.parse(cronExpression), () {
       if (_isDisposed) return;
       _logging.info('스케줄된 녹음 시작 트리거');
-      _logging.debug('요일=$weekDay, 시각=${_formatTime(timeOfDay)}');
+      _logging.debug('요일=$weekDay, 시각=${formatHm(timeOfDay)}');
       if (onRecordingStart != null) {
         onRecordingStart!();
       }
@@ -80,7 +81,7 @@ class ScheduleService {
     _cron.schedule(Schedule.parse(cronExpression), () {
       if (_isDisposed) return;
       _logging.info('스케줄된 녹음 중지 트리거');
-      _logging.debug('요일=$weekDay, 시각=${_formatTime(timeOfDay)}');
+      _logging.debug('요일=$weekDay, 시각=${formatHm(timeOfDay)}');
       if (onRecordingStop != null) {
         onRecordingStop!();
       }
@@ -150,11 +151,6 @@ class ScheduleService {
     }
 
     return null;
-  }
-
-  /// 시간 포맷팅
-  String _formatTime(TimeOfDay time) {
-    return '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
   }
 
   /// 서비스 정리

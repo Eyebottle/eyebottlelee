@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../../utils/time_format.dart';
 import '../../style/app_colors.dart';
 import '../../style/app_typography.dart';
 
@@ -316,7 +317,7 @@ class _TimeRangeSliderState extends State<TimeRangeSlider> {
         child: _isEditMode
             ? _buildTimeInput(hourController, minuteController, color)
             : Text(
-                _formatTime(time),
+                formatHm(time),
                 style: AppTypography.headlineSmall.copyWith(
                   fontSize: 28,
                   color: color,
@@ -436,11 +437,6 @@ class _TimeRangeSliderState extends State<TimeRangeSlider> {
     );
   }
 
-  String _formatTime(TimeOfDay time) {
-    final hour = time.hour.toString().padLeft(2, '0');
-    final minute = time.minute.toString().padLeft(2, '0');
-    return '$hour:$minute';
-  }
 }
 
 /// 시간 범위 모델

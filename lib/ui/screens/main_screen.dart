@@ -7,6 +7,7 @@ import 'package:showcaseview/showcaseview.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../../main.dart' show gStartedInBackground; // 백그라운드 시작 플래그
+import '../../utils/time_format.dart';
 import '../../services/auto_launch_service.dart';
 import '../../services/auto_launch_manager_service.dart';
 import '../../models/mic_diagnostic_result.dart';
@@ -1092,14 +1093,9 @@ class _MainScreenState extends State<MainScreen>
               : (session.start.hour < 18 ? '오후' : '세션 ${i + 1}'))
           : '세션';
       lines.add(
-          '$prefix: ${_formatTime(session.start)} - ${_formatTime(session.end)}');
+          '$prefix: ${formatHm(session.start)} - ${formatHm(session.end)}');
     }
     return lines;
   }
 
-  String _formatTime(TimeOfDay time) {
-    final hour = time.hour.toString().padLeft(2, '0');
-    final minute = time.minute.toString().padLeft(2, '0');
-    return '$hour:$minute';
-  }
 }
