@@ -79,6 +79,7 @@ v1.3.20 업데이트
 • 시간표 시간 표시를 오전/오후 12시간제로 통일
 • 시간 편집을 표준 시간 선택기(오전/오후)로 변경
 • 기본 시간표를 흔한 진료 패턴(평일 오전·오후 + 토요일 반일)으로 정비
+• 앱 아이콘 선명도 개선 (큰 화면/타일에서 흐릿하게 보이던 문제 해결)
 
 [안정성]
 • 녹음 정지/분할 처리 안정화 (음성 유실·중복 녹음 방지)
@@ -120,6 +121,8 @@ ALSO:
   (no zombie process holding the WAV file).
 - Removed dead code/dependencies (permission_handler, flutter_local_notifications,
   an unreachable diagnostics dialog).
+- App icon/tile logos regenerated from a 1024px source (msix logo_path) to fix
+  upscaling blur on larger tiles.
 
 NOTE: This release does NOT change any boot/tray/window-visibility code, so the
 boot-to-tray behavior shipped in 1.3.19 is unchanged.
