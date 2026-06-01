@@ -30,7 +30,6 @@ import '../style/app_colors.dart';
 // 위젯/다이얼로그는 같은 라이브러리의 part 파일로 분리(가독성). private 심볼·임포트 공유.
 part 'main_screen_dashboard.dart';
 part 'main_screen_tabs.dart';
-part 'main_screen_diagnostics.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -84,8 +83,6 @@ class _MainScreenState extends State<MainScreen>
   bool _vadEnabled = true;
   bool _startMinimizedOnBoot = false;
   bool _autoLaunchEnabled = false; // 자동 실행 매니저 (별도 기능)
-  bool _isPackaged = false;
-  String? _packageFamilyName;
   Duration? _retentionDuration;
   RecordingQualityProfile _recordingProfile = RecordingQualityProfile.balanced;
   double _makeupGainDb = 0.0;
@@ -148,12 +145,10 @@ class _MainScreenState extends State<MainScreen>
     try {
       await AutoLaunchService().applySavedPreference();
 
-      // Fetch startup status snapshot for diagnostics
+      // WinRT StartupTask 상태(켜짐/꺼짐)를 읽어 설정 화면에 반영한다.
       final statusSnapshot = await AutoLaunchService().getStatusSnapshot();
       if (mounted) {
         setState(() {
-          _isPackaged = statusSnapshot.isPackaged;
-          _packageFamilyName = statusSnapshot.packageFamilyName;
           _autoLaunchEnabled = statusSnapshot.startupTaskEnabled;
         });
       }
@@ -428,8 +423,6 @@ class _MainScreenState extends State<MainScreen>
                         retentionDuration: _retentionDuration,
                         recordingProfile: _recordingProfile,
                         makeupGainDb: _makeupGainDb,
-                        startupStatusMismatch: false,
-                        onShowStartupDiagnostics: _showStartupDiagnostics,
                       ),
                       _LaunchManagerTab(
                         onAutoLaunchChanged: (enabled) {
@@ -682,26 +675,6 @@ class _MainScreenState extends State<MainScreen>
         );
       }
     }
-  }
-
-  void _showStartupDiagnostics() async {
-    // Get log path from logging service
-    String logPath;
-    try {
-      logPath = await _loggingService.getLogDirectoryPath();
-    } catch (_) {
-      logPath = r'C:\Users\<user>\Documents\EyebottleRecorder\logs';
-    }
-
-    if (!mounted) return;
-    StartupDiagnosticsDialog.show(
-      context,
-      expectedEnabled: true, // Windows StartupTask로 관리
-      actualEnabled: null, // OS 상태 직접 확인 불가 (네이티브 API 제거)
-      isPackaged: _isPackaged,
-      packageFamilyName: _packageFamilyName,
-      logPath: logPath,
-    );
   }
 
   Future<void> _refreshSaveFolderDisplay() async {

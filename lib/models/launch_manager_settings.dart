@@ -4,17 +4,11 @@ import 'launch_program.dart';
 class LaunchManagerSettings {
   const LaunchManagerSettings({
     this.autoLaunchEnabled = false,
-    this.showNotifications = true,
-    this.retryOnFailure = false,
-    this.requireConfirmationForNewPrograms = true,
     this.programs = const [],
     this.version = 1,
   });
 
   final bool autoLaunchEnabled;
-  final bool showNotifications;
-  final bool retryOnFailure;
-  final bool requireConfirmationForNewPrograms;
   final List<LaunchProgram> programs;
   final int version;
 
@@ -25,10 +19,6 @@ class LaunchManagerSettings {
   factory LaunchManagerSettings.fromJson(Map<String, dynamic> json) {
     return LaunchManagerSettings(
       autoLaunchEnabled: json['autoLaunchEnabled'] as bool? ?? false,
-      showNotifications: json['showNotifications'] as bool? ?? true,
-      retryOnFailure: json['retryOnFailure'] as bool? ?? false,
-      requireConfirmationForNewPrograms:
-          json['requireConfirmationForNewPrograms'] as bool? ?? true,
       programs: (json['programs'] as List<dynamic>?)
               ?.map((p) => LaunchProgram.fromJson(p as Map<String, dynamic>))
               .toList() ??
@@ -41,9 +31,6 @@ class LaunchManagerSettings {
   Map<String, dynamic> toJson() {
     return {
       'autoLaunchEnabled': autoLaunchEnabled,
-      'showNotifications': showNotifications,
-      'retryOnFailure': retryOnFailure,
-      'requireConfirmationForNewPrograms': requireConfirmationForNewPrograms,
       'programs': programs.map((p) => p.toJson()).toList(),
       'version': version,
     };
@@ -55,21 +42,8 @@ class LaunchManagerSettings {
       ..sort((a, b) => a.order.compareTo(b.order));
   }
 
-  /// 전체 프로그램 개수
-  int get totalProgramCount => programs.length;
-
   /// 활성화된 프로그램 개수
   int get enabledProgramCount => programs.where((p) => p.enabled).length;
-
-  /// 유효한 프로그램만 필터링 (파일이 존재하는 프로그램)
-  List<LaunchProgram> get validPrograms {
-    return programs.where((p) => p.isValid).toList();
-  }
-
-  /// 무효한 프로그램 목록 (파일이 존재하지 않는 프로그램)
-  List<LaunchProgram> get invalidPrograms {
-    return programs.where((p) => !p.isValid).toList();
-  }
 
   /// 프로그램 추가
   LaunchManagerSettings addProgram(LaunchProgram program) {
@@ -114,18 +88,11 @@ class LaunchManagerSettings {
   /// 설정 복사 (일부 속성 변경)
   LaunchManagerSettings copyWith({
     bool? autoLaunchEnabled,
-    bool? showNotifications,
-    bool? retryOnFailure,
-    bool? requireConfirmationForNewPrograms,
     List<LaunchProgram>? programs,
     int? version,
   }) {
     return LaunchManagerSettings(
       autoLaunchEnabled: autoLaunchEnabled ?? this.autoLaunchEnabled,
-      showNotifications: showNotifications ?? this.showNotifications,
-      retryOnFailure: retryOnFailure ?? this.retryOnFailure,
-      requireConfirmationForNewPrograms: requireConfirmationForNewPrograms ??
-          this.requireConfirmationForNewPrograms,
       programs: programs ?? this.programs,
       version: version ?? this.version,
     );
@@ -152,10 +119,6 @@ class LaunchManagerSettings {
     if (identical(this, other)) return true;
     return other is LaunchManagerSettings &&
         other.autoLaunchEnabled == autoLaunchEnabled &&
-        other.showNotifications == showNotifications &&
-        other.retryOnFailure == retryOnFailure &&
-        other.requireConfirmationForNewPrograms ==
-            requireConfirmationForNewPrograms &&
         _listEquals(other.programs, programs) &&
         other.version == version;
   }
@@ -164,9 +127,6 @@ class LaunchManagerSettings {
   int get hashCode {
     return Object.hash(
       autoLaunchEnabled,
-      showNotifications,
-      retryOnFailure,
-      requireConfirmationForNewPrograms,
       programs,
       version,
     );

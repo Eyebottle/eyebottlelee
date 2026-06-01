@@ -117,8 +117,6 @@ class _SettingsTab extends StatelessWidget {
     required this.retentionDuration,
     required this.recordingProfile,
     required this.makeupGainDb,
-    this.startupStatusMismatch = false,
-    this.onShowStartupDiagnostics,
   });
 
   final Future<void> Function() onOpenSchedule;
@@ -140,8 +138,6 @@ class _SettingsTab extends StatelessWidget {
   final Duration? retentionDuration;
   final RecordingQualityProfile recordingProfile;
   final double makeupGainDb;
-  final bool startupStatusMismatch;
-  final VoidCallback? onShowStartupDiagnostics;
 
   @override
   Widget build(BuildContext context) {
@@ -228,12 +224,6 @@ class _SettingsTab extends StatelessWidget {
                     : startMinimizedOnBoot
                         ? '켜짐 · 백그라운드'
                         : '켜짐 · 창 표시',
-                statusBadge: startupStatusMismatch
-                    ? _StartupStatusBadge(
-                        hasMismatch: true,
-                        onTap: onShowStartupDiagnostics,
-                      )
-                    : null,
                 onTap: onOpenStartup,
               ),
             ],
@@ -262,7 +252,6 @@ class SettingsDestination {
     required this.description,
     required this.onTap,
     this.statusText,
-    this.statusBadge,
     this.showcaseKey,
     this.showcaseDescription,
   });
@@ -272,7 +261,6 @@ class SettingsDestination {
   final String description;
   final Future<void> Function() onTap;
   final String? statusText;
-  final Widget? statusBadge;
   final GlobalKey? showcaseKey;
   final String? showcaseDescription;
 }
@@ -360,10 +348,6 @@ class _SettingsTile extends StatelessWidget {
                 ],
               ),
             ),
-            if (item.statusBadge != null) ...[
-              item.statusBadge!,
-              const SizedBox(width: 8),
-            ],
             if (item.statusText != null) ...[
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -516,50 +500,3 @@ class _LiveIndicatorState extends State<_LiveIndicator>
   }
 }
 
-/// Status badge for startup task showing sync state
-class _StartupStatusBadge extends StatelessWidget {
-  const _StartupStatusBadge({
-    required this.hasMismatch,
-    this.onTap,
-  });
-
-  final bool hasMismatch;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    if (!hasMismatch) return const SizedBox.shrink();
-
-    return Tooltip(
-      message: '자동 실행 설정이 OS와 동기화되지 않았습니다. 클릭하여 상세정보를 확인하세요.',
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-          decoration: BoxDecoration(
-            color: AppColors.warning.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: AppColors.warning.withValues(alpha: 0.3)),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.warning_amber_rounded,
-                  color: AppColors.warning, size: 14),
-              const SizedBox(width: 4),
-              Text(
-                '동기화 필요',
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.warning,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}

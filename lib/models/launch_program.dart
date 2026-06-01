@@ -16,7 +16,6 @@ class LaunchProgram {
     this.enabled = true,
     required this.order,
     this.lastExecuted,
-    this.requiresConfirmation = false,
   });
 
   final String id;
@@ -29,7 +28,6 @@ class LaunchProgram {
   final bool enabled;
   final int order;
   final DateTime? lastExecuted;
-  final bool requiresConfirmation;
 
   /// JSON에서 생성
   factory LaunchProgram.fromJson(Map<String, dynamic> json) {
@@ -46,7 +44,6 @@ class LaunchProgram {
       lastExecuted: json['lastExecuted'] != null
           ? DateTime.fromMillisecondsSinceEpoch(json['lastExecuted'] as int)
           : null,
-      requiresConfirmation: json['requiresConfirmation'] as bool? ?? false,
     );
   }
 
@@ -63,7 +60,6 @@ class LaunchProgram {
       'enabled': enabled,
       'order': order,
       'lastExecuted': lastExecuted?.millisecondsSinceEpoch,
-      'requiresConfirmation': requiresConfirmation,
     };
   }
 
@@ -75,11 +71,6 @@ class LaunchProgram {
     } catch (e) {
       return false;
     }
-  }
-
-  /// 바로가기(.lnk) 파일인지 확인
-  bool get isShortcut {
-    return path.toLowerCase().endsWith('.lnk');
   }
 
   /// 프로그램 이름을 경로에서 자동 추출
@@ -104,21 +95,6 @@ class LaunchProgram {
     }
   }
 
-  /// 배치 파일(.bat, .cmd)인지 확인
-  bool get isBatchFile {
-    final extension = path.toLowerCase();
-    return extension.endsWith('.bat') || extension.endsWith('.cmd');
-  }
-
-  /// 실행 파일인지 확인 (.exe, .bat, .cmd, .lnk)
-  bool get isExecutable {
-    final extension = path.toLowerCase();
-    return extension.endsWith('.exe') ||
-        extension.endsWith('.bat') ||
-        extension.endsWith('.cmd') ||
-        extension.endsWith('.lnk');
-  }
-
   /// 프로그램 정보 복사 (일부 속성 변경)
   ///
   /// nullable 필드(workingDirectory, lastExecuted)를 명시적으로 null로
@@ -136,7 +112,6 @@ class LaunchProgram {
     int? order,
     DateTime? lastExecuted,
     bool clearLastExecuted = false,
-    bool? requiresConfirmation,
   }) {
     return LaunchProgram(
       id: id ?? this.id,
@@ -151,7 +126,6 @@ class LaunchProgram {
       order: order ?? this.order,
       lastExecuted:
           clearLastExecuted ? null : (lastExecuted ?? this.lastExecuted),
-      requiresConfirmation: requiresConfirmation ?? this.requiresConfirmation,
     );
   }
 

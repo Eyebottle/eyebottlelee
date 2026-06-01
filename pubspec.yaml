@@ -28,8 +28,8 @@ dependencies:
   desktop_drop: ^0.6.0
   # launch_at_startup 제거: MSIX 샌드박스에서 PowerShell 크래시 유발
   # Windows StartupTask는 MSIX manifest로 직접 관리
-  permission_handler: ^11.3.1
-  flutter_local_notifications: ^17.2.2
+  # (permission_handler 제거: 미사용 — 마이크 권한은 record 패키지가 직접 처리)
+  # (flutter_local_notifications 제거: 17.x는 Windows 미지원 — NotificationService는 로그 stub)
   # Windows 패키지(MSIX/Store) 환경 정보 조회용 (PackageFamilyName)
   win32: ^5.7.2
   ffi: ^2.1.3
