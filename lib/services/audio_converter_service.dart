@@ -58,6 +58,10 @@ class AudioConverterService {
   bool _isConverting = false;
   final LoggingService _logging = LoggingService();
 
+  /// 현재 실행 중인 ffmpeg 프로세스. 타임아웃·취소·앱 종료 시 강제 종료하기 위해
+  /// 핸들을 보유한다(Process.run은 핸들을 주지 않아 좀비가 됐었다).
+  Process? _activeProcess;
+
   // ffmpeg 경로 캐싱
   String? _ffmpegPath;
   bool _ffmpegChecked = false;
@@ -183,20 +187,48 @@ class AudioConverterService {
       _logging.debug('ffmpeg 명령: $ffmpegPath ${args.join(" ")}');
 
       // ffmpeg 프로세스 실행
-      // 타임아웃을 두지 않으면 ffmpeg가 멈췄을 때 변환 큐 전체가 영구히 정지한다.
-      // (5분 초과 시 TimeoutException → 아래 catch에서 처리, 큐는 계속 진행)
+      // Process.run().timeout()은 await만 끊을 뿐 ffmpeg를 종료하지 못해, 멈춘
+      // 프로세스가 입력 WAV 핸들을 쥔 채 분리 실행되는 좀비가 됐다. Process.start로
+      // 핸들을 보유하고, 타임아웃(또는 취소/앱 종료) 시 직접 kill한다.
       final stopwatch = Stopwatch()..start();
-      final result = await Process.run(
+      final process = await Process.start(
         ffmpegPath,
         args,
         runInShell: false,
-      ).timeout(const Duration(minutes: 5));
+      );
+      _activeProcess = process;
+
+      // 파이프 버퍼가 가득 차 ffmpeg가 블록되지 않도록 출력 스트림을 항상 소비한다.
+      // stdout은 흘려보내고, stderr만 진단용으로 수집한다.
+      final stdoutDrain = process.stdout.drain<void>();
+      final stderrFuture =
+          process.stderr.transform(systemEncoding.decoder).join();
+
+      int? exitCode;
+      bool timedOut = false;
+      try {
+        exitCode = await process.exitCode.timeout(const Duration(minutes: 5));
+      } on TimeoutException {
+        timedOut = true;
+        _logging.error('ffmpeg 변환 5분 초과 — 프로세스를 강제 종료합니다');
+        process.kill();
+        exitCode = await process.exitCode; // 종료 코드 회수(좀비 방지)
+      } finally {
+        _activeProcess = null;
+      }
+
+      // 스트림 소비가 끝날 때까지 대기(핸들 누수 방지)
+      await stdoutDrain;
+      final stderrText = await stderrFuture;
       stopwatch.stop();
 
-      if (result.exitCode != 0) {
+      if (timedOut || exitCode != 0) {
+        final tail = stderrText.length > 2000
+            ? stderrText.substring(stderrText.length - 2000)
+            : stderrText;
         _logging.error(
-          'ffmpeg 실패 (exit code: ${result.exitCode})\n'
-          'stderr: ${result.stderr}',
+          'ffmpeg 실패 (timedOut=$timedOut, exit code: $exitCode)\n'
+          'stderr: $tail',
         );
         return null;
       }
@@ -391,6 +423,14 @@ class AudioConverterService {
           task.completer.complete(null);
         }
       }
+    }
+
+    // 실행 중인 ffmpeg가 있으면 강제 종료한다(앱 종료 시 좀비/입력 파일 핸들 점유 방지).
+    final active = _activeProcess;
+    if (active != null) {
+      _logging.info('실행 중인 ffmpeg 변환을 종료합니다');
+      active.kill();
+      _activeProcess = null;
     }
   }
 

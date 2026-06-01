@@ -4,6 +4,7 @@ import 'package:record/record.dart';
 
 import '../../services/auto_launch_service.dart';
 import '../../services/settings_service.dart';
+import '../../services/logging_service.dart';
 import '../../models/recording_profile.dart';
 import 'startup_diagnostics_section.dart';
 
@@ -576,20 +577,34 @@ class _AdvancedSettingsDialogState extends State<AdvancedSettingsDialog> {
 
     // v1.3.16: WinRT StartupTask API로 자동 실행 제어
     final autoLaunchService = AutoLaunchService();
+    bool startupTaskFailed = false;
     try {
       if (_launchAtStartup) {
         await autoLaunchService.enable();
       } else {
         await autoLaunchService.disable();
       }
-    } catch (e) {
-      // StartupTask API 호출 실패해도 나머지 설정은 저장
-      debugPrint('StartupTask API error: $e');
+    } catch (e, st) {
+      // StartupTask API 호출이 실패해도 나머지 설정은 저장한다. 다만 debugPrint는
+      // 릴리스에서 제거되어 프로덕션에 흔적이 남지 않으므로, OS 상태가 실제로는
+      // 안 바뀌었는데 사용자가 '저장됨'으로 오인하지 않도록 로그를 남기고 아래에서
+      // 에러를 사용자에게 노출한다.
+      startupTaskFailed = true;
+      LoggingService().error('Windows 시작(StartupTask) 설정 적용 실패',
+          error: e, stackTrace: st);
     }
 
-    if (mounted) {
-      Navigator.of(context).pop('saved');
+    if (!mounted) return;
+    if (startupTaskFailed) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('⚠️ Windows 시작 설정을 적용하지 못했습니다. (다른 설정은 저장됨)'),
+          backgroundColor: Colors.redAccent,
+          duration: Duration(seconds: 6),
+        ),
+      );
     }
+    Navigator.of(context).pop('saved');
   }
 }
 

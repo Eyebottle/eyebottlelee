@@ -99,8 +99,12 @@ class _LaunchManagerWidgetState extends State<LaunchManagerWidget> {
   }
 
   void _toggleProgramEnabled(String programId, bool enabled) {
-    final program = _settings.programs.firstWhere((p) => p.id == programId);
-    final updatedProgram = program.copyWith(enabled: enabled);
+    // orElse 없는 firstWhere는 id가 없으면 StateError를 던진다. 리스트와 위젯
+    // 트리가 일시적으로 어긋나면(동시 reload 등) 잡히지 않는 크래시가 되므로,
+    // 누락 id는 조용히 무시한다.
+    final idx = _settings.programs.indexWhere((p) => p.id == programId);
+    if (idx < 0) return;
+    final updatedProgram = _settings.programs[idx].copyWith(enabled: enabled);
 
     setState(() {
       _settings = _settings.updateProgram(updatedProgram);
@@ -186,7 +190,10 @@ class _LaunchManagerWidgetState extends State<LaunchManagerWidget> {
   }
 
   void _removeProgram(String programId) {
-    final program = _settings.programs.firstWhere((p) => p.id == programId);
+    // 누락 id로 인한 StateError 크래시 방지 (위 _toggleProgramEnabled 참고).
+    final idx = _settings.programs.indexWhere((p) => p.id == programId);
+    if (idx < 0) return;
+    final program = _settings.programs[idx];
 
     setState(() {
       _settings = _settings.removeProgram(programId);

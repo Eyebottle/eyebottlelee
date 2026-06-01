@@ -44,7 +44,12 @@ class SettingsService {
     try {
       final map = jsonDecode(jsonStr) as Map<String, dynamic>;
       return WeeklySchedule.fromJson(map);
-    } catch (_) {
+    } catch (e, st) {
+      // 저장된 스케줄 JSON이 손상된 경우. null을 반환하면 호출부가 '저장된 스케줄
+      // 없음'으로 보고 기본 스케줄(월-금 9-18)로 폴백하므로, 손상이 조용히 묻히지
+      // 않도록 로그를 남긴다(진단에서 '없음'과 '손상'을 구분 가능).
+      LoggingService().warning('저장된 주간 스케줄 JSON 파싱 실패, 기본 스케줄로 폴백',
+          error: e, stackTrace: st);
       return null;
     }
   }
@@ -124,8 +129,12 @@ class SettingsService {
       }
 
       await prefs.setString(_keyBootDecisionHistory, jsonEncode(history));
-    } catch (_) {
-      // 진단용 부가 기능이므로 실패해도 앱 동작에 영향 주지 않는다.
+    } catch (e, st) {
+      // 진단용 부가 기능이므로 실패해도 앱 동작에 영향을 주지 않는다(삼킴은 유지).
+      // 다만 이 경로는 과거 MSIX 컨테이너 SharedPreferences 쓰기가 실패했던 곳이라,
+      // 자동시작 오작동을 디버깅할 때 의존하는 부팅 이력이 흔적 없이 비는 일이 없도록
+      // 로그 한 줄은 남긴다.
+      LoggingService().warning('부팅 결정 이력 저장 실패', error: e, stackTrace: st);
     }
   }
 
