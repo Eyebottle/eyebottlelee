@@ -2,17 +2,22 @@
 
 브랜치: `feat/v1.3.18-launch-boot-refactor` (main 대비 다수 커밋, 미머지).
 
-## 1. 지금 상태: 빌드·검증 완료, MS Store 업로드 단계
+## 1. 지금 상태: ✅ MS Store 제출 완료 (2026-06-02, 인증/게시 대기)
 
-- `medical_recorder.msix` = **1.3.20.0** (Build 31), ffmpeg 번들 포함, 2026-06-02 빌드
+- `medical_recorder.msix` = **1.3.20.0** (Build 31), ffmpeg 번들 포함 — Partner Center 업로드·제출 완료
 - `flutter analyze` error 0 (info 3건은 사전 deprecation, 무관)
 - 단위 테스트 **22종** 통과 (async_lock / schedule_model / schedule_templates)
 - `flutter build windows --release` + `dart run msix:create` 성공
 - `scripts/preflight/verify-msix.ps1` 전 항목 OK (버전 1.3.20.0 / StartupTask /
-  capability / ffmpeg 181.6MB)
-- 업로드 경로:
+  capability / ffmpeg)
+- 업로드한 파일:
   `C:\ws-workspace\eyebottlelee\build\windows\x64\runner\Release\medical_recorder.msix`
 - 제출 프롬프트: `docs/MS-STORE-SUBMISSION-v1.3.20-BROWSER-CLAUDE-PROMPT.md`
+
+**게시 후 확인:** Store에서 업데이트 받은 뒤 — (1) 시간표 빠른설정 요일 정상(평일=월~금),
+12시간제 표시, 시간 칩 탭→선택기. (2) 앱 아이콘 선명(타일/검색). (3) 녹음 시작/정지/분할
+정상. (부팅·트레이는 1.3.19에서 미변경 → 재검증 불필요.) 개발 PC 비패키지 exe 미리보기로
+시간표·아이콘은 이미 확인함(2026-06-02).
 
 **버전 정책:** Store는 동일 버전 재업로드 차단 + revision(4번째)=0 강제. 1.3.19가
 게시됐으므로 build 자리를 올려 **1.3.20.0**. 다음엔 1.3.21.0 식.
