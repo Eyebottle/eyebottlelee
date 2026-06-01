@@ -11,6 +11,7 @@ import 'settings_service.dart';
 import 'logging_service.dart';
 import 'audio_converter_service.dart';
 import '../models/recording_profile.dart';
+import '../utils/async_lock.dart';
 
 class AudioService {
   final AudioRecorder _recorder = AudioRecorder();
@@ -18,6 +19,10 @@ class AudioService {
   Timer? _segmentTimer;
   final LoggingService _logging = LoggingService();
   final AudioConverterService _audioConverterService = AudioConverterService();
+
+  /// recorder 상태 전이(start/stop/세그먼트 분할)를 직렬화하는 락.
+  /// 타이머 분할과 사용자 정지가 인터리브되어 고아 녹음 세션이 생기는 경쟁을 막는다.
+  final AsyncLock _recorderLock = AsyncLock();
 
   bool _isRecording = false;
   bool _isDisposed = false; // dispose 여부 플래그
@@ -40,6 +45,12 @@ class AudioService {
   Function(DateTime startTime)? onRecordingStarted;
   Function(DateTime startTime, DateTime stopTime, Duration recordedDuration)?
       onRecordingStopped;
+
+  /// 녹음이 비정상 중단되었을 때 호출된다(예: 세그먼트 분할 후 재시작 실패).
+  /// recorder가 죽었는데 UI/트레이가 '녹음 중'을 계속 표시하면 임상의가 녹음되고
+  /// 있다고 오인해 진료 음성이 통째로 유실된다. 이 콜백으로 즉시 중단 상태로
+  /// 전이시키고 사용자에게 알린다.
+  Function(Object error)? onRecordingAborted;
 
   bool get isRecording => _isRecording;
   bool get vadEnabled => _vadEnabled;
@@ -109,7 +120,15 @@ class AudioService {
   }
 
   /// 녹음 시작
+  ///
+  /// recorder 상태 전이가 분할/정지와 인터리브되지 않도록 직렬화 락으로 감싼다.
   Future<void> startRecording(
+      {Duration segmentDuration = const Duration(minutes: 10)}) {
+    return _recorderLock.synchronized(
+        () => _startRecordingLocked(segmentDuration: segmentDuration));
+  }
+
+  Future<void> _startRecordingLocked(
       {Duration segmentDuration = const Duration(minutes: 10)}) async {
     _logging.info('🎙️ 녹음 시작 요청 (세그먼트 주기: ${segmentDuration.inMinutes}분)');
 
@@ -231,46 +250,31 @@ class AudioService {
   }
 
   /// 녹음 중지
-  Future<String?> stopRecording() async {
+  ///
+  /// recorder 상태 전이를 직렬화 락으로 감싼다. 진행 중인 세그먼트 분할이 있으면
+  /// 그것이 끝난 뒤에 정지가 실행되어, 분할 재시작과 정지가 인터리브되지 않는다.
+  Future<String?> stopRecording() {
+    // 새 분할이 큐잉되지 않도록 타이머는 락 밖에서 즉시 취소한다.
+    _segmentTimer?.cancel();
+    _segmentTimer = null;
+    return _recorderLock.synchronized(_stopRecordingLocked);
+  }
+
+  Future<String?> _stopRecordingLocked() async {
     _logging.info('⏹️ 녹음 중지 요청');
 
+    final stoppedAt = DateTime.now();
+    final startTime = _sessionStartTime;
+    final currentEncoder = _currentEncoder;
+    String? filePath;
+
     try {
-      final stoppedAt = DateTime.now();
-      final startTime = _sessionStartTime;
-      final currentEncoder = _currentEncoder;
-
-      // 1. 타이머 먼저 취소 (새 세그먼트 생성 방지)
-      _logging.info('🧹 타이머 정리 중...');
-      _segmentTimer?.cancel();
-      _logging.info('✅ 타이머 취소 완료');
-
-      // 2. 녹음 중지
+      // 녹음 중지
       _logging.info('🛑 녹음 중지 시도...');
-      final filePath = await _recorder.stop();
+      filePath = await _recorder.stop();
       _logging.info('✅ 녹음 중지 완료');
-      _isRecording = false;
-      _currentEncoder = null;
 
-      // 3. 스트림 정리
-      _logging.info('🧹 스트림 정리 중...');
-      _amplitudeSubscription?.cancel();
-      _logging.info('✅ 리소스 정리 완료');
-
-      // 4. 세션 통계
-      if (startTime != null) {
-        final duration = stoppedAt.difference(startTime);
-        _logging.info('📊 세션 통계:');
-        _logging.info('  - 시작 시각: ${startTime.toIso8601String()}');
-        _logging.info('  - 종료 시각: ${stoppedAt.toIso8601String()}');
-        _logging.info('  - 총 녹음 시간: ${_formatDuration(duration)}');
-
-        if (onRecordingStopped != null && duration > Duration.zero) {
-          onRecordingStopped!(startTime, stoppedAt, duration);
-        }
-      }
-      _sessionStartTime = null;
-
-      // 5. 파일 정보 및 WAV 변환
+      // 파일 정보 및 WAV 변환
       if (filePath != null) {
         _logging.info('📁 마지막 세그먼트: $filePath');
         final file = File(filePath);
@@ -293,9 +297,8 @@ class AudioService {
           unawaited(_scheduleWavConversion(filePath, skipRecordingCheck: true));
         }
       }
-      _currentSegmentStartedAt = null;
 
-      // 6. 보관 정책 적용 (백그라운드 — 녹음 중지 반환을 막지 않음. splitSegment와 동일)
+      // 보관 정책 적용 (백그라운드 — 녹음 중지 반환을 막지 않음)
       _logging.info('🧹 보관 정책 적용 중...');
       unawaited(_pruneOldFiles());
 
@@ -306,6 +309,36 @@ class AudioService {
       _logging.error('에러 타입: ${e.runtimeType}');
       _logging.error('에러 메시지: $e');
       throw Exception('녹음 중지 실패: $e');
+    } finally {
+      // stop()의 성공/실패와 무관하게 세션 통계를 통지하고 상태를 정리한다.
+      // stop()이 throw해도 recorder는 멈춘 것으로 간주하고 UI를 정지 상태로 되돌린다.
+      // (이렇게 하지 않으면 stop 실패 시 UI가 '녹음 중'에 머문 채 세션 기록도 유실된다.)
+      if (startTime != null) {
+        final duration = stoppedAt.difference(startTime);
+        _logging.info('📊 세션 통계: ${_formatDuration(duration)}');
+        if (onRecordingStopped != null && duration > Duration.zero) {
+          // 콜백이 예외를 던져도 정리/원래 예외를 가리지 않도록 보호한다.
+          try {
+            onRecordingStopped!(startTime, stoppedAt, duration);
+          } catch (e, st) {
+            _logging.error('onRecordingStopped 콜백 실패', error: e, stackTrace: st);
+          }
+        }
+      }
+
+      // 상태/리소스 정리는 항상 보장한다(끼인 상태·스트림 누수 방지).
+      _isRecording = false;
+      _currentEncoder = null;
+      _amplitudeSubscription?.cancel();
+      _amplitudeSubscription = null;
+      _resumeTimer?.cancel();
+      _resumeTimer = null;
+      _segmentTimer?.cancel();
+      _segmentTimer = null;
+      _sessionStartTime = null;
+      _currentSegmentStartedAt = null;
+      _pausedByVad = false;
+      _silenceMs = 0;
     }
   }
 
@@ -329,11 +362,19 @@ class AudioService {
   }
 
   /// 파일 세그먼트 분할
+  ///
+  /// recorder 상태 전이를 직렬화 락으로 감싼다. 정지/시작과 인터리브되지 않는다.
   Future<void> splitSegment() async {
-    if (!_isRecording) return;
+    if (!_isRecording || _isDisposed) return;
+    await _recorderLock.synchronized(_splitSegmentLocked);
+  }
+
+  Future<void> _splitSegmentLocked() async {
+    // 락 대기 사이에 정지/dispose 됐을 수 있으니 재확인.
+    if (!_isRecording || _isDisposed) return;
 
     try {
-      // 현재 녹음 중지
+      // 현재 세그먼트 중지
       final segmentStopTime = DateTime.now();
       final completedEncoder = _currentEncoder;
       final completedPath = await _recorder.stop();
@@ -353,6 +394,13 @@ class AudioService {
             encoder: completedEncoder,
           ),
         );
+      }
+
+      // 재시작 전 재확인: 분할 도중 정지/dispose 됐으면 재시작하지 않는다.
+      // (재시작하면 UI는 정지인데 마이크는 계속 캡처하는 고아 세션이 생긴다.)
+      if (!_isRecording || _isDisposed) {
+        _logging.info('세그먼트 분할 중 녹음 중지 감지 — 재시작하지 않음');
+        return;
       }
 
       // 새로운 세그먼트로 즉시 재시작
@@ -377,8 +425,48 @@ class AudioService {
 
       // 보관 정책 적용 (백그라운드)
       unawaited(_pruneOldFiles());
-    } catch (e) {
-      _logging.error('세그먼트 분할 실패', error: e);
+    } catch (e, st) {
+      // 재시작 실패 → recorder가 죽었다. '녹음 중' 상태를 유지하면 무음으로 진료
+      // 음성이 통째로 유실된다. 명확한 중단 상태로 전이하고 UI/트레이에 통지한다.
+      await _abortRecording(e, st);
+    }
+  }
+
+  /// 녹음을 비정상 중단 상태로 전이한다.
+  ///
+  /// 세그먼트 분할 후 재시작이 실패하면 recorder가 죽어 더 이상 오디오가 기록되지
+  /// 않는다. 이때 모든 상태/타이머/스트림을 정리하고 [onRecordingAborted]로 UI·트레이에
+  /// 통지해, '녹음 중' 표시가 유지된 채 음성이 조용히 유실되는 것을 막는다.
+  Future<void> _abortRecording(Object error, StackTrace stackTrace) async {
+    _logging.error('세그먼트 재시작 실패 — 녹음을 중단합니다',
+        error: error, stackTrace: stackTrace);
+
+    _isRecording = false;
+    _currentEncoder = null;
+    _segmentTimer?.cancel();
+    _segmentTimer = null;
+    _amplitudeSubscription?.cancel();
+    _amplitudeSubscription = null;
+    _resumeTimer?.cancel();
+    _resumeTimer = null;
+    _sessionStartTime = null;
+    _currentSegmentStartedAt = null;
+    _pausedByVad = false;
+    _silenceMs = 0;
+
+    // recorder가 어중간한 상태일 수 있으니 정지 시도(실패는 무시).
+    try {
+      await _recorder.stop();
+    } catch (_) {}
+
+    if (!_isDisposed) {
+      // 콜백 예외가 fire-and-forget 분할 타이머를 통해 unhandled async error로
+      // 새지 않도록 보호한다.
+      try {
+        onRecordingAborted?.call(error);
+      } catch (e, st) {
+        _logging.error('onRecordingAborted 콜백 실패', error: e, stackTrace: st);
+      }
     }
   }
 

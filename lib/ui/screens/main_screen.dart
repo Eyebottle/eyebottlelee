@@ -230,6 +230,33 @@ class _MainScreenState extends State<MainScreen>
       await _recordSessionDuration(startTime, stopTime);
     };
 
+    // 녹음이 비정상 중단된 경우(세그먼트 재시작 실패 등): UI/트레이를 즉시 정지
+    // 상태로 되돌리고 사용자에게 경고한다. 이렇게 하지 않으면 '녹음 중' 표시가
+    // 유지되어 임상의가 녹음되고 있다고 오인한 채 진료 음성이 유실된다.
+    _audioService.onRecordingAborted = (error) {
+      _loggingService.error('녹음 비정상 중단', error: error);
+      _sessionTicker?.cancel();
+      _sessionTicker = null;
+      if (mounted) {
+        setState(() {
+          _currentSessionStart = null;
+          _isRecording = false;
+        });
+      }
+      unawaited(_trayService.setRecordingState(false));
+      if (!mounted) return;
+      Future.microtask(() {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('⚠️ 녹음이 중단되었습니다. 마이크와 저장 공간을 확인하고 다시 시작해 주세요.'),
+            backgroundColor: Colors.redAccent,
+            duration: Duration(seconds: 8),
+          ),
+        );
+      });
+    };
+
     _scheduleService.onRecordingStart =
         () => _startRecording(showFeedback: false);
     _scheduleService.onRecordingStop =
