@@ -222,18 +222,21 @@ class DayDetailEditor extends StatelessWidget {
   }
 
   Widget _buildSplitEditor(DaySchedule schedule) {
-    // 시간대 기반으로 오전/오후 세션 구분
-    // 오전: 종료 시간이 14시 이전인 세션
-    // 오후: 시작 시간이 12시 이후인 세션
+    // 세션을 시작 시각 기준(정오 이전=오전, 정오 이후=오후)으로 '전수' 분류한다.
+    //
+    // 이전 휴리스틱(종료<14시=오전, 시작>=12시=오후)은 9:00-14:30 같은 정상 오전
+    // 세션을 어느 분기에도 못 넣어, 편집 시 onScheduleChanged가 그 세션을 빠뜨린 채
+    // 저장하며 유효한 진료 시간이 조용히 삭제됐다. start<정오 규칙은 모든 세션을
+    // 반드시 한 버킷에 넣으므로(오전/오후 단독 케이스 포함) 누락이 발생하지 않는다.
+    // 같은 버킷의 첫 세션을 유지한다(??=).
     WorkingSession? morningSession;
     WorkingSession? afternoonSession;
 
     for (final session in schedule.sessions) {
-      if (session.end.hour < 14 ||
-          (session.end.hour == 14 && session.end.minute == 0)) {
-        morningSession = session;
-      } else if (session.start.hour >= 12) {
-        afternoonSession = session;
+      if (session.start.hour < 12) {
+        morningSession ??= session;
+      } else {
+        afternoonSession ??= session;
       }
     }
 
