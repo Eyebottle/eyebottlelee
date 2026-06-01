@@ -130,4 +130,33 @@ void main() {
       }
     });
   });
+
+  group('기본 스케줄(defaultSchedule) — 요일 매핑/일관성', () {
+    final def = WeeklySchedule.defaultSchedule();
+
+    test('일요일(0)은 휴무', () {
+      expect(def.weekDays[0]!.isWorkingDay, false);
+    });
+
+    test('월~금(1-5)은 모두 동일한 오전/오후 분리 (09-13 / 14-18, 점심 13-14)', () {
+      for (int d = 1; d <= 5; d++) {
+        final day = def.weekDays[d]!;
+        expect(day.isWorkingDay, true, reason: 'day $d 근무여부');
+        expect(day.mode, ScheduleMode.split, reason: 'day $d 분리모드');
+        expect(day.sessions.length, 2, reason: 'day $d 세션 수');
+        expect(day.sessions[0].startMinutes, 9 * 60, reason: 'day $d 오전 시작');
+        expect(day.sessions[0].endMinutes, 13 * 60, reason: 'day $d 오전 종료');
+        expect(day.sessions[1].startMinutes, 14 * 60, reason: 'day $d 오후 시작');
+        expect(day.sessions[1].endMinutes, 18 * 60, reason: 'day $d 오후 종료');
+      }
+    });
+
+    test('토요일(6)은 09-13 반일', () {
+      final sat = def.weekDays[6]!;
+      expect(sat.isWorkingDay, true);
+      expect(sat.sessions.length, 1);
+      expect(sat.sessions[0].startMinutes, 9 * 60);
+      expect(sat.sessions[0].endMinutes, 13 * 60);
+    });
+  });
 }

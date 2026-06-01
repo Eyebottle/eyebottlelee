@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../models/schedule_model.dart';
+import '../../../utils/time_format.dart';
 import '../../style/app_colors.dart';
 import '../../style/app_typography.dart';
 import '../../style/app_elevation.dart';
@@ -219,7 +220,7 @@ class WeeklyCalendarGrid extends StatelessWidget {
       final session = sessions.first;
       return Center(
         child: Text(
-          '${_formatTime(session.start)} - ${_formatTime(session.end)}',
+          '${formatHm12(session.start)} - ${formatHm12(session.end)}',
           style: AppTypography.bodyMedium.copyWith(
             color: AppColors.textPrimary,
             fontWeight: FontWeight.w600,
@@ -236,7 +237,7 @@ class WeeklyCalendarGrid extends StatelessWidget {
         children: [
           // 오전 진료
           Text(
-            '${_formatTime(sessions[0].start)} - ${_formatTime(sessions[0].end)}',
+            '${formatHm12(sessions[0].start)} - ${formatHm12(sessions[0].end)}',
             style: AppTypography.bodySmall.copyWith(
               color: AppColors.textPrimary,
               fontWeight: FontWeight.w600,
@@ -247,7 +248,7 @@ class WeeklyCalendarGrid extends StatelessWidget {
           // 오후 진료
           if (sessions.length > 1)
             Text(
-              '${_formatTime(sessions[1].start)} - ${_formatTime(sessions[1].end)}',
+              '${formatHm12(sessions[1].start)} - ${formatHm12(sessions[1].end)}',
               style: AppTypography.bodySmall.copyWith(
                 color: AppColors.textPrimary,
                 fontWeight: FontWeight.w600,
@@ -259,11 +260,4 @@ class WeeklyCalendarGrid extends StatelessWidget {
     }
   }
 
-  String _formatTime(TimeOfDay time) {
-    final hour =
-        time.hour == 0 ? 12 : (time.hour > 12 ? time.hour - 12 : time.hour);
-    final minute = time.minute.toString().padLeft(2, '0');
-    final period = time.hour < 12 ? '오전' : '오후';
-    return '$period $hour:$minute';
-  }
 }

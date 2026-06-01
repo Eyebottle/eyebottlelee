@@ -34,62 +34,27 @@ class WeeklySchedule {
     return json;
   }
 
-  /// 기본 스케줄 생성 (월-금 9-18시, 점심 12-13시)
+  /// 기본 스케줄 생성 — 흔한 한국 의원 패턴.
+  /// 월~금 09:00-13:00 / 14:00-18:00(점심 13-14시), 토 09:00-13:00 반일, 일 휴무.
+  /// (요일 인덱스: 0=일, 1=월 … 6=토. 과거엔 월요일만 점심이 13-14, 화~금은 12-13으로 어긋났음.)
   factory WeeklySchedule.defaultSchedule() {
+    const morning = WorkingSession(
+      start: TimeOfDay(hour: 9, minute: 0),
+      end: TimeOfDay(hour: 13, minute: 0),
+    );
+    const afternoon = WorkingSession(
+      start: TimeOfDay(hour: 14, minute: 0),
+      end: TimeOfDay(hour: 18, minute: 0),
+    );
     return WeeklySchedule(
       weekDays: {
-        0: DaySchedule.rest(), // 일요일
-        1: DaySchedule.split(
-          morning: WorkingSession(
-            start: const TimeOfDay(hour: 9, minute: 0),
-            end: const TimeOfDay(hour: 13, minute: 0),
-          ),
-          afternoon: WorkingSession(
-            start: const TimeOfDay(hour: 14, minute: 0),
-            end: const TimeOfDay(hour: 18, minute: 0),
-          ),
-        ),
-        2: DaySchedule.split(
-          morning: WorkingSession(
-            start: const TimeOfDay(hour: 9, minute: 0),
-            end: const TimeOfDay(hour: 12, minute: 0),
-          ),
-          afternoon: WorkingSession(
-            start: const TimeOfDay(hour: 13, minute: 0),
-            end: const TimeOfDay(hour: 18, minute: 0),
-          ),
-        ),
-        3: DaySchedule.split(
-          morning: WorkingSession(
-            start: const TimeOfDay(hour: 9, minute: 0),
-            end: const TimeOfDay(hour: 12, minute: 0),
-          ),
-          afternoon: WorkingSession(
-            start: const TimeOfDay(hour: 13, minute: 0),
-            end: const TimeOfDay(hour: 18, minute: 0),
-          ),
-        ),
-        4: DaySchedule.split(
-          morning: WorkingSession(
-            start: const TimeOfDay(hour: 9, minute: 0),
-            end: const TimeOfDay(hour: 12, minute: 0),
-          ),
-          afternoon: WorkingSession(
-            start: const TimeOfDay(hour: 13, minute: 0),
-            end: const TimeOfDay(hour: 18, minute: 0),
-          ),
-        ),
-        5: DaySchedule.split(
-          morning: WorkingSession(
-            start: const TimeOfDay(hour: 9, minute: 0),
-            end: const TimeOfDay(hour: 12, minute: 0),
-          ),
-          afternoon: WorkingSession(
-            start: const TimeOfDay(hour: 13, minute: 0),
-            end: const TimeOfDay(hour: 18, minute: 0),
-          ),
-        ),
-        6: DaySchedule.rest(), // 토요일
+        0: DaySchedule.rest(), // 일요일 휴무
+        for (int d = 1; d <= 5; d++) // 월~금: 오전/오후 분리
+          d: DaySchedule.split(morning: morning, afternoon: afternoon),
+        6: DaySchedule.fullDay(
+          start: const TimeOfDay(hour: 9, minute: 0),
+          end: const TimeOfDay(hour: 13, minute: 0),
+        ), // 토요일 반일
       },
     );
   }

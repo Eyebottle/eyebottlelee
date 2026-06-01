@@ -1083,17 +1083,10 @@ class _MainScreenState extends State<MainScreen>
       return const ['오늘은 녹음 일정이 없습니다.'];
     }
 
-    final isSplit = daySchedule.sessions.length > 1;
+    // 12시간제 표시에 이미 오전/오후가 들어가므로 별도 접두사는 생략한다.
     final lines = <String>[];
-    for (var i = 0; i < daySchedule.sessions.length; i++) {
-      final session = daySchedule.sessions[i];
-      final prefix = isSplit
-          ? (session.start.hour < 12
-              ? '오전'
-              : (session.start.hour < 18 ? '오후' : '세션 ${i + 1}'))
-          : '세션';
-      lines.add(
-          '$prefix: ${formatHm(session.start)} - ${formatHm(session.end)}');
+    for (final session in daySchedule.sessions) {
+      lines.add('${formatHm12(session.start)} - ${formatHm12(session.end)}');
     }
     return lines;
   }
