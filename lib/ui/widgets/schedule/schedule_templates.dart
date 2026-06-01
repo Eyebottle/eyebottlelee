@@ -19,35 +19,31 @@ class ScheduleTemplate {
   final IconData icon;
   final WeeklySchedule schedule;
 
+  // ── 요일 인덱스 규약: 0=일, 1=월, 2=화, 3=수, 4=목, 5=금, 6=토 ──
+  // (schedule_model.weekDays / schedule_service 크론과 동일. 과거 템플릿이 0=월로
+  //  착각해 "금요일 휴무·일요일 근무"로 어긋났던 버그를 이 헬퍼로 바로잡는다.)
+
+  /// 월~금(1~5)에 [build]로 만든 근무일을 넣고, 일(0)·토(6)는 휴무로 둔 주간 맵.
+  /// build를 요일마다 새로 호출해 세션 리스트를 공유하지 않는다.
+  static Map<int, DaySchedule> _mondayToFriday(DaySchedule Function() build) => {
+        0: DaySchedule.rest(),
+        for (int day = 1; day <= 5; day++) day: build(),
+        6: DaySchedule.rest(),
+      };
+
+  static DaySchedule _fullDay(int startH, int endH) => DaySchedule.fullDay(
+        start: TimeOfDay(hour: startH, minute: 0),
+        end: TimeOfDay(hour: endH, minute: 0),
+      );
+
   /// 평일만 근무 (월~금 09:00-18:00)
   static ScheduleTemplate get weekdaysOnly => ScheduleTemplate(
         name: '평일만 근무',
         description: '월~금 09:00-18:00',
         icon: Icons.business_center,
-        schedule: WeeklySchedule(weekDays: {
-          0: DaySchedule.fullDay(
-            start: const TimeOfDay(hour: 9, minute: 0),
-            end: const TimeOfDay(hour: 18, minute: 0),
-          ),
-          1: DaySchedule.fullDay(
-            start: const TimeOfDay(hour: 9, minute: 0),
-            end: const TimeOfDay(hour: 18, minute: 0),
-          ),
-          2: DaySchedule.fullDay(
-            start: const TimeOfDay(hour: 9, minute: 0),
-            end: const TimeOfDay(hour: 18, minute: 0),
-          ),
-          3: DaySchedule.fullDay(
-            start: const TimeOfDay(hour: 9, minute: 0),
-            end: const TimeOfDay(hour: 18, minute: 0),
-          ),
-          4: DaySchedule.fullDay(
-            start: const TimeOfDay(hour: 9, minute: 0),
-            end: const TimeOfDay(hour: 18, minute: 0),
-          ),
-          5: DaySchedule.rest(),
-          6: DaySchedule.rest(),
-        }),
+        schedule: WeeklySchedule(
+          weekDays: _mondayToFriday(() => _fullDay(9, 18)),
+        ),
       );
 
   /// 반나절 진료 (월~금 09:00-13:00)
@@ -55,30 +51,9 @@ class ScheduleTemplate {
         name: '반나절 진료',
         description: '월~금 09:00-13:00',
         icon: Icons.wb_sunny_outlined,
-        schedule: WeeklySchedule(weekDays: {
-          0: DaySchedule.fullDay(
-            start: const TimeOfDay(hour: 9, minute: 0),
-            end: const TimeOfDay(hour: 13, minute: 0),
-          ),
-          1: DaySchedule.fullDay(
-            start: const TimeOfDay(hour: 9, minute: 0),
-            end: const TimeOfDay(hour: 13, minute: 0),
-          ),
-          2: DaySchedule.fullDay(
-            start: const TimeOfDay(hour: 9, minute: 0),
-            end: const TimeOfDay(hour: 13, minute: 0),
-          ),
-          3: DaySchedule.fullDay(
-            start: const TimeOfDay(hour: 9, minute: 0),
-            end: const TimeOfDay(hour: 13, minute: 0),
-          ),
-          4: DaySchedule.fullDay(
-            start: const TimeOfDay(hour: 9, minute: 0),
-            end: const TimeOfDay(hour: 13, minute: 0),
-          ),
-          5: DaySchedule.rest(),
-          6: DaySchedule.rest(),
-        }),
+        schedule: WeeklySchedule(
+          weekDays: _mondayToFriday(() => _fullDay(9, 13)),
+        ),
       );
 
   /// 오전·오후 분리 (월~금 09:00-13:00, 14:00-18:00)
@@ -86,59 +61,37 @@ class ScheduleTemplate {
         name: '오전·오후 분리',
         description: '월~금 09:00-13:00, 14:00-18:00',
         icon: Icons.schedule,
-        schedule: WeeklySchedule(weekDays: {
-          for (int i = 0; i < 5; i++)
-            i: DaySchedule(
+        schedule: WeeklySchedule(
+          weekDays: _mondayToFriday(
+            () => DaySchedule(
               isWorkingDay: true,
               mode: ScheduleMode.split,
               sessions: [
-                WorkingSession(
-                  start: const TimeOfDay(hour: 9, minute: 0),
-                  end: const TimeOfDay(hour: 13, minute: 0),
+                const WorkingSession(
+                  start: TimeOfDay(hour: 9, minute: 0),
+                  end: TimeOfDay(hour: 13, minute: 0),
                 ),
-                WorkingSession(
-                  start: const TimeOfDay(hour: 14, minute: 0),
-                  end: const TimeOfDay(hour: 18, minute: 0),
+                const WorkingSession(
+                  start: TimeOfDay(hour: 14, minute: 0),
+                  end: TimeOfDay(hour: 18, minute: 0),
                 ),
               ],
             ),
-          5: DaySchedule.rest(),
-          6: DaySchedule.rest(),
-        }),
+          ),
+        ),
       );
 
   /// 토요일 반일 (월~금 종일, 토 오전만)
   static ScheduleTemplate get saturdayHalf => ScheduleTemplate(
         name: '토요일 반일',
-        description: '월~금 종일, 토 09:00-13:00',
+        description: '월~금 09:00-18:00, 토 09:00-13:00',
         icon: Icons.weekend,
-        schedule: WeeklySchedule(weekDays: {
-          0: DaySchedule.fullDay(
-            start: const TimeOfDay(hour: 9, minute: 0),
-            end: const TimeOfDay(hour: 18, minute: 0),
-          ),
-          1: DaySchedule.fullDay(
-            start: const TimeOfDay(hour: 9, minute: 0),
-            end: const TimeOfDay(hour: 18, minute: 0),
-          ),
-          2: DaySchedule.fullDay(
-            start: const TimeOfDay(hour: 9, minute: 0),
-            end: const TimeOfDay(hour: 18, minute: 0),
-          ),
-          3: DaySchedule.fullDay(
-            start: const TimeOfDay(hour: 9, minute: 0),
-            end: const TimeOfDay(hour: 18, minute: 0),
-          ),
-          4: DaySchedule.fullDay(
-            start: const TimeOfDay(hour: 9, minute: 0),
-            end: const TimeOfDay(hour: 18, minute: 0),
-          ),
-          5: DaySchedule.fullDay(
-            start: const TimeOfDay(hour: 9, minute: 0),
-            end: const TimeOfDay(hour: 13, minute: 0),
-          ),
-          6: DaySchedule.rest(),
-        }),
+        schedule: WeeklySchedule(
+          weekDays: {
+            ..._mondayToFriday(() => _fullDay(9, 18)),
+            6: _fullDay(9, 13), // 토요일 반일 (일요일은 휴무 유지)
+          },
+        ),
       );
 
   /// 모든 템플릿 목록
