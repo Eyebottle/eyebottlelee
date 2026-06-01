@@ -36,70 +36,73 @@ class ScheduleTemplate {
         end: TimeOfDay(hour: endH, minute: 0),
       );
 
-  /// 평일만 근무 (월~금 09:00-18:00)
+  /// 오전/오후로 나뉜 근무일 (점심시간은 두 구간 사이로 빠진다).
+  static DaySchedule _split(
+          int mStartH, int mEndH, int aStartH, int aEndH) =>
+      DaySchedule(
+        isWorkingDay: true,
+        mode: ScheduleMode.split,
+        sessions: [
+          WorkingSession(
+            start: TimeOfDay(hour: mStartH, minute: 0),
+            end: TimeOfDay(hour: mEndH, minute: 0),
+          ),
+          WorkingSession(
+            start: TimeOfDay(hour: aStartH, minute: 0),
+            end: TimeOfDay(hour: aEndH, minute: 0),
+          ),
+        ],
+      );
+
+  /// 평일만 근무 (월~금 09:00-13:00 / 14:00-18:00, 점심 13-14)
   static ScheduleTemplate get weekdaysOnly => ScheduleTemplate(
         name: '평일만 근무',
-        description: '월~금 09:00-18:00',
+        description: '월~금 09:00-13:00, 14:00-18:00',
         icon: Icons.business_center,
         schedule: WeeklySchedule(
-          weekDays: _mondayToFriday(() => _fullDay(9, 18)),
+          weekDays: _mondayToFriday(() => _split(9, 13, 14, 18)),
         ),
       );
 
-  /// 반나절 진료 (월~금 09:00-13:00)
+  /// 평일 + 토요일 반일 (월~금 점심분리, 토 오전 반일)
+  static ScheduleTemplate get weekdaysWithSaturday => ScheduleTemplate(
+        name: '평일 + 토요일 반일',
+        description: '월~금 09:00-18:00(점심 13-14), 토 09:00-13:00',
+        icon: Icons.weekend,
+        schedule: WeeklySchedule(
+          weekDays: {
+            ..._mondayToFriday(() => _split(9, 13, 14, 18)),
+            6: _fullDay(9, 13), // 토요일 반일 (일요일은 휴무 유지)
+          },
+        ),
+      );
+
+  /// 반나절 진료 (월~금 오전만 09:00-13:00)
   static ScheduleTemplate get halfDay => ScheduleTemplate(
         name: '반나절 진료',
-        description: '월~금 09:00-13:00',
+        description: '월~금 09:00-13:00 (오전만)',
         icon: Icons.wb_sunny_outlined,
         schedule: WeeklySchedule(
           weekDays: _mondayToFriday(() => _fullDay(9, 13)),
         ),
       );
 
-  /// 오전·오후 분리 (월~금 09:00-13:00, 14:00-18:00)
-  static ScheduleTemplate get splitShift => ScheduleTemplate(
-        name: '오전·오후 분리',
-        description: '월~금 09:00-13:00, 14:00-18:00',
-        icon: Icons.schedule,
+  /// 종일 연속 (월~금 09:00-18:00, 점심시간도 끊지 않고 녹음)
+  static ScheduleTemplate get continuousFullDay => ScheduleTemplate(
+        name: '종일 연속',
+        description: '월~금 09:00-18:00 (점심시간도 녹음)',
+        icon: Icons.timelapse,
         schedule: WeeklySchedule(
-          weekDays: _mondayToFriday(
-            () => DaySchedule(
-              isWorkingDay: true,
-              mode: ScheduleMode.split,
-              sessions: [
-                const WorkingSession(
-                  start: TimeOfDay(hour: 9, minute: 0),
-                  end: TimeOfDay(hour: 13, minute: 0),
-                ),
-                const WorkingSession(
-                  start: TimeOfDay(hour: 14, minute: 0),
-                  end: TimeOfDay(hour: 18, minute: 0),
-                ),
-              ],
-            ),
-          ),
+          weekDays: _mondayToFriday(() => _fullDay(9, 18)),
         ),
       );
 
-  /// 토요일 반일 (월~금 종일, 토 오전만)
-  static ScheduleTemplate get saturdayHalf => ScheduleTemplate(
-        name: '토요일 반일',
-        description: '월~금 09:00-18:00, 토 09:00-13:00',
-        icon: Icons.weekend,
-        schedule: WeeklySchedule(
-          weekDays: {
-            ..._mondayToFriday(() => _fullDay(9, 18)),
-            6: _fullDay(9, 13), // 토요일 반일 (일요일은 휴무 유지)
-          },
-        ),
-      );
-
-  /// 모든 템플릿 목록
+  /// 모든 템플릿 목록 (흔한 순서)
   static List<ScheduleTemplate> get all => [
         weekdaysOnly,
+        weekdaysWithSaturday,
         halfDay,
-        splitShift,
-        saturdayHalf,
+        continuousFullDay,
       ];
 }
 
